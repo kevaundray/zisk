@@ -119,15 +119,10 @@ test_elf() {
     MPI_CMD="mpirun --allow-run-as-root --bind-to none -np $DISTRIBUTED_PROCESSES -x OMP_NUM_THREADS=$DISTRIBUTED_THREADS"
 
     # Build prove flags
-    PROVE_FLAGS="-a -y"
-    if [[ "$DISABLE_ASSEMBLY" == "1" ]]; then
-        PROVE_FLAGS="$PROVE_FLAGS -l"
-        warn "Emulator assembly disabled: using -l flag in cargo-zisk prove"
+    flags="-a -y"
+    if [ -n "{$PROVE_FLAGS+x}" ]; then
+        flags="$flags $PROVE_FLAGS"
     fi
-    if [[ "$DISABLE_MAP_LOCKED" == "1" ]]; then
-        PROVE_FLAGS="$PROVE_FLAGS -u"
-        warn "Assemply map locked disabled: using -u flag in cargo-zisk prove"
-    fi    
 
     # step "Deleting shared memory..."
     # rm -rf /dev/shm/ZISK* /dev/shm/sem*
@@ -172,7 +167,7 @@ test_elf() {
             ensure cargo-zisk prove \
                 -e "${ELF_FILE}" \
                 -i "${INPUTS_PATH}/${input_file}" \
-                -o proof $PROVE_FLAGS \
+                -o proof $flags \
                 2>&1 | tee "prove_${input_file}.log" || return 1
             if ! grep -F "Vadcop Final proof was verified" "prove_${input_file}.log"; then
                 err "prove failed for ${input_file}"
@@ -204,7 +199,7 @@ test_elf() {
             ensure $MPI_CMD cargo-zisk prove \
                 -e "${ELF_FILE}" \
                 -i "${INPUTS_PATH}/${input_file}" \
-                -o proof $PROVE_FLAGS \
+                -o proof $flags \
                 2>&1 | tee "prove_dist_${input_file}.log" || return 1
             if ! grep -F "Vadcop Final proof was verified" \
                      "prove_dist_${input_file}.log"; then
