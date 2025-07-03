@@ -200,6 +200,7 @@ test_elf() {
     if [ ${num_dist_inputs} -gt 0 ]; then
         for input_file in "${dist_inputs[@]}"; do
             step "Proving (distributed) for ${input_file}..."
+            export RAYON_NUM_THREADS=$DISTRIBUTED_THREADS
             ensure $MPI_CMD cargo-zisk prove \
                 -e "${ELF_FILE}" \
                 -i "${INPUTS_PATH}/${input_file}" \
