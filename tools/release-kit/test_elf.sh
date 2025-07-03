@@ -124,6 +124,10 @@ test_elf() {
         PROVE_FLAGS="$PROVE_FLAGS -l"
         warn "Emulator assembly disabled: using -l flag in cargo-zisk prove"
     fi
+    if [[ "$DISABLE_MAP_LOCKED" == "1" ]]; then
+        PROVE_FLAGS="$PROVE_FLAGS -u"
+        warn "Assemply map locked disabled: using -u flag in cargo-zisk prove"
+    fi    
 
     # step "Deleting shared memory..."
     # rm -rf /dev/shm/ZISK* /dev/shm/sem*
@@ -138,6 +142,7 @@ test_elf() {
     verify_files_exist "$INPUTS_PATH" "${dist_inputs[@]}" || return 1
 
     step "Generating pessimistic program setup..."
+    ensure cargo-zisk clean
     ensure cargo-zisk rom-setup -e "${ELF_FILE}" \
         2>&1 | tee romsetup_output.log || return 1
     if ! grep -F "ROM setup successfully completed" romsetup_output.log; then
@@ -180,8 +185,7 @@ test_elf() {
 
             step "Verifying proof for ${input_file}..."
             ensure cargo-zisk verify \
-                -p ./proof/proofs/vadcop_final_proof.json \
-                -u ./proof/publics.json \
+                -p ./proof/vadcop_final_proof.bin \
                 2>&1 | tee "verify_${input_file}.log" || return 1
             if ! grep -F "Stark proof was verified" "verify_${input_file}.log"; then
                 err "verify proof failed for ${input_file}"

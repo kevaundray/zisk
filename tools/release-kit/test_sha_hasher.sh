@@ -24,6 +24,10 @@ main() {
         PROVE_FLAGS="$PROVE_FLAGS -l"
         warn "Emulator assembly disabled: using -l flag in cargo-zisk prove"
     fi
+    if [[ "$DISABLE_MAP_LOCKED" == "1" ]]; then
+        PROVE_FLAGS="$PROVE_FLAGS -u"
+        warn "Assemply map locked disabled: using -u flag in cargo-zisk prove"
+    fi     
 
     step "Deleting shared memory..."
     rm -rf /dev/shm/ZISK*
@@ -80,7 +84,7 @@ main() {
     fi
 
     step "Verifying proof..."
-    ensure cargo-zisk verify -p ./proof/proofs/vadcop_final_proof.json -u ./proof/publics.json 2>&1 | tee verify_output.log || return 1
+    ensure cargo-zisk verify -p ./proof/vadcop_final_proof.bin 2>&1 | tee verify_output.log || return 1
     if ! grep -F "Stark proof was verified" verify_output.log; then
         err "verify proof failed"
         return 1
