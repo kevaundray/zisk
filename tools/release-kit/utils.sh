@@ -46,27 +46,21 @@ success() {
 # load_env: Load environment variables from .env file
 load_env() {
     if [[ ! -f ".env" ]]; then
-        err "❌ No .env file found. Please create one with the required environment variables."
-        return 1
-    fi
-
-    # Load environment variables from .env file ignoring comments and empty lines
-    ENV_VARS=$(grep -vE '^\s*#' .env | grep -vE '^\s*$')
-
-    if [[ -z "${ENV_VARS}" ]]; then
-        err "❌ .env file is empty or contains only comments. Please define the required environment variables."
+        echo "❌ No .env file found."
         return 1
     fi
 
     info "📦 Loading environment variables from .env"
-    export ${ENV_VARS}
+
+    set -a  # export all variables loaded by `source`
+    source .env
+    set +a
 
     echo
     info "🔍 Loaded environment variables:"
-    while IFS='=' read -r key value; do
-        [[ -z "$key" || "$key" =~ ^# ]] && continue
+    grep -vE '^\s*#' .env | grep -vE '^\s*$' | while IFS='=' read -r key _; do
         echo "  - ${key} = ${!key}"
-    done < <(echo "${ENV_VARS}")
+    done
     echo
 }
 
