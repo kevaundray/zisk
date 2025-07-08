@@ -130,13 +130,13 @@ test_elf() {
     verify_files_exist "$INPUTS_PATH" "${inputs[@]}" || return 1
     verify_files_exist "$INPUTS_PATH" "${dist_inputs[@]}" || return 1
 
-    step "Generating pessimistic program setup..."
-    ensure cargo-zisk clean
+    step "Generating ${desc} setup..."
+    rm -rf $HOME/.zisk/cache
     ensure cargo-zisk rom-setup -e "${ELF_FILE}" \
-        2>&1 | tee romsetup_output.log || return 1
+       2>&1 | tee romsetup_output.log || return 1
     if ! grep -F "ROM setup successfully completed" romsetup_output.log; then
-        err "program setup failed"
-        return 1
+       err "program setup failed"
+       return 1
     fi
 
     # Process inputs in non-distributed
