@@ -17,17 +17,7 @@ main() {
     confirm_continue || return 1
 
     mkdir -p "${HOME}/work"
-    cd "${HOME}/work"
-
-    PROVE_FLAGS="-a -y"
-    if [[ "$DISABLE_ASSEMBLY" == "1" ]]; then
-        PROVE_FLAGS="$PROVE_FLAGS -l"
-        warn "Emulator assembly disabled: using -l flag in cargo-zisk prove"
-    fi
-    if [[ "$DISABLE_MAP_LOCKED" == "1" ]]; then
-        PROVE_FLAGS="$PROVE_FLAGS -u"
-        warn "Assemply map locked disabled: using -u flag in cargo-zisk prove"
-    fi     
+    cd "${HOME}/work" 
 
     step "Deleting shared memory..."
     rm -rf /dev/shm/ZISK*
