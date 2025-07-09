@@ -107,7 +107,6 @@ main() {
     ensure cp -r ./emulator-asm/src "$HOME/.zisk/zisk/emulator-asm" || return 1
     ensure cp ./emulator-asm/Makefile "$HOME/.zisk/zisk/emulator-asm" || return 1
     ensure cp -r ./lib-c $HOME/.zisk/zisk || return 1
-    a
     step "Adding ~/.zisk/bin to PATH..."
     echo 'export PATH="$PATH:$HOME/.zisk/bin"' >> "$HOME/.bashrc"
     # export PATH="$PATH:$HOME/.zisk/bin"
