@@ -116,7 +116,7 @@ test_elf() {
     cd "${HOME}/work" || return 1
 
     # Build mpi command
-    MPI_CMD="mpirun --allow-run-as-root --bind-to none -np $DISTRIBUTED_PROCESSES -x OMP_NUM_THREADS=$DISTRIBUTED_THREADS"
+    MPI_CMD="mpirun --allow-run-as-root --bind-to none -np $DISTRIBUTED_PROCESSES -x OMP_NUM_THREADS=$DISTRIBUTED_THREADS -x RAYON_NUM_THREADS=$DISTRIBUTED_THREADS"
 
     # step "Deleting shared memory..."
     # rm -rf /dev/shm/ZISK* /dev/shm/sem*
