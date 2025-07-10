@@ -1050,18 +1050,16 @@ dependencies = [
  "num-bigint",
  "paste",
  "proofman-starks-lib-c 0.9.0",
- "rand 0.9.1",
 ]
 
 [[package]]
 name = "fields"
 version = "0.9.0"
-source = "git+https://github.com/0xPolygonHermez/pil2-proofman.git?branch=pre-develop-0.10.0#d1e92287df7322e86ddce5a5986a12842e53f5a3"
+source = "git+https://github.com/0xPolygonHermez/pil2-proofman.git?branch=pre-develop-0.10.0#7c0dd544d0817709f5896b515485cb30d4336942"
 dependencies = [
  "num-bigint",
  "paste",
  "proofman-starks-lib-c 0.9.0 (git+https://github.com/0xPolygonHermez/pil2-proofman.git?branch=pre-develop-0.10.0)",
- "rand 0.9.1",
 ]
 
 [[package]]
@@ -2516,7 +2514,7 @@ dependencies = [
 [[package]]
 name = "proofman-starks-lib-c"
 version = "0.9.0"
-source = "git+https://github.com/0xPolygonHermez/pil2-proofman.git?branch=pre-develop-0.10.0#d1e92287df7322e86ddce5a5986a12842e53f5a3"
+source = "git+https://github.com/0xPolygonHermez/pil2-proofman.git?branch=pre-develop-0.10.0#7c0dd544d0817709f5896b515485cb30d4336942"
 dependencies = [
  "crossbeam-channel",
  "tracing",
@@ -2535,11 +2533,10 @@ dependencies = [
 [[package]]
 name = "proofman-verifier"
 version = "0.9.0"
-source = "git+https://github.com/0xPolygonHermez/pil2-proofman.git?branch=pre-develop-0.10.0#d1e92287df7322e86ddce5a5986a12842e53f5a3"
+source = "git+https://github.com/0xPolygonHermez/pil2-proofman.git?branch=pre-develop-0.10.0#7c0dd544d0817709f5896b515485cb30d4336942"
 dependencies = [
  "fields 0.9.0 (git+https://github.com/0xPolygonHermez/pil2-proofman.git?branch=pre-develop-0.10.0)",
  "num-bigint",
- "rand 0.9.1",
  "tracing",
 ]
 
