@@ -39,6 +39,12 @@ const CSR_FCALL_PARAM_OFFSET_TO_WORDS: [u64; 16] =
 const CAUSE_EXIT: u64 = 93;
 const CSR_ADDR: u64 = SYS_ADDR + 0x8000;
 const MTVEC: u64 = CSR_ADDR + 0x305;
+
+// Floating Point CSRs (RISC-V F/D extension)
+const FCSR: u64 = CSR_ADDR + 0x003;   // Floating-point control and status register
+const FFLAGS: u64 = CSR_ADDR + 0x001; // Floating-point exception flags  
+const FRM: u64 = CSR_ADDR + 0x002;    // Floating-point dynamic rounding mode
+
 const M64: u64 = 0xFFFFFFFFFFFFFFFF;
 
 /// Context to store the list of converted ZisK instructions, including their program address and a
@@ -163,6 +169,19 @@ impl Riscv2ZiskContext<'_> {
             "csrrwi" => self.csrrwi(riscv_instruction),
             "csrrsi" => self.csrrsi(riscv_instruction),
             "csrrci" => self.csrrci(riscv_instruction),
+            
+            // Floating point arithmetic operations
+            "fadd.s" => self.create_freg_op(riscv_instruction, "fadd"),
+            "fsub.s" => self.create_freg_op(riscv_instruction, "fsub"),
+            "fmul.s" => self.create_freg_op(riscv_instruction, "fmul"),
+            "fdiv.s" => self.create_freg_op(riscv_instruction, "fdiv"),
+            
+            // Floating point double precision operations
+            "fadd.d" => self.create_freg_op(riscv_instruction, "fadd_d"),
+            "fsub.d" => self.create_freg_op(riscv_instruction, "fsub_d"),
+            "fmul.d" => self.create_freg_op(riscv_instruction, "fmul_d"),
+            "fdiv.d" => self.create_freg_op(riscv_instruction, "fdiv_d"),
+            
             _ => panic!(
                 "Riscv2ZiskContext::convert() found invalid riscv_instruction.inst={}",
                 riscv_instruction.inst
@@ -365,6 +384,20 @@ impl Riscv2ZiskContext<'_> {
         zib.store("reg", i.rd as i64, false, false);
         zib.j(4, 4);
         zib.verbose(&format!("{} r{}, r{}, r{}", i.inst, i.rd, i.rs1, i.rs2));
+        zib.build();
+        self.insts.insert(self.s, zib);
+        self.s += 4;
+    }
+
+    /// Creates a Zisk operation that implements a RISC-V floating point register operation
+    pub fn create_freg_op(&mut self, i: &RiscvInstruction, op: &str) {
+        let mut zib = ZiskInstBuilder::new(self.s);
+        zib.src_a("freg", i.rs1 as u64, false);
+        zib.src_b("freg", i.rs2 as u64, false);
+        zib.op(op).unwrap();
+        zib.store("freg", i.rd as i64, false, false);
+        zib.j(4, 4);
+        zib.verbose(&format!("{} f{}, f{}, f{}", i.inst, i.rd, i.rs1, i.rs2));
         zib.build();
         self.insts.insert(self.s, zib);
         self.s += 4;
@@ -1554,6 +1587,19 @@ pub fn add_entry_exit_jmp(rom: &mut ZiskRom, addr: u64) {
     rom.next_init_inst_addr += 4;
 
     // :0008
+    // Initialize FCSR (Floating-Point Control and Status Register) to 0
+    let mut zib = ZiskInstBuilder::new(rom.next_init_inst_addr);
+    zib.src_a("imm", 0, false);
+    zib.src_b("imm", 0, false);  // Initial rounding mode = 0 (RNE - Round to Nearest, ties to Even)
+    zib.op("copyb").unwrap();
+    zib.store("mem", FCSR as i64, false, false);
+    zib.j(4, 4);
+    zib.verbose("Initialize FCSR to 0");
+    zib.build();
+    rom.insts.insert(rom.next_init_inst_addr, zib);
+    rom.next_init_inst_addr += 4;
+
+    // :000C
     // Store the input data address into register #10
     let mut zib = ZiskInstBuilder::new(rom.next_init_inst_addr);
     zib.src_a("imm", 0, false);

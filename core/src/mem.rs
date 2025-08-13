@@ -26,7 +26,8 @@
 //! `|--------------- SYS_ADDR (= RAM_ADDR = REG_FIRST)   (0xa0000000)`
 //! `|`
 //! `| Contains system address.`
-//! `| The first 256 bytes contain 32 8-byte registers`
+//! `| The first 256 bytes contain 32 8-byte integer registers`
+//! `| The next 256 bytes contain 32 8-byte floating point registers`
 //! `| The address UART_ADDR is used as a standard output`
 //! `|`
 //! `|--------------- OUTPUT_ADDR                         (0xa0010000)`
@@ -70,8 +71,8 @@
 //!   read-write (RW) memory region.
 //! * The first RW memory region going from `SYS_ADDR` to `OUTPUT_ADDR` is reserved for the system
 //!   operation.
-//! * The lower addresses of this region is used to store 32 registers of 8 bytes each, i.e. 256
-//!   bytes in total.  These registers are the equivalent to the RISC-V registers.
+//! * The lower addresses of this region is used to store 32 integer registers of 8 bytes each (256 bytes),
+//!   followed by 32 floating point registers of 8 bytes each (256 bytes), for a total of 512 bytes.
 //! * Any data of exactly 1-byte length written to UART_ADDR will be sent to the standard output of
 //!   the system.
 //! * The second RW memory region going from `OUTPUT_ADDR` to `AVAILABLE_MEM_ADDR` is reserved to
@@ -79,7 +80,7 @@
 //! * The third RW memory region going from `AVAILABLE_MEM_ADDR` onwards can be used during the
 //!   program execution as general purpose memory.
 
-use crate::{M16, M3, M32, M8, REG_FIRST, REG_LAST};
+use crate::{M16, M3, M32, M8, REG_FIRST, REG_LAST, FREG_FIRST, FREG_LAST};
 use core::fmt;
 
 /// Fist input data memory address
@@ -115,6 +116,7 @@ pub const ROM_ADDR_MAX: u64 = (ROM_ADDR + 0x08000000) - 1; // 128M
 /// Zisk architecture ID
 pub const ARCH_ID_ZISK: u64 = 0xFFFEEEE;
 /// UART memory address; single bytes written here will be copied to the standard output
+/// Located after 32 integer registers (256 bytes) + 32 floating point registers (256 bytes) = 512 bytes
 pub const UART_ADDR: u64 = SYS_ADDR + 512;
 
 /// Memory section data, including a buffer (a vector of bytes) and start and end program
@@ -686,6 +688,17 @@ impl Mem {
     pub fn address_to_register_index(address: u64) -> usize {
         debug_assert!(Mem::address_is_register(address));
         ((address - REG_FIRST) >> 3) as usize
+    }
+
+    #[inline(always)]
+    pub fn address_is_freg(address: u64) -> bool {
+        ((address & 0x7) == 0) && (FREG_FIRST..=FREG_LAST).contains(&address)
+    }
+
+    #[inline(always)]
+    pub fn address_to_freg_index(address: u64) -> usize {
+        debug_assert!(Mem::address_is_freg(address));
+        ((address - FREG_FIRST) >> 3) as usize
     }
 
     /// Returns true if the address and width are fully aligned

@@ -4,7 +4,7 @@
 
 use crate::{
     zisk_ops::{InvalidNameError, OpType, ZiskOp},
-    ZiskInst, REGS_IN_MAIN_FROM, REGS_IN_MAIN_TO, REG_FIRST, SRC_C, SRC_IMM, SRC_IND, SRC_MEM,
+    ZiskInst, REGS_IN_MAIN_FROM, REGS_IN_MAIN_TO, REG_FIRST, FREG_FIRST, SRC_C, SRC_IMM, SRC_IND, SRC_MEM,
     SRC_REG, SRC_STEP, STORE_IND, STORE_MEM, STORE_NONE, STORE_REG,
 };
 
@@ -31,6 +31,7 @@ impl ZiskInstBuilder {
     fn a_src(&self, src: &str) -> u64 {
         match src {
             "reg" => SRC_REG,
+            "freg" => SRC_REG, // Floating point registers use same source type as regular registers
             "mem" => SRC_MEM,
             "imm" => SRC_IMM,
             "lastc" => SRC_C,
@@ -45,6 +46,7 @@ impl ZiskInstBuilder {
     fn b_src(&self, src: &str) -> u64 {
         match src {
             "reg" => SRC_REG,
+            "freg" => SRC_REG, // Floating point registers use same source type as regular registers
             "mem" => SRC_MEM,
             "imm" => SRC_IMM,
             "lastc" => SRC_C,
@@ -59,6 +61,7 @@ impl ZiskInstBuilder {
             "none" => STORE_NONE,
             "mem" => STORE_MEM,
             "reg" => STORE_REG,
+            "freg" => STORE_REG, // Floating point registers use same store type as regular registers
             "ind" => STORE_IND,
             _ => panic!("ZiskInstBuilder::c_store() called with invalid store={store}"),
         }
@@ -93,6 +96,10 @@ impl ZiskInstBuilder {
                 src = "mem";
                 offset_imm_reg = REG_FIRST + offset_imm_reg * 8;
             }
+        } else if src == "freg" {
+            // All floating point registers are memory-mapped
+            src = "mem";
+            offset_imm_reg = FREG_FIRST + offset_imm_reg * 8;
         }
         // assert!(src != "mem" || offset_imm_reg != 0);
 
@@ -129,6 +136,10 @@ impl ZiskInstBuilder {
                 src = "mem";
                 offset_imm_reg = REG_FIRST + offset_imm_reg * 8;
             }
+        } else if src == "freg" {
+            // All floating point registers are memory-mapped
+            src = "mem";
+            offset_imm_reg = FREG_FIRST + offset_imm_reg * 8;
         }
         self.i.b_src = self.b_src(src);
 
@@ -160,6 +171,10 @@ impl ZiskInstBuilder {
                 dst = "mem";
                 offset = REG_FIRST as i64 + offset * 8;
             }
+        } else if dst == "freg" {
+            // All floating point registers are memory-mapped
+            dst = "mem";
+            offset = FREG_FIRST as i64 + offset * 8;
         }
 
         self.i.store_ra = store_ra;
