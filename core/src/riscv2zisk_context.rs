@@ -2,10 +2,10 @@
 //! instances of ZiskInstBuilder, and accumulates these instances in a hash map as a public
 //! attribute.
 
-use riscv::{riscv_interpreter, RiscvInstruction};
+use riscv::RiscvInstruction;
 
 use crate::{
-    convert_vector, ZiskInstBuilder, ZiskRom, ARCH_ID_ZISK, INPUT_ADDR, OUTPUT_ADDR, ROM_ENTRY,
+    convert_vector_mixed, ZiskInstBuilder, ZiskRom, ARCH_ID_ZISK, INPUT_ADDR, OUTPUT_ADDR, ROM_ENTRY,
     ROM_EXIT, SYS_ADDR,
 };
 
@@ -51,6 +51,11 @@ pub struct Riscv2ZiskContext<'a> {
 }
 
 impl Riscv2ZiskContext<'_> {
+    /// Returns the size of a RISC-V instruction in bytes (2 for compressed, 4 for uncompressed)
+    fn get_instruction_size(instruction: &RiscvInstruction) -> u64 {
+        if instruction.is_compressed { 2 } else { 4 }
+    }
+
     /// Converts an input RISCV instruction into a ZisK instruction and stores it into the internal
     /// map
     pub fn convert(&mut self, riscv_instruction: &RiscvInstruction) {
@@ -358,16 +363,17 @@ impl Riscv2ZiskContext<'_> {
     /// loads both input parameters a and b from their respective registers,
     /// and stores the result c into a register
     pub fn create_register_op(&mut self, i: &RiscvInstruction, op: &str) {
+        let inst_size = Self::get_instruction_size(i);
         let mut zib = ZiskInstBuilder::new(self.s);
         zib.src_a("reg", i.rs1 as u64, false);
         zib.src_b("reg", i.rs2 as u64, false);
         zib.op(op).unwrap();
         zib.store("reg", i.rd as i64, false, false);
-        zib.j(4, 4);
+        zib.j(inst_size as i32, inst_size as i32);
         zib.verbose(&format!("{} r{}, r{}, r{}", i.inst, i.rd, i.rs1, i.rs2));
         zib.build();
         self.insts.insert(self.s, zib);
-        self.s += 4;
+        self.s += inst_size;
     }
 
     // beq rs1, rs2, label
@@ -395,15 +401,16 @@ impl Riscv2ZiskContext<'_> {
     /// Creates a Zisk flag operation that simply sets the flag to true and continues the execution
     /// to the next operation
     pub fn nop(&mut self, i: &RiscvInstruction) {
+        let inst_size = Self::get_instruction_size(i);
         let mut zib = ZiskInstBuilder::new(self.s);
         zib.src_a("imm", 0, false);
         zib.src_b("imm", 0, false);
         zib.op("flag").unwrap();
-        zib.j(4, 4);
+        zib.j(inst_size as i32, inst_size as i32);
         zib.verbose(&i.inst.to_string());
         zib.build();
         self.insts.insert(self.s, zib);
-        self.s += 4;
+        self.s += inst_size;
     }
 
     // lb rd, imm(rs1)
@@ -412,17 +419,18 @@ impl Riscv2ZiskContext<'_> {
     /// Creates a Zisk operation that loads a value from memory using the specified operation
     /// and stores the result in a register
     pub fn load_op(&mut self, i: &RiscvInstruction, op: &str, w: u64) {
+        let inst_size = Self::get_instruction_size(i);
         let mut zib = ZiskInstBuilder::new(self.s);
         zib.src_a("reg", i.rs1 as u64, false);
         zib.ind_width(w);
         zib.src_b("ind", i.imm as u64, false);
         zib.op(op).unwrap();
         zib.store("reg", i.rd as i64, false, false);
-        zib.j(4, 4);
+        zib.j(inst_size as i32, inst_size as i32);
         zib.verbose(&format!("{} r{}, 0x{:x}(r{})", i.inst, i.rd, i.imm, i.rs1));
         zib.build();
         self.insts.insert(self.s, zib);
-        self.s += 4;
+        self.s += inst_size;
     }
 
     // sb rs2, imm(rs1)
@@ -1374,11 +1382,11 @@ impl Riscv2ZiskContext<'_> {
 pub fn add_zisk_code(rom: &mut ZiskRom, addr: u64, data: &[u8]) {
     //print!("add_zisk_code() addr={}\n", addr);
 
-    // Convert input data to a u32 vector
-    let code_vector: Vec<u32> = convert_vector(data);
+    // Convert input data to instruction words (supporting compressed and uncompressed)
+    let instruction_words = convert_vector_mixed(data, addr);
 
-    // Convert data vector to RISCV instructions
-    let riscv_instructions = riscv_interpreter(&code_vector);
+    // Convert instruction words to RISCV instructions
+    let riscv_instructions = riscv::riscv_interpreter_mixed(&instruction_words);
 
     // Create a context to convert RISCV instructions to ZisK instructions, using rom.insts
     let mut ctx = Riscv2ZiskContext { s: addr, insts: &mut rom.insts };
@@ -1389,6 +1397,8 @@ pub fn add_zisk_code(rom: &mut ZiskRom, addr: u64, data: &[u8]) {
         // riscv_instruction.to_string());
 
         // Convert RICV instruction to ZisK instruction and store it in rom.insts
+        // Update the context address to match the instruction's address
+        ctx.s = riscv_instruction.addr;
         ctx.convert(&riscv_instruction);
         //print!("   to: {}", ctx.insts.iter().last().)
     }

@@ -6,7 +6,7 @@ use crate::{
 // #[cfg(feature = "sp")]
 // use crate::SRC_SP;
 
-/// Converts a u8 vector into a u32 vector
+/// Converts a u8 vector into a u32 vector (legacy 32-bit only)
 /// The length of the input vector must be a multiple of 4
 pub fn convert_vector(input: &[u8]) -> Vec<u32> {
     // Check that the input length is a multiple of 4
@@ -27,6 +27,55 @@ pub fn convert_vector(input: &[u8]) -> Vec<u32> {
     }
 
     // Return the output u32 vector
+    output
+}
+
+/// Converts a u8 vector into a vector of RISC-V instruction words, handling both
+/// 16-bit compressed and 32-bit uncompressed instructions
+pub fn convert_vector_mixed(input: &[u8], base_addr: u64) -> Vec<riscv::RiscvInstructionWord> {
+    let mut output: Vec<riscv::RiscvInstructionWord> = Vec::new();
+    let mut i = 0;
+    let mut addr = base_addr;
+    
+    while i < input.len() {
+        // Need at least 2 bytes to read instruction
+        if i + 1 >= input.len() {
+            break;
+        }
+        
+        // Read first 16 bits to determine instruction length
+        let first_16 = u16::from_le_bytes([input[i], input[i + 1]]);
+        
+        // Check if this is a compressed instruction
+        // Compressed instructions have bits [1:0] != 11
+        let is_compressed = (first_16 & 0x3) != 0x3;
+        
+        if is_compressed {
+            // 16-bit compressed instruction
+            output.push(riscv::RiscvInstructionWord {
+                addr,
+                instruction: first_16 as u32,
+                is_compressed: true,
+            });
+            i += 2;
+            addr += 2;
+        } else {
+            // 32-bit uncompressed instruction
+            if i + 3 >= input.len() {
+                // Not enough bytes for a 32-bit instruction
+                break;
+            }
+            let instruction = u32::from_le_bytes([input[i], input[i + 1], input[i + 2], input[i + 3]]);
+            output.push(riscv::RiscvInstructionWord {
+                addr,
+                instruction,
+                is_compressed: false,
+            });
+            i += 4;
+            addr += 4;
+        }
+    }
+    
     output
 }
 

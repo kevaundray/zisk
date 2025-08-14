@@ -57,8 +57,8 @@ pub fn elf2rom(elf_file: &Path) -> Result<ZiskRom, Box<dyn Error>> {
                 let (data_u8, _) = elf_bytes.section_data(&section_header)?;
                 let mut data = data_u8.to_vec();
 
-                // Remove extra bytes if length is not 4-bytes aligned
-                while data.len() % 4 != 0 {
+                // Remove extra bytes if length is not 2-bytes aligned (for compressed instruction support)
+                while data.len() % 2 != 0 {
                     data.pop();
                 }
 
@@ -138,8 +138,7 @@ pub fn elf2rom(elf_file: &Path) -> Result<ZiskRom, Box<dyn Error>> {
         } else if addr < ROM_ADDR {
             if addr % 4 != 0 {
                 // When an address is not 4 bytes aligned, it is considered a
-                // na_rom_instructions We are supposed to have only one non
-                // aligned instructions in > ROM_ADDRESS
+                // na_rom_instructions (may be compressed instructions at 2-byte alignment)
                 min_rom_na_unstructions = std::cmp::min(min_rom_na_unstructions, addr);
                 max_rom_na_unstructions = std::cmp::max(max_rom_na_unstructions, addr);
             } else {
@@ -148,8 +147,7 @@ pub fn elf2rom(elf_file: &Path) -> Result<ZiskRom, Box<dyn Error>> {
         } else if addr < ROM_ADDR_MAX {
             if addr % 4 != 0 {
                 // When an address is not 4 bytes aligned, it is considered a
-                // na_rom_instructions We are supposed to have only one non
-                // aligned instructions in > ROM_ADDRESS
+                // na_rom_instructions (may be compressed instructions at 2-byte alignment)
                 min_rom_na_unstructions = std::cmp::min(min_rom_na_unstructions, addr);
                 max_rom_na_unstructions = std::cmp::max(max_rom_na_unstructions, addr);
             } else {

@@ -32,14 +32,28 @@
 //!
 //! See <https://devopedia.org/risc-v-instruction-sets>
 
+/// Represents a RISC-V instruction with its address and size information
+#[derive(Debug, Clone)]
+pub struct RiscvInstructionWord {
+    pub addr: u64,
+    pub instruction: u32,
+    pub is_compressed: bool,
+}
+
 /// RISC-V instruction data
 #[derive(Default, Debug)]
 pub struct RiscvInstruction {
-    /// Original instruction content (32 bits)
+    /// Original instruction content (32 bits for uncompressed, 16 bits for compressed stored in lower 16 bits)
     pub rvinst: u32,
 
     /// Instruction type
     pub t: String,
+
+    /// True if this is a compressed (16-bit) instruction
+    pub is_compressed: bool,
+
+    /// Program counter address of this instruction
+    pub addr: u64,
 
     pub funct3: u32,
     pub funct5: u32,
@@ -55,6 +69,16 @@ pub struct RiscvInstruction {
     pub csr: u32,
     pub pred: u32,
     pub succ: u32,
+
+    // Compressed instruction specific fields
+    /// Compressed instruction funct2 field
+    pub funct2: u32,
+    /// Compressed instruction funct4 field  
+    pub funct4: u32,
+    /// Compressed instruction funct6 field
+    pub funct6: u32,
+    /// Compressed instruction opcode (bits 1:0)
+    pub c_op: u32,
 }
 
 impl RiscvInstruction {
@@ -63,6 +87,12 @@ impl RiscvInstruction {
         let mut s = String::new();
         s += &("t=".to_string() + &self.t);
         s += &(" inst=".to_string() + &self.inst);
+        if self.is_compressed {
+            s += " compressed=true";
+        }
+        if self.addr != 0 {
+            s += &format!(" addr=0x{:x}", self.addr);
+        }
         if self.rvinst != 0 {
             s += &(" rvinst=".to_string() + &self.rvinst.to_string());
         }
@@ -104,6 +134,18 @@ impl RiscvInstruction {
         }
         if self.succ != 0 {
             s += &(" succ=".to_string() + &self.succ.to_string());
+        }
+        if self.funct2 != 0 {
+            s += &(" funct2=".to_string() + &self.funct2.to_string());
+        }
+        if self.funct4 != 0 {
+            s += &(" funct4=".to_string() + &self.funct4.to_string());
+        }
+        if self.funct6 != 0 {
+            s += &(" funct6=".to_string() + &self.funct6.to_string());
+        }
+        if self.c_op != 0 {
+            s += &(" c_op=".to_string() + &self.c_op.to_string());
         }
         s
     }
