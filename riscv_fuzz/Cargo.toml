@@ -1,0 +1,15 @@
+[package]
+name = "riscv_fuzz"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+keywords.workspace = true
+repository.workspace = true
+categories.workspace = true
+description = "Idiomatic Rust implementation of RISC-V instruction decoding"
+
+[lib]
+name = "riscv_fuzz"
+path = "src/lib.rs"
+
+[dependencies]
