@@ -117,6 +117,10 @@ pub enum Opcode {
     
     /// System instructions (ecall, ebreak, csr)
     System = 0b1110011,
+
+    /// Illegal/sentinel opcode for invalid/unsupported instructions
+    /// Not produced by TryFrom; used only for DecodedInstruction::Illegal
+    Illegal = 0x7F,
 }
 
 impl Opcode {
@@ -147,6 +151,7 @@ impl Opcode {
             Opcode::Jalr => "Jump and link register (jalr)",
             Opcode::Jal => "Jump and link (jal)",
             Opcode::System => "System instructions (ecall, ebreak, csr)",
+            Opcode::Illegal => "Illegal/invalid instruction",
         }
     }
 }

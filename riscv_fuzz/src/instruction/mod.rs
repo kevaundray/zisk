@@ -232,7 +232,7 @@ impl DecodedInstruction {
             | DecodedInstruction::AType { opcode, .. }
             | DecodedInstruction::FType { opcode, .. }
             | DecodedInstruction::System { opcode, .. } => *opcode,
-            DecodedInstruction::Illegal => Opcode::System, // TODO: Placeholder for illegal instructions
+            DecodedInstruction::Illegal => Opcode::Illegal,
             DecodedInstruction::Compressed { expanded, .. } => expanded.opcode(),
         }
     }
@@ -265,7 +265,7 @@ impl DecodedInstruction {
             DecodedInstruction::JType { .. } => InstructionFormat::J,
             DecodedInstruction::AType { .. } => InstructionFormat::A,
             DecodedInstruction::FType { .. } => InstructionFormat::F,
-            DecodedInstruction::System { .. } => InstructionFormat::F,
+            DecodedInstruction::System { .. } => InstructionFormat::I,
             DecodedInstruction::Illegal => InstructionFormat::I, // TODO: Illegal instructions use I-type format I think
             DecodedInstruction::Compressed { .. } => InstructionFormat::C,
         }

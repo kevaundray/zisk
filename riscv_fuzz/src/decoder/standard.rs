@@ -2,7 +2,7 @@
 
 use std::collections::HashMap;
 use crate::instruction::{DecodedInstruction, DecodeResult, DecodeError, InstructionFormat, Opcode};
-use super::{StandardInstructionDecoder, FieldExtractor, utils::*};
+use super::{StandardInstructionDecoder, FieldExtractor, utils::*, XLen};
 
 /// Decoder for R-type instructions (register-register operations)
 pub struct RTypeDecoder {
@@ -97,11 +97,11 @@ pub struct ITypeDecoder {
     /// Mapping from funct3 to instruction mnemonic for different opcodes
     load_mnemonics: HashMap<u8, &'static str>,
     imm_mnemonics: HashMap<u8, &'static str>,
-    shift_mnemonics: HashMap<(u8, u8), &'static str>,
+    xlen: XLen,
 }
 
 impl ITypeDecoder {
-    pub fn new() -> Self {
+    pub fn new(xlen: XLen) -> Self {
         let mut load_mnemonics = HashMap::new();
         load_mnemonics.insert(0, "lb");
         load_mnemonics.insert(1, "lh");
@@ -122,12 +122,7 @@ impl ITypeDecoder {
         // RV64I 32-bit word operations (OP-IMM-32)
         // Note: These will be distinguished by opcode in decode method
         
-        let mut shift_mnemonics = HashMap::new();
-        shift_mnemonics.insert((1, 0), "slli");
-        shift_mnemonics.insert((5, 0), "srli");
-        shift_mnemonics.insert((5, 16), "srai");
-        
-        Self { load_mnemonics, imm_mnemonics, shift_mnemonics }
+        Self { load_mnemonics, imm_mnemonics, xlen }
     }
 }
 
@@ -149,16 +144,28 @@ impl StandardInstructionDecoder for ITypeDecoder {
                     .ok_or(DecodeError::InvalidFunct(funct3, funct7))?
             },
             Opcode::OpImm => {
-                // Check for shift instructions first (they use funct7)
-                if matches!(funct3, 1 | 5) {
-                    self.shift_mnemonics.get(&(funct3, funct7 >> 1))
+                // Immediate shifts use funct3 plus bit 30 (in imm upper bits) to choose arithmetic vs logical
+                match funct3 {
+                    1 => {
+                        // slli: validate shamt width per XLEN (RV32 => 5 bits, RV64 => 6 bits)
+                        let shamt = ((inst >> 20) & 0x3F) as u32;
+                        if self.xlen == XLen::X32 && (shamt & 0x20) != 0 {
+                            return Err(DecodeError::InvalidFunct(funct3, funct7));
+                        }
+                        "slli".to_string()
+                    },
+                    5 => {
+                        let is_arith = ((inst >> 30) & 1) == 1; // SRAI when bit 30 set
+                        // Validate shamt width (same rule as slli)
+                        let shamt = ((inst >> 20) & 0x3F) as u32;
+                        if self.xlen == XLen::X32 && (shamt & 0x20) != 0 {
+                            return Err(DecodeError::InvalidFunct(funct3, funct7));
+                        }
+                        if is_arith { "srai".to_string() } else { "srli".to_string() }
+                    }
+                    _ => self.imm_mnemonics.get(&funct3)
                         .map(|&s| s.to_string())
-                        .or_else(|| self.imm_mnemonics.get(&funct3).map(|&s| s.to_string()))
-                        .ok_or(DecodeError::InvalidFunct(funct3, funct7))?
-                } else {
-                    self.imm_mnemonics.get(&funct3)
-                        .map(|&s| s.to_string())
-                        .ok_or(DecodeError::InvalidFunct(funct3, funct7))?
+                        .ok_or(DecodeError::InvalidFunct(funct3, funct7))?,
                 }
             },
             Opcode::OpImm32 => {
@@ -175,7 +182,7 @@ impl StandardInstructionDecoder for ITypeDecoder {
                     5 => {
                         match funct7 {
                             0 => "srliw".to_string(),
-                            16 => "sraiw".to_string(),
+                            32 => "sraiw".to_string(),
                             _ => return Err(DecodeError::InvalidFunct(funct3, funct7)),
                         }
                     },
@@ -195,9 +202,14 @@ impl StandardInstructionDecoder for ITypeDecoder {
         let mut imm = extract_i_immediate(inst);
         let mut resolved_funct7 = 0;
         
-        // For shift instructions, limit immediate to 6 bits and set funct7
+        // For shift instructions, limit immediate width appropriately and set funct7 for inspection/roundtrips
         if matches!(funct3, 1 | 5) && matches!(opcode, Opcode::OpImm | Opcode::OpImm32) {
-            imm &= 0x3F;
+            if opcode == Opcode::OpImm32 {
+                imm &= 0x1F; // word ops use 5-bit shamt
+            } else {
+                // Tailor to XLEN: RV32 => 5 bits, RV64 => 6 bits
+                imm &= if self.xlen == XLen::X32 { 0x1F } else { 0x3F };
+            }
             resolved_funct7 = funct7;
         }
         
@@ -415,7 +427,7 @@ pub struct SystemDecoder;
 
 impl StandardInstructionDecoder for SystemDecoder {
     fn format(&self) -> InstructionFormat {
-        InstructionFormat::F // System instructions use a variant of I-type format
+        InstructionFormat::I // System uses I-type encoding layout
     }
     
     fn decode(&self, inst: u32) -> DecodeResult<DecodedInstruction> {

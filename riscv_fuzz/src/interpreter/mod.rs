@@ -1,6 +1,6 @@
 //! TODO
 
-use crate::decoder::InstructionDecoderRegistry;
+use crate::decoder::{InstructionDecoderRegistry, XLen};
 use crate::instruction::{DecodeError, DecodeResult, DecodedInstruction};
 
 /// Represents either a 16-bit compressed or 32-bit standard instruction
@@ -24,6 +24,11 @@ impl RiscvDecoder {
         Self {
             registry: InstructionDecoderRegistry::new(),
         }
+    }
+
+    /// Create a new decoder configured for the target XLEN (RV32 or RV64)
+    pub fn new_with_xlen(xlen: XLen) -> Self {
+        Self { registry: InstructionDecoderRegistry::with_xlen(xlen) }
     }
 
     /// Decode a buffer of 16-bit words into a vector of decoded instructions

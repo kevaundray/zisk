@@ -3,7 +3,7 @@
 //! Implements decoding for the RVC (compressed) extension which provides
 //! 16-bit encodings for common RISC-V instructions to improve code density.
 
-use crate::decoder::CompressedInstructionDecoder;
+use crate::decoder::{CompressedInstructionDecoder, XLen};
 use crate::instruction::{CompressedFormat, DecodeError, DecodeResult, DecodedInstruction, Opcode};
 
 /// Utility function to convert compressed register index (3-bit) to full register index
@@ -160,7 +160,15 @@ impl CompressedInstructionDecoder for Quadrant0Decoder {
 }
 
 /// Decoder for Quadrant 1 compressed instructions (bits [1:0] = 01)
-pub struct Quadrant1Decoder;
+pub struct Quadrant1Decoder {
+    xlen: XLen,
+}
+
+impl Quadrant1Decoder {
+    pub fn new(xlen: XLen) -> Self {
+        Self { xlen }
+    }
+}
 
 impl CompressedInstructionDecoder for Quadrant1Decoder {
     fn quadrant(&self) -> u8 {
@@ -311,6 +319,9 @@ impl CompressedInstructionDecoder for Quadrant1Decoder {
                     0x0 => {
                         // c.srli rd', shamt → srli rd', rd', shamt
                         let shamt = extract_cb_shift_immediate(inst);
+                        if self.xlen == XLen::X32 && (shamt & 0x20) != 0 {
+                            return Err(DecodeError::Reserved);
+                        }
 
                         Ok(DecodedInstruction::Compressed {
                             raw: inst,
@@ -331,6 +342,9 @@ impl CompressedInstructionDecoder for Quadrant1Decoder {
                     0x1 => {
                         // c.srai rd', shamt → srai rd', rd', shamt
                         let shamt = extract_cb_shift_immediate(inst);
+                        if self.xlen == XLen::X32 && (shamt & 0x20) != 0 {
+                            return Err(DecodeError::Reserved);
+                        }
 
                         Ok(DecodedInstruction::Compressed {
                             raw: inst,
@@ -1185,7 +1199,15 @@ fn expand_css_to_sdsp(inst: u16) -> u32 {
 }
 
 /// Decoder for Quadrant 2 compressed instructions (bits [1:0] = 10)  
-pub struct Quadrant2Decoder;
+pub struct Quadrant2Decoder {
+    xlen: XLen,
+}
+
+impl Quadrant2Decoder {
+    pub fn new(xlen: XLen) -> Self {
+        Self { xlen }
+    }
+}
 
 impl CompressedInstructionDecoder for Quadrant2Decoder {
     fn quadrant(&self) -> u8 {
@@ -1200,6 +1222,9 @@ impl CompressedInstructionDecoder for Quadrant2Decoder {
                 // c.slli rd, shamt → slli rd, rd, shamt
                 let rd = (inst >> 7) & 0x1F;
                 let shamt = extract_ci_slli_immediate(inst);
+                if self.xlen == XLen::X32 && (shamt & 0x20) != 0 {
+                    return Err(DecodeError::Reserved);
+                }
 
                 if rd == 0 {
                     return Err(DecodeError::Reserved);

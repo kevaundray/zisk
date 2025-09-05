@@ -19,6 +19,13 @@ use crate::instruction::{
 };
 use std::collections::HashMap;
 
+/// Target XLEN for decoding semantics that depend on word size
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum XLen {
+    X32,
+    X64,
+}
+
 /// Trait for decoding 32-bit standard instructions of a specific format
 pub trait StandardInstructionDecoder {
     /// The instruction format this decoder handles
@@ -98,13 +105,23 @@ pub struct InstructionDecoderRegistry {
     standard_decoders: HashMap<Opcode, Box<dyn StandardInstructionDecoder>>,
     /// Registry for 16-bit compressed instructions (by quadrant)
     compressed_decoders: HashMap<u8, Box<dyn CompressedInstructionDecoder>>,
+    /// Target XLEN (affects shift-immediate validation and some compressed rules)
+    xlen: XLen,
 }
 
 impl InstructionDecoderRegistry {
     /// Create a new unified registry with all standard RISC-V decoders
     pub fn new() -> Self {
-        let mut registry =
-            Self { standard_decoders: HashMap::new(), compressed_decoders: HashMap::new() };
+        Self::with_xlen(XLen::X64)
+    }
+
+    /// Create a new registry for a specific XLEN (RV32 or RV64)
+    pub fn with_xlen(xlen: XLen) -> Self {
+        let mut registry = Self {
+            standard_decoders: HashMap::new(),
+            compressed_decoders: HashMap::new(),
+            xlen,
+        };
 
         registry.register_standard_decoders();
         registry.register_compressed_decoders();
@@ -114,10 +131,10 @@ impl InstructionDecoderRegistry {
     /// Register all standard RISC-V instruction decoders
     fn register_standard_decoders(&mut self) {
         // I-type decoders
-        self.register_standard(Opcode::Load, Box::new(ITypeDecoder::new()));
-        self.register_standard(Opcode::OpImm, Box::new(ITypeDecoder::new()));
-        self.register_standard(Opcode::OpImm32, Box::new(ITypeDecoder::new()));
-        self.register_standard(Opcode::Jalr, Box::new(ITypeDecoder::new()));
+        self.register_standard(Opcode::Load, Box::new(ITypeDecoder::new(self.xlen)));
+        self.register_standard(Opcode::OpImm, Box::new(ITypeDecoder::new(self.xlen)));
+        self.register_standard(Opcode::OpImm32, Box::new(ITypeDecoder::new(self.xlen)));
+        self.register_standard(Opcode::Jalr, Box::new(ITypeDecoder::new(self.xlen)));
 
         // R-type decoders
         self.register_standard(Opcode::Op, Box::new(RTypeDecoder::new()));
@@ -150,10 +167,10 @@ impl InstructionDecoderRegistry {
     fn register_compressed_decoders(&mut self) {
         // Register quadrant-based decoders
         self.register_compressed(0, Box::new(Quadrant0Decoder));
-        self.register_compressed(1, Box::new(Quadrant1Decoder));
+        self.register_compressed(1, Box::new(Quadrant1Decoder::new(self.xlen)));
 
         // Quadrant 2 (complete implementation)
-        self.register_compressed(2, Box::new(Quadrant2Decoder));
+        self.register_compressed(2, Box::new(Quadrant2Decoder::new(self.xlen)));
     }
 
     /// Register a decoder for a specific standard instruction opcode
@@ -314,5 +331,59 @@ mod tests {
         let decoded_compressed = registry.decode_compressed(0x0000).unwrap();
         assert!(decoded_compressed.is_compressed());
         assert_eq!(decoded_compressed.mnemonic(), "c.unimp");
+    }
+
+    #[test]
+    fn test_rv32_slli_shamt_reserved() {
+        // Build slli x1, x1, 32 (shamt[5]=1) → reserved on RV32
+        // imm[5]=1 → bit 25 set, funct3=001, opcode=0x13
+        let inst: u32 = 0x02009093; // computed composition
+
+        let registry = InstructionDecoderRegistry::with_xlen(XLen::X32);
+        let res = registry.decode_standard(inst);
+        assert!(res.is_err());
+    }
+
+    #[test]
+    fn test_rv64_slli_shamt_32_ok() {
+        // Same instruction should be valid on RV64
+        let inst: u32 = 0x02009093;
+        let registry = InstructionDecoderRegistry::with_xlen(XLen::X64);
+        let res = registry.decode_standard(inst).expect("RV64 slli decode failed");
+        assert_eq!(res.mnemonic(), "slli");
+    }
+
+    #[test]
+    fn test_rv32_c_slli_shamt_reserved() {
+        // c.slli with shamt[5]=1 is reserved on RV32
+        // Quadrant2, funct3=000, bit12=1, rd=1, shamt[4:0]=0, low=10
+        let inst: u16 = 0x1082;
+        let registry = InstructionDecoderRegistry::with_xlen(XLen::X32);
+        let res = registry.decode_compressed(inst);
+        assert!(res.is_err());
+    }
+
+    #[test]
+    fn test_rv32_c_srli_srai_shamt_reserved() {
+        let registry = InstructionDecoderRegistry::with_xlen(XLen::X32);
+        // c.srli: Quadrant1, funct3=100, bit12=1, sub=00, rd'=x8, shamt[4:0]=0, low=01
+        let srli: u16 = 0x9001;
+        let res1 = registry.decode_compressed(srli);
+        assert!(res1.is_err());
+
+        // c.srai: sub=01
+        let srai: u16 = 0x9401;
+        let res2 = registry.decode_compressed(srai);
+        assert!(res2.is_err());
+    }
+
+    #[test]
+    fn test_rv64_sraiw_decoding() {
+        // sraiw x1, x1, 1 → OP-IMM-32, funct3=101, funct7=0100000
+        let inst: u32 = 0x4010D09B;
+        let registry = InstructionDecoderRegistry::with_xlen(XLen::X64);
+        let decoded = registry.decode_standard(inst).expect("sraiw decode failed");
+        assert_eq!(decoded.opcode(), Opcode::OpImm32);
+        assert_eq!(decoded.mnemonic(), "sraiw");
     }
 }
