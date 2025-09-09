@@ -90,12 +90,12 @@ impl InstructionDecoder {
 
     /// Decode a single 32-bit instruction
     fn decode_standard(&self, bits: u32) -> Result<Instruction, Error> {
-        decode_standard_instruction(bits, &self.target).map_err(|err| Error::Standard(err))
+        decode_standard_instruction(bits, &self.target).map_err(Error::Standard)
     }
 
     /// Decode a single 16-bit compressed instruction
     fn decode_compressed(&self, bits: u16) -> Result<CompressedInstruction, Error> {
-        decode_compressed_instruction(bits, &self.target).map_err(|err| Error::Compressed(err))
+        decode_compressed_instruction(bits, &self.target).map_err(Error::Compressed)
     }
 }
 

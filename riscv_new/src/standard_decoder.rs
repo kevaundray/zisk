@@ -2,7 +2,7 @@
 //! TODO: riscv manual has `fm` for the fence check and add. can also reference: https://five-embeddev.com/riscv-user-isa-manual/Priv-v1.12/rv32.html#rv32
 //!
 //! TODO(note): The public API of this module is `decode_standard_instruction` and its types.
-//!
+//! TODO: Add hint instructions -- see section 2.9 and 4.4
 mod error;
 mod instruction;
 mod opcode;
@@ -392,10 +392,8 @@ fn decode_op_imm_instruction(
                 if imm_hi6 != 0 {
                     return Err(DecodeError::InvalidFormat);
                 }
-            } else {
-                if funct7 != 0 {
-                    return Err(DecodeError::InvalidFormat);
-                }
+            } else if funct7 != 0 {
+                return Err(DecodeError::InvalidFormat);
             }
             Ok(Instruction::SLLI { rd, rs1, shamt })
         }
@@ -584,7 +582,7 @@ fn decode_fence_instruction(
     let pred = encoded.pred;
     let succ = encoded.succ;
     let fm = encoded.fm;
-
+    // TODO: check funct12 -- possibly parse funct12 for readability
     match encoded.funct3 {
         0b000 => {
             // rd and rs1 must be zero

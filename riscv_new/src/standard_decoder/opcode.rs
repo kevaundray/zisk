@@ -1,4 +1,7 @@
 /// RISC-V instruction format types
+///
+/// There are six base instruction formats that _most_ instructions follow.
+/// See section `2.3 Immediate Encoding Variants` for where these are defined.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub enum InstructionFormat {
     /// R-type: Register-register operations (add, sub, mul, etc.)
@@ -81,6 +84,7 @@ pub enum InstructionFormat {
 ///
 /// Note: Since this file is only concerned with 32-bit, all opcodes will have the bottom two bits set as written in the spec.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[allow(clippy::unusual_byte_groupings)]
 #[repr(u8)]
 pub enum Opcode {
     /// Load instructions (lb, lh, lw, ld, lbu, lhu, lwu)
@@ -127,6 +131,7 @@ pub enum Opcode {
 }
 
 impl Opcode {
+    #[allow(clippy::unusual_byte_groupings)]
     /// Convert from u8 to Opcode enum
     pub fn from_bits(bits: u8) -> Option<Self> {
         match bits {
