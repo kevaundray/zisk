@@ -177,13 +177,20 @@ impl EncodedInstruction {
         --------------------------------------------------------------------
         */
 
+        // Opcode is always the first 7 bits
         let opcode_raw = (raw & MASK7) as u8;
-        let opcode = Opcode::from_bits(opcode_raw);
+        // rd is always the next 5 bits
         let rd = ((raw >> 7) & MASK5) as u8;
+        // funct3 is always the next 3 bits
         let funct3 = ((raw >> 12) & MASK3) as u8;
+        // rs1 is always the next 5 bits
         let rs1 = ((raw >> 15) & MASK5) as u8;
+        // rs2 is always the next 5 bits
         let rs2 = ((raw >> 20) & MASK5) as u8;
+        // funct7 is always the next 7 bits
         let funct7 = ((raw >> 25) & MASK7) as u8;
+
+        let opcode = Opcode::from_bits(opcode_raw);
 
         // Extract all possible immediate formats
         let i_immediate = Self::extract_i_immediate(raw);
@@ -193,7 +200,7 @@ impl EncodedInstruction {
         let j_immediate = Self::extract_j_immediate(raw);
 
         // Extract other specialized fields
-        let csr = ((raw >> 20) & MASK12) as u16; // 12-bit CSR address
+        let csr = ((raw >> 20) & MASK12) as u16; // 12-bit CSR address -- note, no sign extension here for csr address
         let shamt32 = ((raw >> 20) & MASK5) as u8; // 5-bit shift amount for RV32I
         let shamt64 = ((raw >> 20) & MASK6) as u8; // 6-bit shift amount for RV64I
         let aq = ((raw >> 26) & MASK1) != 0;
@@ -231,9 +238,9 @@ impl EncodedInstruction {
 
     /// Extract I-type immediate (12-bit, sign-extended)
     fn extract_i_immediate(raw: u32) -> i32 {
-        let imm = (raw >> 20) & MASK12; // 12-bit immediate
+        let imm = (raw >> 20) & MASK12;
 
-        // sign-extend from 12 bits using shift trick
+        // sign-extend from 12 bits
         ((imm as i32) << 20) >> 20
     }
 
@@ -244,7 +251,7 @@ impl EncodedInstruction {
 
         let imm = imm11_5 | imm4_0;
 
-        // sign-extend from 12 bits using shift trick
+        // sign-extend from 12 bits
         ((imm as i32) << 20) >> 20
     }
 
@@ -257,7 +264,7 @@ impl EncodedInstruction {
 
         let imm = imm12 | imm11 | imm10_5 | imm4_1;
 
-        // sign-extend from 13 bits using shift trick
+        // sign-extend from 13 bits
         ((imm as i32) << 19) >> 19
     }
 
@@ -275,7 +282,7 @@ impl EncodedInstruction {
 
         let imm = imm20 | imm19_12 | imm11 | imm10_1;
 
-        // sign-extend from 21 bits using shift trick
+        // sign-extend from 21 bits
         ((imm as i32) << 11) >> 11
     }
 
@@ -377,6 +384,8 @@ fn decode_op_imm_instruction(
     let rd = encoded.rd;
     let rs1 = encoded.rs1;
     let imm = encoded.i_immediate;
+    // I-type doesn't use funct7, but we just re-use it to get top 7 bits
+    // Could just as well shift on the immediate
     let funct7 = encoded.funct7;
 
     let is_rv64 = target.supports_extension(Extension::RV64I);
@@ -404,7 +413,7 @@ fn decode_op_imm_instruction(
             if is_rv64 {
                 match imm_hi6 {
                     0b000000 => Ok(Instruction::SRLI { rd, rs1, shamt }),
-                    0b010000 => Ok(Instruction::SRAI { rd, rs1, shamt }),
+                    0b01_0000 => Ok(Instruction::SRAI { rd, rs1, shamt }),
                     _ => Err(DecodeError::InvalidFormat),
                 }
             } else {
