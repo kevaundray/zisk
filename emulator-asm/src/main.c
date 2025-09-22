@@ -1,3 +1,5 @@
+// Check -- why is all of this code in C?
+
 #define _GNU_SOURCE
 #include <stdio.h>
 #include <sys/mman.h>

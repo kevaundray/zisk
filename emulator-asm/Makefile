@@ -9,6 +9,8 @@ else
 endif
 
 # Default EMU_PATH and OUT_PATH
+# Check -- Is this the emulator that we manually build from the zisk-rom?
+# ie program specific emulator
 EMU_PATH ?= src/emu.asm
 OUT_PATH ?= build/ziskemuasm
 

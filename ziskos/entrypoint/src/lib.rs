@@ -129,7 +129,7 @@ mod ziskos {
           "li   t1, 0xFFFEEEE",
           "beq t0, t1, 1f",
 
-          // QEmuu exit
+          // Qemu exit
           //"li t0, {_QEMU_EXIT_ADDR}",
           //"li t1, {_QEMU_EXIT_CODE}",
           "li t0, 0x100000",

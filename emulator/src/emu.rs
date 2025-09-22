@@ -2385,6 +2385,7 @@ impl<'a> Emu<'a> {
     }
 
     /// Get the output as a vector of u64
+    // TODO: can we have one method, then get_output_u32, get_output_u8 reuses it
     pub fn get_output(&self) -> Vec<u64> {
         let n = self.ctx.inst_ctx.mem.read(OUTPUT_ADDR, 8);
         let mut addr = OUTPUT_ADDR + 8;
@@ -2419,6 +2420,7 @@ impl<'a> Emu<'a> {
 
     /// Get the output as a vector of u8
     pub fn get_output_8(&self) -> Vec<u8> {
+        // `n` here is the length of the output content
         let n = self.ctx.inst_ctx.mem.read(OUTPUT_ADDR, 4);
         let mut addr = OUTPUT_ADDR + 4;
 

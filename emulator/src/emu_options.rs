@@ -41,6 +41,7 @@ pub struct EmuOptions {
     #[clap(short, long, value_name = "TRACE_FILE")]
     pub trace: Option<String>,
     /// Sets the verbose mode
+    // TODO: check how reth does this, ie tracing should be configurable at runtime
     #[clap(short, long, value_name = "VERBOSE", default_value = "false")]
     pub verbose: bool,
     /// Sets the log step mode
@@ -58,19 +59,53 @@ pub struct EmuOptions {
     /// Tracer v.  Enabled with `-a`.
     #[clap(short = 'a', long, value_name = "TRACERV", default_value = "false")]
     pub tracerv: bool,
+    // TODO: check does this get used
     /// Generates statistics about opcodes and memory usage.  Enabled with `-x`.
     #[clap(short = 'x', long, value_name = "STATS", default_value = "false")]
     pub stats: bool,
+    // TODO: check does this get used
     /// Generates minimal traces.  Enabled with `-g`.
     #[clap(short = 'g', long, value_name = "MINIMAL_TRACES", default_value = "false")]
     pub generate_minimal_traces: bool,
+    // TODO: check does this get used
     /// Optional file path to store operation data for analysis
     #[clap(short, long, value_name = "STORE_OP_OUTPUT")]
     pub store_op_output: Option<String>,
 }
 
+pub struct EmuOptionsCLI {
+    /// Sets the Zisk ROM data file path
+    #[clap(short, long, value_name = "ROM_FILE")]
+    pub rom: Option<String>,
+    /// Sets the ELF data file path, to be converted to ZisK ROM data
+    #[clap(short, long, value_name = "ELF_FILE")]
+    pub elf: Option<String>,
+    /// Sets the input data file path
+    #[clap(short, long, value_name = "INPUT_FILE")]
+    pub inputs: Option<String>,
+    /// Sets the output data file path
+    #[clap(short, long, value_name = "OUTPUT_FILE")]
+    pub output: Option<String>,
+    /// Sets the maximum number of steps to execute.  Default value is 1000000000.  Configured with
+    /// `-n`.
+    #[clap(short = 'n', long, value_name = "MAX_STEPS", default_value = DEFAULT_MAX_STEPS_STR)]
+    pub max_steps: u64,
+    /// Sets the print step period in number of steps
+    #[clap(short, long, value_name = "PRINT_STEP", default_value = "0")]
+    pub print_step: Option<u64>,
+    /// Sets the trace output file
+    #[clap(short, long, value_name = "TRACE_FILE")]
+    pub trace: Option<String>,
+    // TODO: Note this is only needed for RISCOF tests
+
+    /// Log the output to console. This option is set by default to true as a requirement to pass
+    /// the riscof GHA tests.  Enabled with `-c`.
+    #[clap(short = 'c', long, value_name = "LOG_OUTPUT", default_value = "true")]
+    pub log_output: bool,
+    
+}
+
 impl Default for EmuOptions {
-    /// Default constructor for impl fmt::Display for EmuOptions structure
     fn default() -> Self {
         Self {
             rom: None,

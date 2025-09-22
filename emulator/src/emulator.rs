@@ -39,7 +39,19 @@ use rayon::prelude::*;
 
 pub struct ZiskEmulator;
 
+pub enum OutputVar {
+    // Add a note on why each of these different variants are needed
+    U8(Vec<u8>),
+    U32(Vec<u32>),
+    U64(Vec<u64>)
+}
+
+pub struct EmulatorOutput {
+    output_u8: OutputVar
+}
+
 impl ZiskEmulator {
+    // TODO: This is RISCOF specific, we can move it ito a riscof directory
     /// Lists all device-under-test riscof files in a directory (*dut*.elf) and calls
     /// process_elf_file with each of them
     fn process_directory(
@@ -291,6 +303,7 @@ impl Emulator for ZiskEmulator {
     ) -> Result<Vec<u8>, ZiskEmulatorErr> {
         // Log this call
         if options.verbose {
+            // TODO: switch to tracing
             println!("emulate()\n{options}");
         }
 

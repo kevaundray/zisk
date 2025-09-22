@@ -3,7 +3,7 @@
 // use tracing::info;
 
 // use crate::{gen_elf_hash, get_elf_bin_file_path, get_rom_blowup_factor};
-
+// Check -- why is this empty?
 pub fn rom_vkey(// elf: &Path,
     // output_path: &Path,
     // proving_key: &Path,

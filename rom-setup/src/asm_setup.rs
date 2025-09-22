@@ -66,6 +66,7 @@ pub fn generate_assembly(
             std::process::exit(1);
         }
 
+        // Check why assembly is being called here vs native rust
         let status = Command::new("make")
             .arg(format!("EMU_PATH={}", asm_file.to_str().unwrap()))
             .arg(format!("OUT_PATH={}", file.to_str().unwrap()))

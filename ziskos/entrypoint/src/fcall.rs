@@ -16,6 +16,7 @@ pub fn ziskos_fcall_get() -> u64 {
 macro_rules! ziskos_fcall_param {
     ( $addr:expr, $words:literal) => {{
         // Calcula l'índex basat en log2 del nombre de words
+        // TODO: translate
         const fn words_to_port(words: usize) -> usize {
             match words {
                 1 => 0,     /* direct value */
