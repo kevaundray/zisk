@@ -391,7 +391,7 @@ define_ops! {
     (Bls12_381ComplexSub, "bls12_381_complex_sub", ArithEq384, ARITH_EQ_384_COST, 0xe6, 208, 96, opc_bls12_381_complex_sub, op_bls12_381_complex_sub, ops_bls12_381_complex_sub),
     (Bls12_381ComplexMul, "bls12_381_complex_mul", ArithEq384, ARITH_EQ_384_COST, 0xe7, 208, 96, opc_bls12_381_complex_mul, op_bls12_381_complex_mul, ops_bls12_381_complex_mul),
     (Add256, "add256", BigInt, BIG_INT_COST, 0xf0, 104, 32, opc_add256, op_add256, ops_add256),
-    (Adc256, "adc256", BigInt, BIG_INT_COST, 0xe9, 96, opc_adc256, op_adc256),
+    (Adc256, "adc256", BigInt, BIG_INT_COST, 0xe9, 96, 32, opc_adc256, op_adc256, ops_adc256),
     (Keccak, "keccak", Keccak, KECCAK_COST, 0xf1, 200, 200, opc_keccak, op_keccak, ops_none),
     (Arith256, "arith256", ArithEq, ARITH_EQ_COST, 0xf2, 136, 64, opc_arith256, op_arith256, ops_arith256),
     (Arith256Mod, "arith256_mod", ArithEq, ARITH_EQ_COST, 0xf3, 168, 32, opc_arith256_mod, op_arith256_mod, ops_arith256_mod),
