@@ -1,0 +1,17 @@
+[package]
+name = "zisk-hints"
+version = { workspace = true }
+edition = { workspace = true }
+license = { workspace = true }
+keywords = { workspace = true }
+repository = { workspace = true }
+categories = { workspace = true }
+
+[lib]
+name = "zisk_hints"
+path = "src/lib.rs"
+
+[dependencies]
+ziskos = { workspace = true }
+lib-c = { workspace = true }
+precompiles-helpers = { workspace = true }

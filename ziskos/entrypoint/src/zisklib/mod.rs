@@ -1,6 +1,6 @@
 mod fcalls;
-mod fcalls_impl;
-mod lib;
+pub mod fcalls_impl;
+pub mod lib;
 
 pub use fcalls::*;
 pub use fcalls_impl::*;

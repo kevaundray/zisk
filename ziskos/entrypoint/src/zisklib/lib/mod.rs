@@ -1,7 +1,7 @@
 mod bigint256;
 mod bls12_381;
 mod bn254;
-mod secp256k1;
+pub mod secp256k1;
 mod sha256f_compress;
 mod utils;
 
