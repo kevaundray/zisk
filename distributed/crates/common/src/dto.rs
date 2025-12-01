@@ -4,8 +4,12 @@
 //! These DTOs serve as the canonical data structures for business logic, separate from external
 //! representations like gRPC protobuf types or serialization formats.
 
-use crate::{BlockId, ComputeCapacity, JobId, JobPhase, JobState, WorkerId, WorkerState};
+use std::{fmt::Display, path::PathBuf};
+
+use crate::{ComputeCapacity, DataId, JobId, JobPhase, JobState, WorkerId, WorkerState};
+use borsh::{BorshDeserialize, BorshSerialize};
 use chrono::{DateTime, Utc};
+use serde::{Deserialize, Serialize};
 
 pub struct StatusInfoDto {
     pub service_name: String,
@@ -33,7 +37,7 @@ pub struct JobsListDto {
 
 pub struct JobStatusDto {
     pub job_id: JobId,
-    pub block_id: BlockId,
+    pub data_id: DataId,
     pub state: JobState,
     pub phase: Option<JobPhase>,
     pub assigned_workers: Vec<WorkerId>,
@@ -61,10 +65,28 @@ pub struct SystemStatusDto {
     pub active_jobs: u32,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[repr(i32)]
+pub enum InputModeDto {
+    InputModeNone = 0,          // No input provided
+    InputModePath(PathBuf) = 1, // Input will be provided as a path
+    InputModeData(PathBuf) = 2, // Input data will be sent directly
+}
+
+impl Display for InputModeDto {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            InputModeDto::InputModeNone => write!(f, "None"),
+            InputModeDto::InputModePath(path) => write!(f, "Path({})", path.display()),
+            InputModeDto::InputModeData(path) => write!(f, "Data({})", path.display()),
+        }
+    }
+}
+
 pub struct LaunchProofRequestDto {
-    pub block_id: BlockId,
+    pub data_id: DataId,
     pub compute_capacity: u32,
-    pub input_path: String,
+    pub input_mode: InputModeDto,
     pub simulated_node: Option<u32>,
 }
 
@@ -128,12 +150,19 @@ pub enum ExecuteTaskRequestTypeDto {
 }
 
 pub struct ContributionParamsDto {
-    pub block_id: BlockId,
-    pub input_path: String,
+    pub data_id: DataId,
+    pub input_source: InputSourceDto,
     pub rank_id: u32,
     pub total_workers: u32,
     pub worker_allocation: Vec<u32>,
     pub job_compute_units: ComputeCapacity,
+}
+
+#[derive(Debug, Clone, BorshSerialize, BorshDeserialize)]
+pub enum InputSourceDto {
+    InputPath(String),
+    InputData(Vec<u8>),
+    InputNull,
 }
 
 pub struct ProveParamsDto {
@@ -153,6 +182,7 @@ pub struct AggParamsDto {
     pub final_proof: bool,
     pub verify_constraints: bool,
     pub aggregation: bool,
+    pub rma: bool,
     pub final_snark: bool,
     pub verify_proofs: bool,
     pub save_proofs: bool,
@@ -167,6 +197,11 @@ pub struct ProofDto {
     pub values: Vec<u64>,
 }
 
+pub struct FinalProofDto {
+    pub values: Vec<u64>,
+    pub executed_steps: u64,
+}
+
 pub struct ExecuteTaskResponseDto {
     pub job_id: JobId,
     pub worker_id: WorkerId,
@@ -178,7 +213,7 @@ pub struct ExecuteTaskResponseDto {
 pub enum ExecuteTaskResponseResultDataDto {
     Challenges(Vec<ChallengesDto>),
     Proofs(Vec<ProofDto>),
-    FinalProof(Vec<Vec<u64>>),
+    FinalProof(FinalProofDto),
 }
 
 pub struct HeartbeatAckDto {
@@ -189,4 +224,56 @@ pub struct WorkerErrorDto {
     pub worker_id: WorkerId,
     pub job_id: JobId,
     pub error_message: String,
+}
+
+/// Error information for webhook notifications
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WebhookErrorDto {
+    pub code: String,
+    pub message: String,
+}
+
+/// Webhook payload for job completion notifications
+#[derive(Debug, Serialize, Deserialize)]
+pub struct WebhookPayloadDto {
+    pub job_id: String,
+    pub success: bool,
+    pub duration_ms: u64,
+    pub proof: Option<Vec<u64>>,
+    pub executed_steps: Option<u64>,
+    pub timestamp: String,
+    pub error: Option<WebhookErrorDto>,
+}
+
+impl WebhookPayloadDto {
+    /// Creates a successful webhook payload
+    pub fn success(
+        job_id: String,
+        duration_ms: u64,
+        proof: Option<Vec<u64>>,
+        executed_steps: Option<u64>,
+    ) -> Self {
+        Self {
+            job_id,
+            success: true,
+            duration_ms,
+            proof,
+            executed_steps,
+            timestamp: chrono::Utc::now().to_rfc3339(),
+            error: None,
+        }
+    }
+
+    /// Creates a failed webhook payload with error details
+    pub fn failure(job_id: String, duration_ms: u64, error: WebhookErrorDto) -> Self {
+        Self {
+            job_id,
+            success: false,
+            duration_ms,
+            proof: None,
+            executed_steps: None,
+            timestamp: chrono::Utc::now().to_rfc3339(),
+            error: Some(error),
+        }
+    }
 }

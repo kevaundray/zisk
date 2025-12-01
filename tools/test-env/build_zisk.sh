@@ -22,7 +22,6 @@ main() {
     step "Loading environment variables..."
     # Load environment variables from .env file
     load_env || return 1
-    confirm_continue || return 0
 
     # If ZISK_GHA is set, force skip cloning pil2-proofman and use pil2-proofman dependency defined in zisk Cargo.toml
     if is_gha; then
@@ -152,8 +151,10 @@ main() {
     fi
 
     ensure cp target/${TARGET}/release/cargo-zisk "${ZISK_BIN_DIR}" || return 1
-    ensure cp target/${TARGET}/release/ziskemu    "${ZISK_BIN_DIR}" || return 1
+    ensure cp target/${TARGET}/release/ziskemu "${ZISK_BIN_DIR}" || return 1
     ensure cp target/${TARGET}/release/riscv2zisk "${ZISK_BIN_DIR}" || return 1
+    ensure cp target/${TARGET}/release/zisk-coordinator "${ZISK_BIN_DIR}" || return 1
+    ensure cp target/${TARGET}/release/zisk-worker "${ZISK_BIN_DIR}" || return 1
 
     if [[ "${PLATFORM}" == "linux" ]]; then
         LIB_EXT="so"
@@ -162,8 +163,8 @@ main() {
     fi
 
     ensure cp target/${TARGET}/release/libzisk_witness.${LIB_EXT} "${ZISK_BIN_DIR}" || return 1
-    ensure cp ziskup/ziskup                     "${ZISK_BIN_DIR}" || return 1
-    ensure cp target/${TARGET}/release/libziskclib.a      "${ZISK_BIN_DIR}" || return 1
+    ensure cp ziskup/ziskup "${ZISK_BIN_DIR}" || return 1
+    ensure cp target/${TARGET}/release/libziskclib.a "${ZISK_BIN_DIR}" || return 1
 
     step "Copying emulator-asm files..."
     if [[ "${PLATFORM}" == "linux" ]]; then

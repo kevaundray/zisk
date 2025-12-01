@@ -1,7 +1,7 @@
 use crate::{mem_module_collector::MemModuleCollector, MemInput, MemModule, MemPreviousSegment};
 use fields::PrimeField64;
 use mem_common::MemModuleSegmentCheckPoint;
-use proofman_common::{AirInstance, ProofCtx, SetupCtx};
+use proofman_common::{AirInstance, ProofCtx, ProofmanResult, SetupCtx};
 use proofman_util::{timer_start_debug, timer_stop_and_log_debug};
 use rayon::prelude::*;
 use std::sync::Arc;
@@ -61,7 +61,7 @@ impl<F: PrimeField64> Instance<F> for MemModuleInstance<F> {
         _sctx: &SetupCtx<F>,
         collectors: Vec<(usize, Box<dyn BusDevice<PayloadType>>)>,
         trace_buffer: Vec<F>,
-    ) -> Option<AirInstance<F>> {
+    ) -> ProofmanResult<Option<AirInstance<F>>> {
         // Collect inputs from all collectors. At most, one of them has `prev_last_value` non zero,
         // we take this `prev_last_value`, which represents the last value of the previous segment.
 
@@ -83,12 +83,12 @@ impl<F: PrimeField64> Instance<F> for MemModuleInstance<F> {
         let mut inputs = inputs.into_iter().flatten().collect::<Vec<_>>();
 
         if inputs.is_empty() {
-            return None;
+            return Ok(None);
         }
 
         // This method sorts all inputs
-        let parallelize = self.ictx.plan.air_id == MemTrace::<usize>::AIR_ID
-            && self.ictx.plan.airgroup_id == MemTrace::<usize>::AIRGROUP_ID;
+        let parallelize = self.ictx.plan.air_id == MemTrace::<F>::AIR_ID
+            && self.ictx.plan.airgroup_id == MemTrace::<F>::AIRGROUP_ID;
         self.prepare_inputs(&mut inputs, parallelize);
 
         // This method calculates intermediate accesses without adding inputs and trims
@@ -101,13 +101,13 @@ impl<F: PrimeField64> Instance<F> for MemModuleInstance<F> {
         let segment_id = self.ictx.plan.segment_id.unwrap();
 
         let is_last_segment = self.check_point.is_last_segment;
-        Some(self.module.compute_witness(
+        Ok(Some(self.module.compute_witness(
             &inputs,
             segment_id,
             is_last_segment,
             &prev_segment,
             trace_buffer,
-        ))
+        )?))
     }
 
     /// Builds an input collector for the instance.

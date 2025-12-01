@@ -1,3 +1,7 @@
+require "std_permutation.pil";
+require "std_range_check.pil";
+require "opids.pil";
+
 /*
     Memory Component (Mem)
     ======================
@@ -64,12 +68,6 @@
 
 */
 
-require "std_permutation.pil"
-require "std_range_check.pil"
-
-const int MEMORY_ID = 10;
-const int MEMORY_CONT_ID = 11;
-
 const int MEMORY_LOAD_OP = 1;
 const int MEMORY_STORE_OP = 2;
 const int MEMORY_REG_OP = 3;
@@ -83,7 +81,7 @@ const int MAX_RANGE_CHECK_CHUNK = 2**16;
 airtemplate Mem(const int N = 2**21, const int id = MEMORY_ID, const int RC = 2, const int bytes = 8,
                 const int base_address = 0, const int size_mb = 128, int immutable = 0,
                 const int free_input_mem = 0, const expr enable_flag = 1, const int use_predefined_ranges = 0, 
-                const int large_mem = 0, const int dual_mem = 0) {
+                const int large_mem = 0, const int dual_mem = 0, const int continuous_addresses = 0) {
 
     col fixed SEGMENT_L1 = [1,0...];
     const expr SEGMENT_LAST = SEGMENT_L1';
@@ -108,10 +106,10 @@ airtemplate Mem(const int N = 2**21, const int id = MEMORY_ID, const int RC = 2,
     // If is_first_segment means that segment must be 0
     is_first_segment * segment_id === 0;
 
-    col witness addr;        // n-byte address, real address = addr * bytes
-    col witness step;
-    col witness sel;
-    col witness addr_changes;
+    col witness bits(29) addr;
+    col witness bits(40) step;
+    col witness bits(1) sel;
+    col witness bits(1) addr_changes;
 
     if (dual_mem) {
         // Dual mem feature not supported for free input memory
@@ -121,8 +119,8 @@ airtemplate Mem(const int N = 2**21, const int id = MEMORY_ID, const int RC = 2,
 
         // Two columns, one for step (timestap) of second operation, and other
         // to enable dual operation in the row.
-        col witness air.step_dual;
-        col witness air.sel_dual;
+        col witness bits(40) air.step_dual;
+        col witness bits(1) air.sel_dual;
 
         sel_dual * (1 - sel_dual) === 0;
         (1 - sel) * sel_dual === 0;
@@ -137,14 +135,14 @@ airtemplate Mem(const int N = 2**21, const int id = MEMORY_ID, const int RC = 2,
 
     if (free_input_mem) {
         immutable = 1;
-        col witness air.value_word[RC*2];
+        col witness bits(16) air.value_word[RC*2];
 
         // free read for free input, means an specific address (offset = 0) that could be read
         // many times with different well formed 64-bit values. Used for fcalls and other free-inputs
 
-        col witness air.is_free_read;
-        air.is_free_read * (1 - air.is_free_read) === 0;
-        air.is_free_read * (internal_base_address - addr) === 0;
+        col witness bits(1) air.is_free_read;
+        is_free_read * (1 - is_free_read) === 0;
+        is_free_read * (internal_base_address - addr) === 0;
 
         const expr air.value[RC];
         for (int index = 0; index < RC; ++index) {
@@ -155,7 +153,7 @@ airtemplate Mem(const int N = 2**21, const int id = MEMORY_ID, const int RC = 2,
             range_check(value_word[index*2+1], 0, MAX_RANGE_CHECK_CHUNK - 1, predefined: use_predefined_ranges);
         }
     } else {
-        col witness air.value[RC];
+        col witness bits(32) air.value[RC];
     }
 
     if (free_input_mem) {
@@ -170,7 +168,7 @@ airtemplate Mem(const int N = 2**21, const int id = MEMORY_ID, const int RC = 2,
             addr_changes * (1 - sel) * value[i] === 0;
         }
     } else {
-        col witness air.wr;
+        col witness bits(1) air.wr;
         const expr air.rd = 1 - wr;
 
         // boolean constraint over wr;
@@ -194,7 +192,7 @@ airtemplate Mem(const int N = 2**21, const int id = MEMORY_ID, const int RC = 2,
 
     // this constraint "assumes" that previous values of this segment
 
-    direct_update_assumes(MEMORY_CONT_ID,
+    direct_update_assumes(MEMORY_CONTINUATION_ID,
                   [
                     base_address,               // identify area of memory
                     segment_id,                 // current segment_id
@@ -231,7 +229,7 @@ airtemplate Mem(const int N = 2**21, const int id = MEMORY_ID, const int RC = 2,
         SEGMENT_LAST * (step - segment_last_step) === 0;
     }
 
-    direct_update_proves(MEMORY_CONT_ID,
+    direct_update_proves(MEMORY_CONTINUATION_ID,
                   [
                     base_address,               // identify area of memory
                     segment_id + 1,             // next segment_id, for last segment
@@ -252,7 +250,7 @@ airtemplate Mem(const int N = 2**21, const int id = MEMORY_ID, const int RC = 2,
     // to prevent redundant constraints.This flag is used to handle cases where a memory area is not
     // used during a given execution.
 
-    direct_global_update_proves(MEMORY_CONT_ID, [ base_address, 0, internal_base_address, 0, ...zeros], sel: enable_flag);
+    direct_global_update_proves(MEMORY_CONTINUATION_ID, [ base_address, 0, internal_base_address, 0, ...zeros], sel: enable_flag);
 
     // For security, ensure that the first address has the correct value to prevent adding a large
     // number of instances that could cause an "overflow" in the prime field.
@@ -337,15 +335,16 @@ airtemplate Mem(const int N = 2**21, const int id = MEMORY_ID, const int RC = 2,
 
         const expr air.read_same_addr = (1 - addr_changes);
 
-        // If the address changes, the difference must be one
-
-        addr_changes * (delta_addr - 1) === 0;
+        if (continuous_addresses) {
+            // If the address changes, the difference must be one
+            addr_changes * (delta_addr - 1) === 0;
+        } else {
+            range_check(expression: delta_addr - 1, min: 0, max: 2**24 - 1, sel: addr_changes);
+        }
 
         // If the address does not change, the current address and previous must be the same.
 
         (1 - addr_changes) * (addr - previous_addr) === 0;
-
-
     } else {
 
         // In this case we don't need to substract one, as happends on immutable memory, because the step of first
@@ -363,7 +362,7 @@ airtemplate Mem(const int N = 2**21, const int id = MEMORY_ID, const int RC = 2,
             // - If the previous row was in dual mode, it must match the previous `step_dual`.
             // - Otherwise, it must match the previous `step`.
 
-            col witness air.previous_step;
+            col witness bits(40) air.previous_step;
             const expr previous_row_step = 'sel_dual * ('step_dual - 'step) + 'step;
             previous_step === SEGMENT_L1 * (previous_segment_step - previous_row_step) + previous_row_step;
         } else {
@@ -371,7 +370,7 @@ airtemplate Mem(const int N = 2**21, const int id = MEMORY_ID, const int RC = 2,
         }
         const expr delta_step = step - previous_step + (1 - wr);
 
-        col witness increment[2];
+        col witness bits(18) air.increment[2];
         increment[0] + 2**18 * increment[1] + 1 === addr_changes * (delta_addr - delta_step) + delta_step;
 
         is_first_segment * SEGMENT_L1 * (1 - addr_changes) === 0;
@@ -384,7 +383,7 @@ airtemplate Mem(const int N = 2**21, const int id = MEMORY_ID, const int RC = 2,
         range_check(expression: increment[1], min: 0, max: 2**18 - 1);
 
         // to avoid intermediate column
-        col witness air.read_same_addr;
+        col witness bits(1) air.read_same_addr;
 
         read_same_addr === (1 - addr_changes) * (1 - wr);
 

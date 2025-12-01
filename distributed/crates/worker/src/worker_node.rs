@@ -1,39 +1,70 @@
 use crate::{worker::ComputationResult, ProverConfig, Worker};
 use anyhow::{anyhow, Result};
 use proofman::{AggProofs, ContributionsInfo};
+use std::path::Path;
 use std::{path::PathBuf, time::Duration};
 use tokio::sync::mpsc;
 use tokio_stream::StreamExt;
 use tonic::transport::Channel;
 use tonic::Request;
 use tracing::{error, info};
-use zisk_distributed_common::{AggProofData, AggregationParams, BlockContext, WorkerState};
-use zisk_distributed_common::{BlockId, JobId};
+use zisk_distributed_common::{
+    AggProofData, AggregationParams, DataCtx, InputSourceDto, WorkerState,
+};
+use zisk_distributed_common::{DataId, JobId};
+use zisk_distributed_grpc_api::contribution_params::InputSource;
 use zisk_distributed_grpc_api::execute_task_response::ResultData;
 use zisk_distributed_grpc_api::*;
+use zisk_sdk::{Asm, Emu, ZiskBackend};
 
 use crate::config::WorkerServiceConfig;
 
-pub enum WorkerNode {
-    WorkerGrpc(WorkerNodeGrpc),
-    WorkerMpi(WorkerNodeMpi),
+pub enum WorkerNode<T: ZiskBackend + 'static> {
+    WorkerGrpc(WorkerNodeGrpc<T>),
+    WorkerMpi(WorkerNodeMpi<T>),
 }
 
-impl WorkerNode {
-    pub async fn new(
+impl<T: ZiskBackend + 'static> WorkerNode<T> {
+    pub fn world_rank(&self) -> i32 {
+        match self {
+            WorkerNode::WorkerGrpc(worker) => worker.world_rank(),
+            WorkerNode::WorkerMpi(worker) => worker.world_rank(),
+        }
+    }
+}
+
+impl<T: ZiskBackend + 'static> WorkerNode<T> {
+    pub async fn new_emu(
         worker_config: WorkerServiceConfig,
         prover_config: ProverConfig,
-    ) -> Result<Self> {
-        let worker = Worker::new(
+    ) -> Result<WorkerNode<Emu>> {
+        let worker = Worker::<Emu>::new_emu(
             worker_config.worker.worker_id.clone(),
             worker_config.worker.compute_capacity,
             prover_config,
         )?;
 
         if worker.local_rank() == 0 {
-            Ok(WorkerNode::WorkerGrpc(WorkerNodeGrpc::new(worker_config, worker).await?))
+            Ok(WorkerNode::WorkerGrpc(WorkerNodeGrpc::<Emu>::new(worker_config, worker).await?))
         } else {
-            Ok(WorkerNode::WorkerMpi(WorkerNodeMpi::new(worker).await?))
+            Ok(WorkerNode::WorkerMpi(WorkerNodeMpi::<Emu>::new(worker).await?))
+        }
+    }
+
+    pub async fn new_asm(
+        worker_config: WorkerServiceConfig,
+        prover_config: ProverConfig,
+    ) -> Result<WorkerNode<Asm>> {
+        let worker = Worker::<Asm>::new_asm(
+            worker_config.worker.worker_id.clone(),
+            worker_config.worker.compute_capacity,
+            prover_config,
+        )?;
+
+        if worker.local_rank() == 0 {
+            Ok(WorkerNode::WorkerGrpc(WorkerNodeGrpc::<Asm>::new(worker_config, worker).await?))
+        } else {
+            Ok(WorkerNode::WorkerMpi(WorkerNodeMpi::<Asm>::new(worker).await?))
         }
     }
 
@@ -45,13 +76,17 @@ impl WorkerNode {
     }
 }
 
-pub struct WorkerNodeMpi {
-    worker: Worker,
+pub struct WorkerNodeMpi<T: ZiskBackend + 'static> {
+    worker: Worker<T>,
 }
 
-impl WorkerNodeMpi {
-    pub async fn new(worker: Worker) -> Result<Self> {
+impl<T: ZiskBackend + 'static> WorkerNodeMpi<T> {
+    pub async fn new(worker: Worker<T>) -> Result<Self> {
         Ok(Self { worker })
+    }
+
+    pub fn world_rank(&self) -> i32 {
+        self.worker.world_rank()
     }
 
     async fn run(&mut self) -> Result<()> {
@@ -64,14 +99,18 @@ impl WorkerNodeMpi {
     }
 }
 
-pub struct WorkerNodeGrpc {
+pub struct WorkerNodeGrpc<T: ZiskBackend + 'static> {
     worker_config: WorkerServiceConfig,
-    worker: Worker,
+    worker: Worker<T>,
 }
 
-impl WorkerNodeGrpc {
-    pub async fn new(worker_config: WorkerServiceConfig, worker: Worker) -> Result<Self> {
+impl<T: ZiskBackend + 'static> WorkerNodeGrpc<T> {
+    pub async fn new(worker_config: WorkerServiceConfig, worker: Worker<T>) -> Result<Self> {
         Ok(Self { worker_config, worker })
+    }
+
+    pub fn world_rank(&self) -> i32 {
+        self.worker.world_rank()
     }
 
     pub async fn run(&mut self) -> Result<()> {
@@ -111,7 +150,9 @@ impl WorkerNodeGrpc {
 
         let channel =
             Channel::from_shared(self.worker_config.coordinator.url.clone())?.connect().await?;
-        let mut client = zisk_distributed_api_client::ZiskDistributedApiClient::new(channel);
+        let mut client = zisk_distributed_api_client::ZiskDistributedApiClient::new(channel)
+            .max_decoding_message_size(MAX_MESSAGE_SIZE)
+            .max_encoding_message_size(MAX_MESSAGE_SIZE);
 
         // Create bidirectional stream
         let (message_sender, message_receiver) = mpsc::unbounded_channel();
@@ -202,8 +243,8 @@ impl WorkerNodeGrpc {
             ComputationResult::Proofs { job_id, success, result } => {
                 self.send_proof(job_id, success, result, message_sender).await
             }
-            ComputationResult::AggProof { job_id, success, result } => {
-                self.send_aggregation(job_id, success, result, message_sender).await
+            ComputationResult::AggProof { job_id, success, result, executed_steps } => {
+                self.send_aggregation(job_id, success, result, message_sender, executed_steps).await
             }
         }
     }
@@ -221,23 +262,31 @@ impl WorkerNodeGrpc {
 
         let (result_data, error_message) = match result {
             Ok(data) => {
-                assert!(success);
+                if !success {
+                    return Err(anyhow!(
+                        "Inconsistent state: operation reported failure but returned Ok result"
+                    ));
+                }
                 (data, String::new())
             }
             Err(e) => {
-                assert!(!success);
+                if success {
+                    return Err(anyhow!(
+                        "Inconsistent state: operation reported success but returned Err result"
+                    ));
+                }
                 (vec![], e.to_string())
             }
         };
 
-        let mut ch = Vec::new();
-        for cont in result_data {
-            ch.push(Challenges {
+        let challenges: Vec<Challenges> = result_data
+            .into_iter()
+            .map(|cont| Challenges {
                 worker_index: cont.worker_index,
                 airgroup_id: cont.airgroup_id as u32,
                 challenge: cont.challenge.to_vec(),
-            });
-        }
+            })
+            .collect();
 
         let message = WorkerMessage {
             payload: Some(worker_message::Payload::ExecuteTaskResponse(ExecuteTaskResponse {
@@ -245,7 +294,7 @@ impl WorkerNodeGrpc {
                 job_id: job_id.as_string(),
                 task_type: TaskType::PartialContribution as i32,
                 success,
-                result_data: Some(ResultData::Challenges(ChallengesList { challenges: ch })),
+                result_data: Some(ResultData::Challenges(ChallengesList { challenges })),
                 error_message,
             })),
         };
@@ -311,40 +360,39 @@ impl WorkerNodeGrpc {
         success: bool,
         result: Result<Option<Vec<Vec<u64>>>>,
         message_sender: &mpsc::UnboundedSender<WorkerMessage>,
+        executed_steps: u64,
     ) -> Result<()> {
         if let Some(handle) = self.worker.take_current_computation() {
             handle.await?;
         }
 
-        let (result_data, error_message) = match result {
+        let mut error_message = String::new();
+        let mut reset_current_job = false;
+
+        let result_data = match result {
             Ok(data) => {
-                assert!(success);
+                if !success {
+                    return Err(anyhow!("Aggregation returned Ok result but reported failure"));
+                }
 
                 if let Some(final_proof) = data {
-                    (
-                        Some(ResultData::FinalProof(FinalProofList {
-                            final_proofs: final_proof
-                                .into_iter()
-                                .map(|v| FinalProof { values: v })
-                                .collect(),
-                        })),
-                        String::new(),
-                    )
+                    reset_current_job = !final_proof.is_empty();
+                    Some(ResultData::FinalProof(FinalProof {
+                        values: final_proof.into_iter().flatten().collect(),
+                        executed_steps,
+                    }))
                 } else {
-                    (None, String::new())
+                    Some(ResultData::FinalProof(FinalProof { values: vec![], executed_steps }))
                 }
             }
             Err(e) => {
-                // ! FIXME, return an error?
-                assert!(!success);
-                (None, e.to_string())
+                if success {
+                    return Err(anyhow!("Aggregation returned Err but reported success"));
+                }
+                error_message = e.to_string();
+                Some(ResultData::FinalProof(FinalProof { values: vec![], executed_steps }))
             }
         };
-
-        let reset_current_job = matches!(
-            result_data.as_ref(),
-            Some(ResultData::FinalProof(FinalProofList { final_proofs })) if !final_proofs.is_empty()
-        );
 
         let message = WorkerMessage {
             payload: Some(worker_message::Payload::ExecuteTaskResponse(ExecuteTaskResponse {
@@ -466,15 +514,27 @@ impl WorkerNodeGrpc {
             return Err(anyhow!("Expected ContributionParams for Partial Contribution task"));
         };
 
-        let job_id = JobId::from(request.job_id.clone());
-        let block = BlockContext {
-            block_id: BlockId::from(params.block_id.clone()),
-            input_path: PathBuf::from(params.input_path.clone()),
+        let job_id = JobId::from(request.job_id);
+        let input_source = match params.input_source {
+            Some(InputSource::InputPath(ref path)) => {
+                let input_path = self.worker_config.worker.inputs_folder.join(PathBuf::from(path));
+
+                // Validate that input_path is a subdirectory of inputs_folder
+                Self::validate_subdir(&self.worker_config.worker.inputs_folder, &input_path)?;
+
+                InputSourceDto::InputPath(input_path.display().to_string())
+            }
+            Some(InputSource::InputData(data)) => InputSourceDto::InputData(data),
+            None => {
+                return Err(anyhow!("Input source missing in ContributionParams"));
+            }
         };
+
+        let data_ctx = DataCtx { data_id: DataId::from(params.data_id), input_source };
 
         let job = self.worker.new_job(
             job_id,
-            block,
+            data_ctx,
             params.rank_id,
             params.total_workers,
             params.worker_allocation,
@@ -487,6 +547,39 @@ impl WorkerNodeGrpc {
         );
 
         Ok(())
+    }
+
+    fn validate_subdir(base: &Path, candidate: &Path) -> Result<()> {
+        let base = base.canonicalize().map_err(|e| anyhow!("Inputs folder error: {e}"))?;
+
+        // Timeout 60 seconds
+        let timeout = Duration::from_secs(60);
+        let start = std::time::Instant::now();
+
+        while !candidate.exists() {
+            if start.elapsed() > timeout {
+                return Err(anyhow!(
+                    "Input path {:?} did not appear within {:?}",
+                    candidate,
+                    timeout
+                ));
+            }
+            std::thread::sleep(Duration::from_millis(10));
+        }
+
+        info!("Found input file {:?} (elapsed: {:?})", candidate, start.elapsed());
+
+        let candidate = candidate.canonicalize().map_err(|e| anyhow!("Input path error: {e}"))?;
+
+        if candidate.starts_with(&base) {
+            Ok(())
+        } else {
+            Err(anyhow!(
+                "Input path {:?} must be a subdirectory of inputs folder {:?}",
+                candidate,
+                base
+            ))
+        }
     }
 
     pub async fn prove(
@@ -556,7 +649,7 @@ impl WorkerNodeGrpc {
 
         // Extract the Aggregate params
         let Some(execute_task_request::Params::AggParams(agg_params)) = request.params else {
-            return Err(anyhow!("Expected ContributionParams params for Aggregate task"));
+            return Err(anyhow!("Expected AggParams params for Aggregate task"));
         };
 
         let agg_proofs = agg_params.agg_proofs.unwrap().proofs;
@@ -575,6 +668,7 @@ impl WorkerNodeGrpc {
             final_proof: agg_params.final_proof,
             verify_constraints: agg_params.verify_constraints,
             aggregation: agg_params.aggregation,
+            rma: agg_params.rma,
             final_snark: agg_params.final_snark,
             verify_proofs: agg_params.verify_proofs,
             save_proofs: agg_params.save_proofs,

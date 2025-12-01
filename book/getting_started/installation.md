@@ -22,7 +22,7 @@ Ubuntu 22.04 or higher is required.
 
 Install all required dependencies with:
 ```bash
-sudo apt-get install -y xz-utils jq curl build-essential qemu-system libomp-dev libgmp-dev nlohmann-json3-dev protobuf-compiler uuid-dev libgrpc++-dev libsecp256k1-dev libsodium-dev libpqxx-dev nasm libopenmpi-dev openmpi-bin openmpi-common libclang-dev clang
+sudo apt-get install -y xz-utils jq curl build-essential qemu-system libomp-dev libgmp-dev nlohmann-json3-dev protobuf-compiler uuid-dev libgrpc++-dev libsecp256k1-dev libsodium-dev libpqxx-dev nasm libopenmpi-dev openmpi-bin openmpi-common libclang-dev clang gcc-riscv64-unknown-elf
 ```
 
 ZisK uses shared memory to exchange data between processes. The system must be configured to allow enough locked memory per process:
@@ -40,7 +40,7 @@ You must have [Homebrew](https://brew.sh/) and [Xcode](https://developer.apple.c
 
 Install all required dependencies with:
 ```bash
-brew reinstall jq curl libomp protobuf openssl nasm pkgconf open-mpi libffi nlohmann-json libsodium
+brew reinstall jq curl libomp protobuf openssl nasm pkgconf open-mpi libffi nlohmann-json libsodium riscv-tools
 ```
 
 ## Installing ZisK
@@ -117,13 +117,13 @@ You can use the flags `--provingkey`, `--verifykey` or `--nokey` to specify the 
         export C_INCLUDE_PATH=/usr/lib/gcc/x86_64-linux-gnu/13/include
         export CPLUS_INCLUDE_PATH=$C_INCLUDE_PATH
         ```
-    3. Try building again        
+    3. Try building again
 
 3. Copy the tools to `~/.zisk/bin` directory:
     ```bash
     mkdir -p $HOME/.zisk/bin
     LIB_EXT=$([[ "$(uname)" == "Darwin" ]] && echo "dylib" || echo "so")
-    cp target/release/cargo-zisk target/release/ziskemu target/release/riscv2zisk target/release/libzisk_witness.$LIB_EXT target/release/libziskclib.a $HOME/.zisk/bin
+    cp target/release/cargo-zisk target/release/ziskemu target/release/riscv2zisk target/release/zisk-coordinator target/release/zisk-worker target/release/libzisk_witness.$LIB_EXT target/release/libziskclib.a $HOME/.zisk/bin
     ```
 
 4. Copy required files for assembly rom setup:
@@ -197,27 +197,27 @@ Please note that the process can be long, taking approximately 45-60 minutes dep
     cargo run --release --bin binary_extension_frops_fixed_gen
     ```
 
-4. Compile ZisK PIL:
+5. Compile ZisK PIL:
     ```bash
     node ../pil2-compiler/src/pil.js pil/zisk.pil -I pil,../pil2-proofman/pil2-components/lib/std/pil,state-machines,precompiles -o pil/zisk.pilout -u tmp/fixed -O fixed-to-file
     ```
 
     This command will create the `pil/zisk.pilout` file
 
-7. Generate setup data: (this step may take 30-45 minutes):
+6. Generate setup data: (this step may take 30-45 minutes):
     ```bash
     node ../pil2-proofman-js/src/main_setup.js -a ./pil/zisk.pilout -b build -t ../pil2-proofman/pil2-components/lib/std/pil -u tmp/fixed -r
     ```
 
     This command generates the `build/provingKey` directory.
 
-8. Copy (or move) the `build/provingKey` directory to `$HOME/.zisk` directory:
+7. Copy (or move) the `build/provingKey` directory to `$HOME/.zisk` directory:
 
     ```bash
     cp -R build/provingKey $HOME/.zisk
     ```
 
-9. Generate constant tree files:
+8. Generate constant tree files:
     ```bash
     cargo-zisk check-setup -a
     ```

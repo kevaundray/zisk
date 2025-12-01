@@ -21,6 +21,8 @@ pub const OPERATION_BUS_DATA_SIZE: usize = 4; // op,op_type,a,b
 // TODO: optimize and send only one value 64 upto 32-bits addr
 
 const INDIRECTION_SIZE: usize = 1;
+const PARAMS_SIZE: usize = 1;
+const SINGLE_RESULT_SIZE: usize = 1;
 
 const DATA_64_BITS_SIZE: usize = 1;
 const DATA_256_BITS_SIZE: usize = 4 * DATA_64_BITS_SIZE;
@@ -69,6 +71,10 @@ pub const OPERATION_BUS_ADD_256_DATA_SIZE: usize =
     OPERATION_BUS_DATA_SIZE + 4 * INDIRECTION_SIZE + 2 * DATA_256_BITS_SIZE;
 pub const OPERATION_BUS_ADC_256_DATA_SIZE: usize =
     OPERATION_BUS_DATA_SIZE + 5 * INDIRECTION_SIZE + 2 * DATA_256_BITS_SIZE + DATA_64_BITS_SIZE;
+
+// bus_data_size + 4 params (&a, &b, cin, &c, a, b)
+pub const OPERATION_BUS_ADD_256_DATA_SIZE: usize =
+    OPERATION_BUS_DATA_SIZE + 4 * PARAMS_SIZE + 2 * DATA_256_BITS_SIZE + SINGLE_RESULT_SIZE;
 
 // 4 bus_data + 5 addr + 4 x 384 = 4 + 5 + 4 * 6 = 33
 pub const MAX_OPERATION_DATA_SIZE: usize = OPERATION_BUS_ARITH_384_MOD_DATA_SIZE;
@@ -457,6 +463,16 @@ impl OperationBusData<u64> {
                 }
                 _ => ExtOperationData::OperationData([op, op_type, a, b]),
             },
+            ZiskOperationType::BigInt => match inst.op {
+                ADD256_OP => {
+                    let mut data =
+                        unsafe { uninit_array::<OPERATION_BUS_ADD_256_DATA_SIZE>().assume_init() };
+                    data[0..OPERATION_BUS_DATA_SIZE].copy_from_slice(&[op, op_type, a, b]);
+                    data[OPERATION_BUS_DATA_SIZE..].copy_from_slice(&ctx.precompiled.input_data);
+                    ExtOperationData::OperationAdd256Data(data)
+                }
+                _ => ExtOperationData::OperationData([op, op_type, a, b]),
+            },
 
             ZiskOperationType::BigInt => match inst.op {
                 ADD256_OP => {
@@ -615,6 +631,19 @@ impl OperationBusData<u64> {
                     &buffer[..len]
                 }
                 BLS12_381_COMPLEX_MUL_OP => {
+                    let len = OPERATION_BUS_DATA_SIZE + ctx.precompiled.input_data.len();
+                    buffer[0..OPERATION_BUS_DATA_SIZE].copy_from_slice(&[op, op_type, a, b]);
+                    buffer[OPERATION_BUS_DATA_SIZE..len]
+                        .copy_from_slice(&ctx.precompiled.input_data);
+                    &buffer[..len]
+                }
+                _ => {
+                    buffer[0..OPERATION_BUS_DATA_SIZE].copy_from_slice(&[op, op_type, a, b]);
+                    &buffer[..OPERATION_BUS_DATA_SIZE]
+                }
+            },
+            ZiskOperationType::BigInt => match inst.op {
+                ADD256_OP => {
                     let len = OPERATION_BUS_DATA_SIZE + ctx.precompiled.input_data.len();
                     buffer[0..OPERATION_BUS_DATA_SIZE].copy_from_slice(&[op, op_type, a, b]);
                     buffer[OPERATION_BUS_DATA_SIZE..len]

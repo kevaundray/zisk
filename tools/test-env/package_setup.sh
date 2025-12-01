@@ -47,13 +47,12 @@ main() {
     current_step=1
     if [[ "$SETUP_ADD_DYLIBS" == "1" ]]; then
       total_steps=7
-    else  
+    else
       total_steps=5
     fi
 
     step "Loading environment variables..."
     load_env || return 1
-    confirm_continue || return 0
 
     cd "$(get_zisk_repo_dir)"
 
@@ -78,9 +77,7 @@ main() {
 
     step "Compress verify key..."
     ensure tar -czvf "${VERIFYKEY_FILE}" \
-      provingKey/zisk/vadcop_final/vadcop_final.starkinfo.json \
-      provingKey/zisk/vadcop_final/vadcop_final.verkey.json \
-      provingKey/zisk/vadcop_final/vadcop_final.verifier.bin || return 1
+      provingKey/zisk/vadcop_final/vadcop_final.verkey.bin || return 1
 
     step "Generate checksums..."
     ensure md5sum "${PROVINGKEY_FILE}" > "${PROVINGKEY_FILE}.md5" || return 1

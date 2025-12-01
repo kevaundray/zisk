@@ -1,7 +1,9 @@
-require "std_constants.pil"
-require "std_lookup.pil"
-require "std_range_check.pil"
-require "std_connection.pil"
+require "std_constants.pil";
+require "std_lookup.pil";
+require "std_range_check.pil";
+require "std_connection.pil";
+require "operations.pil";
+require "opids.pil";
 
 // Precompile in charge of performing the SHA2-256 permutation (named here Sha256-f). 
 // For reference: https://nvlpubs.nist.gov/nistpubs/FIPS/NIST.FIPS.180-4.pdf
@@ -9,17 +11,7 @@ require "std_connection.pil"
 
 // Note: We use little endian representation.
 
-// SHA256-f opcode
-const int SHA256F_OP = 0xF9;
-
-airtemplate Sha256f(const int N = 2**22, const int RC = 2, const int RB = 32, 
-                    const int operation_bus_id = OPERATION_BUS_ID) {
-    if (RC != 2) {
-        error(`Sha256-f is only implemented for RC=2, but received RC=${RC}`);
-    } else if (RB != 32) {
-        error(`Sha256-f is only implemented for RB=32, but received RB=${RB}`);
-    }
-
+airtemplate Sha256f(const int N = 2**22, const int operation_bus_id = OPERATION_BUS_ID) {
     /*
            ROW     a[0..32]      e[0..32]        w[0..32]             STAGE
         |  0   | 0bD₁D₂..D₃₂ | 0bH₁H₂..H₃₂ | XXXXXXXXXXXXXXXX |      LOAD STATE      |
@@ -82,9 +74,9 @@ airtemplate Sha256f(const int N = 2**22, const int RC = 2, const int RB = 32,
     const expr is_mixing        = clock_set(start: 0, end: CLOCKS_MIXING - 1,      offset: CLOCKS_LOAD_STATE + CLOCKS_LOAD_INPUT);
     const expr is_writing_state = clock_set(start: 0, end: CLOCKS_WRITE_STATE - 1, offset: CLOCKS_LOAD_STATE + CLOCKS_LOAD_INPUT + CLOCKS_MIXING);
 
-    col witness a[32];
-    col witness e[32];
-    col witness w[32];
+    col witness bits(1) a[32];
+    col witness bits(1) e[32];
+    col witness bits(1) w[32];
 
     // a,e and w are bits
     for (int i = 0; i < 32; i++) {
@@ -125,9 +117,9 @@ airtemplate Sha256f(const int N = 2**22, const int RC = 2, const int RB = 32,
     // Similarly, for the new w value, we add 3 32-bit numbers, and this generates
     // a number of at most 34 bits, since 2^33 < 3*(2^32-1) < 2^34
     // We use the following columns to store the carry bits
-    col witness new_a_carry_bits;
-    col witness new_e_carry_bits;
-    col witness new_w_carry_bits;
+    col witness bits(8) new_a_carry_bits;
+    col witness bits(8) new_e_carry_bits;
+    col witness bits(4) new_w_carry_bits;
     range_check(expression: new_a_carry_bits, min: 0, max: P2_3 - 1);
     range_check(expression: new_e_carry_bits, min: 0, max: P2_3 - 1);
     expr rc_new_w_carry_bits = 1;
@@ -166,7 +158,7 @@ airtemplate Sha256f(const int N = 2**22, const int RC = 2, const int RB = 32,
         while sending both addr_ind_0 and addr_ind_1 to the memory.         
     */
 
-    col witness step_addr; 
+    col witness bits(40) step_addr;
 
     /*
         MEMORY ACCESS MAP
@@ -225,11 +217,11 @@ airtemplate Sha256f(const int N = 2**22, const int RC = 2, const int RB = 32,
 
     const expr main_step = clock_map(step_addr, STEP_MAIN, start: 0, end: 17);
 
-    col witness in_use_clk_0;
+    col witness bits(1) in_use_clk_0;
     in_use_clk_0 * (1 - in_use_clk_0) === 0;
     (1 - CLK_0) * in_use_clk_0 === 0; // it can only be active when CLK_0 is active
 
-    col witness in_use;
+    col witness bits(1) in_use;
     in_use * (1 - in_use) === 0;
     const expr in_use_active = clock_set(start: 1, end: 17);
     in_use_active * (in_use - 'in_use) === 0; // if activated, it must be activated while in use
@@ -250,7 +242,7 @@ airtemplate Sha256f(const int N = 2**22, const int RC = 2, const int RB = 32,
     );
 
     // --> Constraints to make sure that this coprocessor is called from the main processor
-    lookup_proves(operation_bus_id, [SHA256F_OP, step_addr'(STEP_MAIN), 0, step_addr'(ADDR_OP), 0, 0, 0, 0], mul: in_use_clk_0);
+    lookup_proves(operation_bus_id, [OP_SHA256F, step_addr'(STEP_MAIN), 0, step_addr'(ADDR_OP), 0, 0, 0, 0], mul: in_use_clk_0);
 
     function pack(const expr a[]): expr {
         const int len = length(a);

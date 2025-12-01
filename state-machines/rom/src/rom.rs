@@ -21,7 +21,7 @@ use crate::{RomInstance, RomPlanner};
 use asm_runner::{AsmRHData, AsmRunnerRH};
 use fields::PrimeField64;
 use itertools::Itertools;
-use proofman_common::{AirInstance, FromTrace};
+use proofman_common::{AirInstance, FromTrace, ProofmanResult};
 use zisk_common::{
     create_atomic_vec, BusDeviceMetrics, ComponentBuilder, CounterStats, Instance, InstanceCtx,
     Planner,
@@ -88,12 +88,12 @@ impl RomSM {
         counter_stats: &CounterStats,
         calculated: &AtomicBool,
         trace_buffer: Vec<F>,
-    ) -> AirInstance<F> {
-        let mut rom_trace = RomTrace::new_from_vec_zeroes(trace_buffer);
+    ) -> ProofmanResult<AirInstance<F>> {
+        let mut rom_trace = RomTrace::new_from_vec_zeroes(trace_buffer)?;
 
         let main_trace_len = MainTrace::<F>::NUM_ROWS as u64;
 
-        tracing::info!("··· Creating Rom instance [{} rows]", rom_trace.num_rows());
+        tracing::debug!("··· Creating Rom instance [{} rows]", RomTrace::<F>::NUM_ROWS);
 
         // For every instruction in the rom, fill its corresponding ROM trace
         for (i, key) in rom.insts.keys().sorted().enumerate() {
@@ -154,19 +154,19 @@ impl RomSM {
             rom_trace[i].multiplicity = F::from_u64(multiplicity);
         }
 
-        AirInstance::new_from_trace(FromTrace::new(&mut rom_trace))
+        Ok(AirInstance::new_from_trace(FromTrace::new(&mut rom_trace)))
     }
 
     pub fn compute_witness_from_asm<F: PrimeField64>(
         rom: &ZiskRom,
         asm_romh: &AsmRHData,
         trace_buffer: Vec<F>,
-    ) -> AirInstance<F> {
-        let mut rom_trace = RomTrace::new_from_vec_zeroes(trace_buffer);
+    ) -> ProofmanResult<AirInstance<F>> {
+        let mut rom_trace = RomTrace::new_from_vec_zeroes(trace_buffer)?;
 
-        tracing::info!("··· Creating Rom instance [{} rows]", rom_trace.num_rows());
+        tracing::debug!("··· Creating Rom instance [{} rows]", RomTrace::<F>::NUM_ROWS);
 
-        const MAIN_TRACE_LEN: u64 = MainTrace::<usize>::NUM_ROWS as u64;
+        let main_trace_len = MainTrace::<F>::NUM_ROWS as u64;
 
         for (i, key) in rom.insts.keys().sorted().enumerate() {
             // Get the Zisk instruction
@@ -188,7 +188,7 @@ impl RomSM {
                     }
 
                     if inst.paddr == ROM_EXIT {
-                        multiplicity += MAIN_TRACE_LEN - asm_romh.steps % MAIN_TRACE_LEN;
+                        multiplicity += main_trace_len - asm_romh.steps % main_trace_len;
                     }
                 }
             } else {
@@ -203,7 +203,7 @@ impl RomSM {
             rom_trace[i].multiplicity = F::from_u64(multiplicity);
         }
 
-        AirInstance::new_from_trace(FromTrace::new(&mut rom_trace))
+        Ok(AirInstance::new_from_trace(FromTrace::new(&mut rom_trace)))
     }
 
     /// Computes the ROM trace based on the ROM instructions.
@@ -270,7 +270,8 @@ impl RomSM {
         }
 
         // Padd with zeroes
-        for i in rom.insts.len()..rom_custom_trace.num_rows() {
+        let num_rows: usize = RomRomTrace::<F>::NUM_ROWS;
+        for i in rom.insts.len()..num_rows {
             rom_custom_trace[i] = RomRomTraceRow::default();
         }
     }
@@ -295,6 +296,15 @@ impl RomSM {
 
         // Convert program to rom
         let rom = riscv2zisk.run().expect("RomSM::prover() failed converting elf to rom");
+
+        let rom_len = rom.insts.len();
+        let air_rom_len = RomTrace::<F>::NUM_ROWS;
+        if rom_len > air_rom_len {
+            panic!(
+                "Error: The generated ROM has {} instructions, which exceeds the maximum supported by the Zisk PIL ROM trace ({} instructions).  Please review zisk.pil and increase the ROM trace size accordingly.",
+                rom_len, air_rom_len
+            );
+        }
 
         Self::compute_trace_rom(&rom, rom_custom_trace);
     }

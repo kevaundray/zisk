@@ -9,22 +9,25 @@ use std::{
     io::Read,
     process::Command,
 };
+use zisk_build::RUSTUP_TOOLCHAIN_NAME;
 
 #[cfg(target_family = "unix")]
 use std::os::unix::fs::PermissionsExt;
 
-use crate::{get_target, get_toolchain_download_url, is_supported_target, RUSTUP_TOOLCHAIN_NAME};
+use crate::{get_target, get_toolchain_download_url, is_supported_target};
 
 #[derive(Parser)]
 #[command(name = "install-toolchain", about = "Install the cargo-zisk toolchain.")]
-pub struct InstallToolchainCmd {}
+pub struct InstallToolchainCmd {
+    version: Option<String>,
+}
 
 impl InstallToolchainCmd {
     pub fn run(&self) -> Result<()> {
         // Setup client.
         let client = Client::builder()
             .user_agent("Mozilla/5.0")
-            .timeout(std::time::Duration::from_secs(60))
+            .timeout(std::time::Duration::from_secs(600))
             .build()?;
 
         // Setup variables.
@@ -88,7 +91,7 @@ impl InstallToolchainCmd {
                 let rt = tokio::runtime::Runtime::new()?;
 
                 let toolchain_download_url =
-                    rt.block_on(get_toolchain_download_url(target.to_string()));
+                    rt.block_on(get_toolchain_download_url(&target, &self.version));
 
                 let mut file = fs::File::create(&toolchain_archive_path)?;
                 rt.block_on(download_file(&client, toolchain_download_url.as_str(), &mut file))

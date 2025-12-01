@@ -1,16 +1,38 @@
 use anyhow::Result;
 use clap::Parser;
+use std::path::PathBuf;
 
 mod handler_coordinator;
-mod handler_prove_block;
+mod handler_prove;
 
 #[derive(Parser, Debug)]
 #[command(name = "zisk-coordinator")]
 #[command(about = "The Coordinator for the Distributed ZisK Network")]
+#[command(version)]
 struct ZiskCoordinatorArgs {
+    /// Path to configuration file
+    #[arg(
+        long,
+        help = "Path to configuration file (overrides ZISK_COORDINATOR_CONFIG_PATH environment variable if exists)"
+    )]
+    config: Option<String>,
+
     /// Port where the ZisK Coordinator gRPC server will listen for incoming connections.
     #[arg(short, long, help = "Port number to bind the ZisK Coordinator gRPC server to")]
     port: Option<u16>,
+
+    /// Directory where to save generated proofs
+    #[arg(long, help = "Directory to save generated proofs", conflicts_with = "no_save_proof")]
+    proofs_dir: Option<PathBuf>,
+
+    /// Disable saving proofs
+    #[arg(
+        long,
+        help = "Do not save proofs",
+        conflicts_with = "proofs_dir",
+        default_value_t = false
+    )]
+    no_save_proofs: bool,
 
     /// Webhook URL to notify when a job finishes.
     ///
@@ -33,19 +55,26 @@ struct ZiskCoordinatorArgs {
 
 #[derive(Parser, Debug)]
 enum ZiskCoordinatorCommands {
-    /// Prove a block with the specified input file and node
-    ProveBlock {
+    /// Generate a proof with the specified input file and node
+    Prove {
         /// Coordinator URL
-        #[arg(short, long)]
-        coordinator_url: String,
+        #[arg(long)]
+        coordinator_url: Option<String>,
+
+        /// Proof id
+        #[arg(long, help = "ID of the proof to generate")]
+        data_id: Option<String>,
 
         /// Path to the input file
-        /// NOTE: THIS IS A DEV FEATURE IT WILL BE REMOVED IN PRODUCTION
-        #[arg(long, help = "Path to the input file for block proving")]
-        input: String,
+        #[arg(long, help = "Path to the input file for proof generation")]
+        input: Option<PathBuf>,
 
-        /// Compute capacity needed to generate the block proof
-        #[arg(long, short, help = "Compute capacity needed to generate the block proof")]
+        /// Whether to send the input data directly
+        #[clap(short = 'x', long, default_value_t = false)]
+        direct_inputs: bool,
+
+        /// Compute capacity needed to generate the proof
+        #[arg(long, short, help = "Compute capacity needed to generate the proof")]
         compute_capacity: u32,
 
         #[arg(long, help = "Simulated node ID")]
@@ -58,23 +87,36 @@ async fn main() -> Result<()> {
     // Parse command line arguments
     let args = ZiskCoordinatorArgs::parse();
 
-    // Initialize tracing
-    zisk_distributed_common::tracing::init()?;
-
     match args.command {
-        Some(ZiskCoordinatorCommands::ProveBlock {
+        Some(ZiskCoordinatorCommands::Prove {
             coordinator_url,
+            data_id,
             input,
+            direct_inputs,
             compute_capacity,
             simulated_node,
         }) => {
-            // Run the "prove-block" subcommand
-            handler_prove_block::handle(coordinator_url, input, compute_capacity, simulated_node)
-                .await
+            // Run the "prove" subcommand
+            handler_prove::handle(
+                coordinator_url,
+                data_id,
+                input,
+                direct_inputs,
+                compute_capacity,
+                simulated_node,
+            )
+            .await
         }
         None => {
             // No subcommand was provided → default to coordinator mode
-            handler_coordinator::handle(args.port, args.webhook_url).await
+            handler_coordinator::handle(
+                args.config,
+                args.port,
+                args.proofs_dir,
+                args.no_save_proofs,
+                args.webhook_url,
+            )
+            .await
         }
     }
 }

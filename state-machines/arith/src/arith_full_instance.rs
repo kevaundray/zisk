@@ -6,7 +6,7 @@
 
 use crate::{ArithFrops, ArithFullSM};
 use fields::PrimeField64;
-use proofman_common::{AirInstance, ProofCtx, SetupCtx};
+use proofman_common::{AirInstance, ProofCtx, ProofmanResult, SetupCtx};
 use std::{
     collections::{HashMap, VecDeque},
     sync::Arc,
@@ -47,7 +47,7 @@ impl<F: PrimeField64> ArithFullInstance<F> {
     pub fn new(arith_full_sm: Arc<ArithFullSM<F>>, mut ictx: InstanceCtx) -> Self {
         assert_eq!(
             ictx.plan.air_id,
-            ArithTrace::<usize>::AIR_ID,
+            ArithTrace::<F>::AIR_ID,
             "ArithFullInstance: Unsupported air_id: {:?}",
             ictx.plan.air_id
         );
@@ -87,7 +87,7 @@ impl<F: PrimeField64> Instance<F> for ArithFullInstance<F> {
         _sctx: &SetupCtx<F>,
         collectors: Vec<(usize, Box<dyn BusDevice<PayloadType>>)>,
         trace_buffer: Vec<F>,
-    ) -> Option<AirInstance<F>> {
+    ) -> ProofmanResult<Option<AirInstance<F>>> {
         let inputs: Vec<_> = collectors
             .into_iter()
             .map(|(_, collector)| {
@@ -96,7 +96,7 @@ impl<F: PrimeField64> Instance<F> for ArithFullInstance<F> {
                 _collector.inputs
             })
             .collect();
-        Some(self.arith_full_sm.compute_witness(&inputs, trace_buffer))
+        Ok(Some(self.arith_full_sm.compute_witness(&inputs, trace_buffer)?))
     }
 
     /// Retrieves the checkpoint associated with this instance.

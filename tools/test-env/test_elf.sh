@@ -87,14 +87,11 @@ test_elf() {
 
     info "Executing ${desc} script"
 
-    if [[ "${PLATFORM}" == "linux" ]]; then
-        is_proving_key_installed || return 1
-    fi
+    is_proving_key_installed || return 1
 
     info "Loading environment variables..."
     # Load environment variables from .env file
     load_env || return 1
-    confirm_continue || return 0
 
     export ELF_FILE="$elf_file"
     export INPUTS_PATH="$inputs_path"
@@ -170,13 +167,20 @@ test_elf() {
     # Process inputs in non-distributed
     if [ ${num_inputs} -gt 0 ]; then
         for input_file in "${inputs[@]}"; do
+            if [[ "${input_file}" != "empty" ]]; then
+                input_flag="-i ${INPUTS_PATH}/${input_file}"
+            else
+                input_flag=""
+            fi
+
             step "Verifying constraints for ${input_file}..."
             if [[ "${BUILD_GPU}" == "1" ]]; then
                 warn "Skipping verify constraints for GPU mode"
             else
+
                 ensure cargo-zisk verify-constraints \
                     -e "${ELF_FILE}" \
-                    -i "${INPUTS_PATH}/${input_file}" \
+                    ${input_flag} \
                     2>&1 | tee "constraints_${input_file}.log" || return 1
                 if ! grep -F "All global constraints were successfully verified" \
                          "constraints_${input_file}.log"; then
@@ -189,7 +193,7 @@ test_elf() {
                 step "Proving (non-distributed) for ${input_file}..."
                 ensure cargo-zisk prove \
                     -e "${ELF_FILE}" \
-                    -i "${INPUTS_PATH}/${input_file}" \
+                    ${input_flag} \
                     -o proof $PROVE_FLAGS \
                     2>&1 | tee "prove_${input_file}.log" || return 1
                 if ! grep -F "Vadcop Final proof was verified" "prove_${input_file}.log"; then
@@ -219,11 +223,17 @@ test_elf() {
     if [ ${num_dist_inputs} -gt 0 ]; then
         if [[ "${DISABLE_PROVE}" != "1" ]]; then
             for input_file in "${dist_inputs[@]}"; do
+                if [[ "${input_file}" != "empty" ]]; then
+                    input_flag="-i ${INPUTS_PATH}/${input_file}"
+                else
+                    input_flag=""
+                fi
+
                 step "Proving (distributed) for ${input_file}..."
                 export RAYON_NUM_THREADS=$DISTRIBUTED_THREADS
                 ensure $MPI_CMD cargo-zisk prove \
                     -e "${ELF_FILE}" \
-                    -i "${INPUTS_PATH}/${input_file}" \
+                    ${input_flag} \
                     -o proof $PROVE_FLAGS \
                     2>&1 | tee "prove_dist_${input_file}.log" || return 1
                 if ! grep -F "Vadcop Final proof was verified" \

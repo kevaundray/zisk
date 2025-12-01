@@ -18,19 +18,6 @@ use std::{
 };
 use tokio::time::sleep;
 
-pub const RUSTUP_TOOLCHAIN_NAME: &str = "zisk";
-
-pub const ZISK_VERSION_MESSAGE: &str = concat!(
-    env!("CARGO_PKG_VERSION"),
-    " (",
-    env!("VERGEN_GIT_SHA"),
-    " ",
-    env!("VERGEN_BUILD_TIMESTAMP"),
-    ")"
-);
-
-const ZISK_TARGET: &str = "riscv64ima-zisk-zkvm-elf";
-
 trait CommandExecutor {
     fn run(&mut self) -> Result<()>;
 }
@@ -81,10 +68,16 @@ pub fn is_supported_target() -> bool {
     false
 }
 
-pub async fn get_toolchain_download_url(target: String) -> String {
-    format!(
+pub async fn get_toolchain_download_url(target: &String, version: &Option<String>) -> String {
+    if let Some(version) = version {
+        format!(
+        "https://github.com/0xPolygonHermez/rust/releases/download/{version}/rust-toolchain-{target}.tar.gz",
+    )
+    } else {
+        format!(
         "https://github.com/0xPolygonHermez/rust/releases/latest/download/rust-toolchain-{target}.tar.gz",
     )
+    }
 }
 
 pub async fn download_file(

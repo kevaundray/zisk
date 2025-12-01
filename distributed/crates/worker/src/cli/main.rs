@@ -1,12 +1,16 @@
 use anyhow::Result;
-use cargo_zisk::commands::{get_proving_key, get_witness_computation_lib};
+use cargo_zisk::{
+    commands::{get_proving_key, get_witness_computation_lib},
+    ux::print_banner,
+};
 use clap::Parser;
 use colored::Colorize;
 use std::path::PathBuf;
 use zisk_distributed_worker::{
-    config::{build_worker_and_prover_config, ProverServiceConfigDto},
+    config::{ProverServiceConfigDto, WorkerServiceConfig},
     ProverConfig, WorkerNode,
 };
+use zisk_sdk::{Asm, Emu};
 
 #[derive(Parser)]
 #[command(name = "zisk-worker")]
@@ -23,7 +27,11 @@ struct Cli {
 
     /// Number of compute units to advertise (overrides config file)
     #[arg(long)]
-    compute_units: Option<u32>,
+    compute_capacity: Option<u32>,
+
+    /// This is the path where the worker will look for input files to process.
+    #[clap(short = 'i', long)]
+    inputs_folder: Option<PathBuf>,
 
     #[clap(
         short = 'j',
@@ -34,8 +42,11 @@ struct Cli {
     pub shared_tables: bool,
 
     /// Path to configuration file
-    #[arg(long, default_value = "config.toml")]
-    config: String,
+    #[arg(
+        long,
+        help = "Path to configuration file (overrides ZISK_WORKER_CONFIG_PATH environment variable)"
+    )]
+    config: Option<String>,
 
     /// Witness computation dynamic library path
     #[clap(short = 'w', long)]
@@ -92,7 +103,7 @@ struct Cli {
     pub final_snark: bool,
 
     /// GPU parameters
-    #[clap(short = 'r', long, default_value_t = false)]
+    #[clap(short = 'z', long, default_value_t = false)]
     pub preallocate: bool,
 
     /// Maximum number of GPU streams
@@ -104,16 +115,30 @@ struct Cli {
 
     #[clap(short = 'x', long)]
     pub max_witness_stored: Option<usize>,
+
+    #[clap(short = 'm', long, default_value_t = false)]
+    pub minimal_memory: bool,
+
+    #[clap(short = 'r', long, default_value_t = false)]
+    pub rma: bool,
 }
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    // Initialize tracing
-    zisk_distributed_common::tracing::init()?;
-
     let cli = Cli::parse();
 
-    let prover_config = ProverServiceConfigDto {
+    let worker_config = WorkerServiceConfig::load(
+        cli.config,
+        cli.coordinator_url,
+        cli.worker_id,
+        cli.compute_capacity,
+        cli.inputs_folder,
+    )
+    .await?;
+
+    print_banner();
+
+    let prover_config_dto = ProverServiceConfigDto {
         elf: cli.elf.clone(),
         witness_lib: cli.witness_lib.clone(),
         asm: cli.asm.clone(),
@@ -131,35 +156,65 @@ async fn main() -> Result<()> {
         number_threads_witness: cli.number_threads_witness,
         max_witness_stored: cli.max_witness_stored,
         shared_tables: cli.shared_tables,
+        rma: cli.rma,
+        minimal_memory: cli.minimal_memory,
     };
 
-    let (grpc_config, service_config) = build_worker_and_prover_config(
-        prover_config,
-        &cli.config,
-        cli.coordinator_url,
-        cli.worker_id,
-        cli.compute_units,
-    )
-    .await?;
+    let prover_config = ProverConfig::load(prover_config_dto)?;
 
-    print_command_info(&service_config, cli.debug.is_some());
+    print_command_info(&prover_config, &worker_config, cli.debug.is_some());
 
-    let mut worker = WorkerNode::new(grpc_config, service_config).await?;
-    worker.run().await
+    if prover_config.emulator {
+        let mut worker = WorkerNode::<Emu>::new_emu(worker_config, prover_config).await?;
+        return worker.run().await;
+    } else {
+        let mut worker = WorkerNode::<Asm>::new_asm(worker_config, prover_config).await?;
+        return worker.run().await;
+    };
 }
 
-fn print_command_info(service_config: &ProverConfig, debug: bool) {
-    println!("{} ZisK Worker", format!("{: >12}", "Command").bright_green().bold());
+fn print_command_info(
+    prover_config: &ProverConfig,
+    worker_config: &WorkerServiceConfig,
+    debug: bool,
+) {
+    println!(
+        "{} zisk-worker (ZisK Distributed Worker {})",
+        format!("{: >12}", "Command").bright_green().bold(),
+        env!("CARGO_PKG_VERSION")
+    );
+    println!("{: >12} {}", "Worker ID".bright_green().bold(), worker_config.worker.worker_id);
+    println!(
+        "{: >12} {}",
+        "Compute Cap".bright_green().bold(),
+        worker_config.worker.compute_capacity
+    );
+    println!("{: >12} {}", "Coordinator".bright_green().bold(), worker_config.coordinator.url);
+    println!("{: >12} {}", "Environment".bright_green().bold(), worker_config.worker.environment);
+    println!(
+        "{: >12} {}/{} {}",
+        "Logging".bright_green().bold(),
+        worker_config.logging.level,
+        worker_config.logging.format,
+        worker_config
+            .logging
+            .file_path
+            .as_deref()
+            .map(|p| format!("(log file: {})", p).bright_black().to_string())
+            .unwrap_or_default()
+    );
     println!(
         "{: >12} {}",
         "Witness Lib".bright_green().bold(),
-        get_witness_computation_lib(Some(&service_config.witness_lib)).display()
+        get_witness_computation_lib(Some(&prover_config.witness_lib)).display()
     );
 
-    println!("{: >12} {}", "Elf".bright_green().bold(), service_config.elf.display());
-
-    if service_config.asm.is_some() {
-        let asm_path = service_config.asm.as_ref().unwrap().display();
+    println!("{: >12} {}", "Elf".bright_green().bold(), prover_config.elf.display());
+    if prover_config.asm.is_some() {
+        if let Some(asm_port) = prover_config.asm_port.as_ref() {
+            println!("{: >12} {}", "Asm port".bright_green().bold(), asm_port);
+        }
+        let asm_path = prover_config.asm.as_ref().unwrap().display();
         println!("{: >12} {}", "ASM runner".bright_green().bold(), asm_path);
     } else {
         println!(
@@ -168,11 +223,10 @@ fn print_command_info(service_config: &ProverConfig, debug: bool) {
             "Running in emulator mode".bright_yellow()
         );
     }
-
     println!(
         "{: >12} {}",
         "Proving key".bright_green().bold(),
-        get_proving_key(Some(&service_config.proving_key)).display()
+        get_proving_key(Some(&prover_config.proving_key)).display()
     );
 
     let std_mode = if debug { "Debug mode" } else { "Standard mode" };
