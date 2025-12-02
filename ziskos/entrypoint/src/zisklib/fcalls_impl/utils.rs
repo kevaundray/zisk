@@ -21,7 +21,7 @@ pub fn n_u64_digits_from_biguint<const N: usize>(value: &BigUint) -> [u64; N] {
         );
     }
     let mut limbs = [0u64; N];
-    for (i, d) in digits.iter().enumerate().take(4) {
+    for (i, d) in digits.iter().enumerate().take(N) {
         limbs[i] = *d;
     }
     limbs
