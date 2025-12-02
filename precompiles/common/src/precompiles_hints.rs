@@ -475,9 +475,14 @@ mod tests {
         let data = vec![make_header(HINTS_TYPE_RESULT, 2), 0x111, 0x222];
 
         // Dispatch should succeed and be non-blocking
-        p.process_hints(&data).unwrap();
-        // Wait for completion
-        p.wait_for_completion().unwrap();
+        assert!(p.process_hints(&data).is_ok());
+        // Wait for completion should succeed
+        assert!(p.wait_for_completion().is_ok());
+
+        // Buffer should be empty after completion
+        let queue = p.state.queue.lock().unwrap();
+        assert!(queue.buffer.is_empty());
+        assert_eq!(queue.next_drain_seq, 1);
     }
 
     #[test]
@@ -491,8 +496,13 @@ mod tests {
             make_header(HINTS_TYPE_RESULT, 1),
             0x333,
         ];
-        p.process_hints(&data).unwrap();
-        p.wait_for_completion().unwrap();
+        assert!(p.process_hints(&data).is_ok());
+        assert!(p.wait_for_completion().is_ok());
+
+        // Verify all hints were processed (buffer empty, next_drain_seq advanced)
+        let queue = p.state.queue.lock().unwrap();
+        assert!(queue.buffer.is_empty());
+        assert_eq!(queue.next_drain_seq, 3);
     }
 
     #[test]
@@ -500,17 +510,27 @@ mod tests {
         let p = processor();
         let data1 = vec![make_header(HINTS_TYPE_RESULT, 1), 0xAAA];
         let data2 = vec![make_header(HINTS_TYPE_RESULT, 1), 0xBBB];
-        p.process_hints(&data1).unwrap();
-        p.process_hints(&data2).unwrap();
-        p.wait_for_completion().unwrap();
+
+        assert!(p.process_hints(&data1).is_ok());
+        assert!(p.process_hints(&data2).is_ok());
+        assert!(p.wait_for_completion().is_ok());
+
+        // Verify sequence continued across calls
+        let queue = p.state.queue.lock().unwrap();
+        assert_eq!(queue.next_drain_seq, 2);
+        assert!(queue.buffer.is_empty());
     }
 
     #[test]
     fn test_empty_input_ok() {
         let p = processor();
         let data: Vec<u64> = vec![];
-        p.process_hints(&data).unwrap();
-        p.wait_for_completion().unwrap();
+        assert!(p.process_hints(&data).is_ok());
+        assert!(p.wait_for_completion().is_ok());
+
+        // No hints processed
+        let queue = p.state.queue.lock().unwrap();
+        assert_eq!(queue.next_drain_seq, 0);
     }
 
     // Negative tests
@@ -518,10 +538,17 @@ mod tests {
     fn test_unknown_hint_type_returns_error() {
         let p = processor();
         let data = vec![make_header(999, 1), 0x1234];
-        // Dispatch enqueues work; error surfaces on wait
-        p.process_hints(&data).unwrap();
-        let err = p.wait_for_completion().err().unwrap();
-        assert!(err.to_string().contains("error"));
+
+        // Dispatch enqueues work
+        assert!(p.process_hints(&data).is_ok());
+
+        // Error surfaces on wait
+        let result = p.wait_for_completion();
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("error"));
+
+        // Error flag should be set
+        assert!(p.state.error_flag.load(Ordering::Acquire));
     }
 
     #[test]
@@ -529,11 +556,12 @@ mod tests {
         let p = processor();
         // First valid, then invalid type
         let data = vec![make_header(HINTS_TYPE_RESULT, 1), 0x111, make_header(999, 0)];
-        // Dispatch returns error at parse/process of bad hint
+
         let _ = p.process_hints(&data);
-        // Wait should report error state
-        let w = p.wait_for_completion();
-        assert!(w.is_err());
+        let result = p.wait_for_completion();
+
+        assert!(result.is_err());
+        assert!(p.state.error_flag.load(Ordering::Acquire));
     }
 
     #[test]
@@ -541,63 +569,113 @@ mod tests {
         let p = processor();
         let bad = vec![make_header(999, 0)];
         let _ = p.process_hints(&bad);
-        // Give workers a moment (no busy wait; optional)
-        std::thread::sleep(std::time::Duration::from_millis(5));
-        p.reset();
 
+        // Wait briefly for error to propagate
+        std::thread::sleep(std::time::Duration::from_millis(10));
+
+        // Error should be set
+        assert!(p.state.error_flag.load(Ordering::Acquire));
+
+        // Reset should clear error
+        p.reset();
+        assert!(!p.state.error_flag.load(Ordering::Acquire));
+
+        // Should be able to process new hints
         let good = vec![make_header(HINTS_TYPE_RESULT, 1), 0x42];
-        p.process_hints(&good).unwrap();
-        p.wait_for_completion().unwrap();
+        assert!(p.process_hints(&good).is_ok());
+        assert!(p.wait_for_completion().is_ok());
+
+        let queue = p.state.queue.lock().unwrap();
+        assert_eq!(queue.next_drain_seq, 1);
     }
 
     // Stream control tests
     #[test]
     fn test_stream_start_resets_state() {
         let p = processor();
+
         // First batch increments sequence
         let batch1 = vec![make_header(HINTS_TYPE_RESULT, 1), 0x01];
         p.process_hints(&batch1).unwrap();
+        p.wait_for_completion().unwrap();
 
-        // Send START control; then a new hint
+        // Sequence should be at 1
+        {
+            let queue = p.state.queue.lock().unwrap();
+            assert_eq!(queue.next_drain_seq, 1);
+        }
+
+        // Send START control - should reset sequence
         let start = vec![make_ctrl_header(CTRL_START, 0)];
         p.process_hints(&start).unwrap();
 
+        // Sequence should be reset to 0
+        {
+            let queue = p.state.queue.lock().unwrap();
+            assert_eq!(queue.next_drain_seq, 0);
+            assert!(queue.buffer.is_empty());
+        }
+
+        // Process new batch
         let batch2 = vec![make_header(HINTS_TYPE_RESULT, 1), 0x02];
         p.process_hints(&batch2).unwrap();
-        // End the stream to ensure completion
+
         let end = vec![make_ctrl_header(CTRL_END, 0)];
         p.process_hints(&end).unwrap();
-        p.wait_for_completion().unwrap();
+
+        // Should have processed 1 hint (starting from 0 again)
+        let queue = p.state.queue.lock().unwrap();
+        assert_eq!(queue.next_drain_seq, 1);
     }
 
     #[test]
     fn test_stream_end_waits_until_completion() {
         let p = processor();
-        // Dispatch a few hints
+
+        // Dispatch hints
         let data =
             vec![make_header(HINTS_TYPE_RESULT, 1), 0x10, make_header(HINTS_TYPE_RESULT, 1), 0x20];
         p.process_hints(&data).unwrap();
-        // End control should cause internal wait during processing
+
+        // END should wait internally
         let end = vec![make_ctrl_header(CTRL_END, 0)];
         p.process_hints(&end).unwrap();
-        // Subsequent explicit wait should be fast (already drained)
-        p.wait_for_completion().unwrap();
+
+        // Buffer should already be empty
+        {
+            let queue = p.state.queue.lock().unwrap();
+            assert!(queue.buffer.is_empty());
+            assert_eq!(queue.next_drain_seq, 2);
+        }
+
+        // Explicit wait should be instant
+        assert!(p.wait_for_completion().is_ok());
     }
 
     #[test]
     fn test_stream_cancel_returns_error() {
         let p = processor();
         let cancel = vec![make_ctrl_header(CTRL_CANCEL, 0)];
-        let err = p.process_hints(&cancel).err().unwrap();
-        assert!(err.to_string().contains("cancelled"));
+
+        let result = p.process_hints(&cancel);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("cancelled"));
+
+        // Error flag should be set
+        assert!(p.state.error_flag.load(Ordering::Acquire));
     }
 
     #[test]
     fn test_stream_error_signal_returns_error() {
         let p = processor();
         let signal_err = vec![make_ctrl_header(CTRL_ERROR, 0)];
-        let err = p.process_hints(&signal_err).err().unwrap();
-        assert!(err.to_string().contains("error"));
+
+        let result = p.process_hints(&signal_err);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("error"));
+
+        // Error flag should be set
+        assert!(p.state.error_flag.load(Ordering::Acquire));
     }
 
     // Stress test
