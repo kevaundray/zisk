@@ -24,22 +24,22 @@
 //! ├────────────────────────────────────────────────────────────────┤
 //! │                      Data[length-1] (u64)                      │
 //! └────────────────────────────────────────────────────────────────┘
-//! 
+//!
 //! - Hint Code — Control code or Data Hint Type
 //! - Length — Number of following u64 data words
 //!
 //! ## Hint Type Layout
 //!
 //! ### Control codes
-//! 
+//!
 //! The following control codes are defined:
 //! - `0x00` (START): Reset processor state and global sequence.
 //! - `0x01` (END): Wait until completion of all pending hints.
-//! - `0x02` (CANCEL): Cancel current stream and stop processing further hints. 
+//! - `0x02` (CANCEL): Cancel current stream and stop processing further hints.
 //! - `0x03` (ERROR): Indicate an error has occurred; stop processing further hints.
-//! 
+//!
 //! Control codes are for control only and do not have any associated data (Length should be zero).
-//! 
+//!
 //! ### Data Hint Types:
 //! - `0x04` (`HINTS_TYPE_RESULT`): Pass-through data
 //! - `0x05` (`HINTS_TYPE_ECRECOVER`): ECRECOVER inputs (currently returns empty)
@@ -51,26 +51,28 @@ use std::collections::VecDeque;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::{Arc, Condvar, Mutex};
 
+// TODO! COnvert Control Code to an enum and HINT TYPE to an enum as well
+
+/// Control code: Reset processor state and global sequence.
+const CTRL_START: u32 = 0x00;
+
+/// Control code: Wait until completion of all pending hints.
+const CTRL_END: u32 = 0x01;
+
+/// Control code: Cancel current stream and stop processing.
+const CTRL_CANCEL: u32 = 0x02;
+
+/// Control code: Signal error and stop processing.
+const CTRL_ERROR: u32 = 0x03;
+
 /// Hint type indicating that the data is already the precomputed result.
 ///
 /// When a hint has this type, the processor simply passes through the data
 /// without any additional computation.
-pub const HINTS_TYPE_RESULT: u32 = 1;
+pub const HINTS_TYPE_RESULT: u32 = 0x04;
 
 /// Hint type indicating that the data contains inputs for the ecrecover precompile.
-pub const HINTS_TYPE_ECRECOVER: u32 = 2;
-
-/// Stream control is encoded in the high byte (bits 31..24) of `hint_type`.
-/// Base type is the lower 24 bits (bits 23..0).
-const STREAM_CTRL_MASK: u32 = 0xFF00_0000;
-const STREAM_BASE_MASK: u32 = 0x00FF_FFFF;
-const STREAM_CTRL_SHIFT: u32 = 24;
-
-const STREAM_CTRL_NONE: u32 = 0x00;
-const STREAM_CTRL_START: u32 = 0x01; // reset stream state
-const STREAM_CTRL_END: u32 = 0x02; // wait until completion
-const STREAM_CTRL_CANCEL: u32 = 0x03; // cancel processing
-const STREAM_CTRL_ERROR: u32 = 0x04; // signal error
+pub const HINTS_TYPE_ECRECOVER: u32 = 0x05;
 
 /// Represents a single precompile hint parsed from a `u64` slice.
 ///
@@ -107,7 +109,7 @@ impl PrecompileHint {
     #[inline(always)]
     fn from_u64_slice(slice: &[u64], idx: usize) -> Result<Self> {
         if slice.is_empty() || idx >= slice.len() {
-            return Err(anyhow::anyhow!("Slice too short to contain a hint"));
+            return Err(anyhow::anyhow!("Slice too short or index out of bounds"));
         }
 
         let header = slice[idx];
@@ -122,45 +124,46 @@ impl PrecompileHint {
             ));
         }
 
+        // TODO! This creates a new Vec to own the data. Sine performance is critical,
+        // TODO! consider using a slice reference instead.
         let data = slice[idx + 1..idx + length as usize + 1].to_vec();
 
         Ok(PrecompileHint { hint_type, data })
     }
 }
 
-/// Shared state for the reorder buffer used by `process_hints_2`.
+/// Ordered result buffer with drain state.
 ///
-/// This structure maintains a global sequence counter and a VecDeque that
-/// holds processed results in order, allowing out-of-order completion while
-/// ensuring in-order output.
-struct ReorderBuffer {
-    /// The reorder buffer: None = pending, Some(Ok(...)) = ready, Some(Err(...)) = error
+/// This structure maintains a VecDeque that holds processed results in order,
+/// allowing out-of-order completion while ensuring in-order output.
+struct ResultQueue {
+    /// The result buffer: None = pending, Some(Ok(...)) = ready, Some(Err(...)) = error
     buffer: VecDeque<Option<Result<Vec<u64>>>>,
-    /// Sequence ID of buffer[0] (the next result to drain/print)
-    base_seq: usize,
+    /// Sequence ID of the next result to drain from buffer[0]
+    next_drain_seq: usize,
 }
 
-/// Shared state across multiple calls to `process_hints_2`.
-struct SharedState {
-    /// The reorder buffer protected by a mutex
-    reorder: Mutex<ReorderBuffer>,
-    /// Condvar to signal when buffer becomes empty or error occurs
-    buffer_empty: Condvar,
-    /// Global sequence counter for assigning seq_ids to hints
+/// Thread-safe shared state for parallel hint processing.
+struct HintProcessorState {
+    /// Ordered results ready for draining
+    queue: Mutex<ResultQueue>,
+    /// Notifies when queue becomes empty or error occurs
+    drain_signal: Condvar,
+    /// Next sequence ID to assign to incoming hints
     next_seq: AtomicUsize,
-    /// Flag to signal that an error occurred and processing should stop
-    has_error: AtomicBool,
-    /// Generation counter to detect stale workers after reset
+    /// Signals processing should stop
+    error_flag: AtomicBool,
+    /// Invalidates stale workers after reset
     generation: AtomicUsize,
 }
 
-impl SharedState {
+impl HintProcessorState {
     fn new() -> Self {
         Self {
-            reorder: Mutex::new(ReorderBuffer { buffer: VecDeque::new(), base_seq: 0 }),
-            buffer_empty: Condvar::new(),
+            queue: Mutex::new(ResultQueue { buffer: VecDeque::new(), next_drain_seq: 0 }),
+            drain_signal: Condvar::new(),
             next_seq: AtomicUsize::new(0),
-            has_error: AtomicBool::new(false),
+            error_flag: AtomicBool::new(false),
             generation: AtomicUsize::new(0),
         }
     }
@@ -174,12 +177,12 @@ impl SharedState {
 pub struct PrecompileHintsProcessor {
     /// The thread pool used for parallel hint processing.
     pool: ThreadPool,
-    /// Shared state for the reorder buffer (used by process_hints_2)
-    shared: Arc<SharedState>,
+    /// Shared state for parallel hint processing
+    state: Arc<HintProcessorState>,
 }
 
 impl PrecompileHintsProcessor {
-    const NUM_THREADS: usize = 32;
+    const DEFAULT_NUM_THREADS: usize = 32;
 
     /// Creates a new processor with the default number of threads.
     ///
@@ -190,7 +193,7 @@ impl PrecompileHintsProcessor {
     /// * `Ok(PrecompileHintsProcessor)` - The configured processor
     /// * `Err` - If the thread pool fails to initialize
     pub fn new() -> Result<Self> {
-        Self::with_num_threads(Self::NUM_THREADS)
+        Self::with_num_threads(Self::DEFAULT_NUM_THREADS)
     }
 
     /// Creates a new processor with the specified number of threads.
@@ -209,19 +212,19 @@ impl PrecompileHintsProcessor {
             .build()
             .map_err(|e| anyhow::anyhow!("Failed to create thread pool: {}", e))?;
 
-        Ok(Self { pool, shared: Arc::new(SharedState::new()) })
+        Ok(Self { pool, state: Arc::new(HintProcessorState::new()) })
     }
 
     /// Processes hints in parallel with non-blocking, ordered output.
     ///
     /// This method dispatches each hint to the thread pool for parallel processing.
-    /// Results are collected in a reorder buffer and drained (printed) in the original
+    /// Results are collected in a reorder buffer and drained (printed!!!!!!!!!!!!!!!!!!!!!) in the original
     /// order as soon as consecutive results become available.
     ///
     /// # Key characteristics:
     /// - **Non-blocking**: Returns immediately after dispatching work to the pool
     /// - **Global sequence**: Sequence IDs are maintained across multiple calls
-    /// - **Ordered output**: Results are printed in the order hints were received
+    /// - **Ordered output**: Results are printed!!!!!!!!!!!!!!!!!!!! in the order hints were received
     /// - **Error handling**: Stops processing on first error
     ///
     /// # Arguments
@@ -233,134 +236,121 @@ impl PrecompileHintsProcessor {
     /// * `Ok(())` - Hints were successfully dispatched (does not mean processing is complete)
     /// * `Err` - If a previous error occurred or hints are malformed
     pub fn process_hints(&self, hints: &[u64]) -> Result<()> {
-        // Check if a previous error occurred
-        if self.shared.has_error.load(Ordering::Acquire) {
-            return Err(anyhow::anyhow!("Processing stopped due to previous error"));
-        }
-
         // Parse hints and dispatch to pool
         let mut idx = 0;
         while idx < hints.len() {
             // Check for error before processing each hint
-            if self.shared.has_error.load(Ordering::Acquire) {
+            if self.state.error_flag.load(Ordering::Acquire) {
                 return Err(anyhow::anyhow!("Processing stopped due to previous error"));
             }
 
             let hint = PrecompileHint::from_u64_slice(hints, idx)?;
             let length = hint.data.len();
 
-            // Decode stream control from high byte
-            let ctrl = (hint.hint_type & STREAM_CTRL_MASK) >> STREAM_CTRL_SHIFT;
-            let base_type = hint.hint_type & STREAM_BASE_MASK;
-
-            // Apply stream control actions
-            match ctrl {
-                STREAM_CTRL_START => {
+            // Check if this is a control code or data hint type
+            match hint.hint_type {
+                CTRL_START => {
                     // Reset global sequence and buffer at stream start
                     self.reset();
                     // Control hint only; skip processing
                     idx += length + 1;
                     continue;
                 }
-                STREAM_CTRL_CANCEL => {
-                    // Cancel current stream: set error and notify
-                    self.shared.has_error.store(true, Ordering::Release);
-                    self.shared.buffer_empty.notify_all();
-                    return Err(anyhow::anyhow!("Stream cancelled"));
-                }
-                STREAM_CTRL_ERROR => {
-                    // External error signal
-                    self.shared.has_error.store(true, Ordering::Release);
-                    self.shared.buffer_empty.notify_all();
-                    return Err(anyhow::anyhow!("Stream error signalled"));
-                }
-                STREAM_CTRL_END => {
+                CTRL_END => {
                     // Control hint only; wait for completion then skip processing
                     self.wait_for_completion()?;
                     idx += length + 1;
                     continue;
                 }
-                _ => {}
+                CTRL_CANCEL => {
+                    // Cancel current stream: set error and notify
+                    self.state.error_flag.store(true, Ordering::Release);
+                    self.state.drain_signal.notify_all();
+                    return Err(anyhow::anyhow!("Stream cancelled"));
+                }
+                CTRL_ERROR => {
+                    // External error signal
+                    self.state.error_flag.store(true, Ordering::Release);
+                    self.state.drain_signal.notify_all();
+                    return Err(anyhow::anyhow!("Stream error signalled"));
+                }
+                _ => {
+                    // Data hint type - process normally
+                }
             }
 
             // Atomically reserve slot and capture generation inside mutex
             // This prevents orphaned slots if reset happens between generation load and push_back
             let (generation, seq_id) = {
-                let mut reorder = self.shared.reorder.lock().unwrap();
-                let gen = self.shared.generation.load(Ordering::SeqCst);
-                let seq = self.shared.next_seq.fetch_add(1, Ordering::SeqCst);
-                reorder.buffer.push_back(None);
+                let mut queue = self.state.queue.lock().unwrap();
+                let gen = self.state.generation.load(Ordering::SeqCst);
+                let seq = self.state.next_seq.fetch_add(1, Ordering::SeqCst);
+                queue.buffer.push_back(None);
                 (gen, seq)
             };
 
             // Spawn processing task
-            let shared = Arc::clone(&self.shared);
+            let state = Arc::clone(&self.state);
             self.pool.spawn(move || {
+                // TODO! Is it necessary? TO increase performance maybe is enough to check error_flag only when storing result
                 // Check if we should stop due to error
-                if shared.has_error.load(Ordering::Acquire) {
+                if state.error_flag.load(Ordering::Acquire) {
                     return;
                 }
 
                 // Process the hint
-                // Override hint type to base type for processing
-                let mut hint_for_proc = hint;
-                hint_for_proc.hint_type = base_type;
-                let result = Self::process_hint(&hint_for_proc);
+                let result = Self::process_hint(&hint);
 
                 // Store result and try to drain
-                let mut reorder = shared.reorder.lock().unwrap();
+                let mut queue = state.queue.lock().unwrap();
 
                 // Check generation first to detect stale workers from previous sessions
-                let current_gen = shared.generation.load(Ordering::SeqCst);
+                let current_gen = state.generation.load(Ordering::SeqCst);
                 if generation != current_gen {
                     // Worker belongs to old generation; ignore result
                     return;
                 }
 
-                // Calculate offset in buffer; handle resets and drained slots
-                if seq_id < reorder.base_seq {
+                // Calculate offset in buffer; handle drained slots
+                if seq_id < queue.next_drain_seq {
                     // This result belongs to a previous stream/session; ignore
                     return;
                 }
-                let offset = seq_id - reorder.base_seq;
-                if offset >= reorder.buffer.len() {
-                    // Buffer no longer has a slot for this seq (likely after reset); ignore
-                    return;
-                }
+                let offset = seq_id - queue.next_drain_seq;
 
                 // Check error flag again before storing to avoid processing after error
-                if shared.has_error.load(Ordering::Acquire) {
+                if state.error_flag.load(Ordering::Acquire) {
                     return;
                 }
 
-                reorder.buffer[offset] = Some(result);
+                queue.buffer[offset] = Some(result);
 
                 // Drain consecutive ready results from the front
-                while let Some(Some(res)) = reorder.buffer.front() {
+                while let Some(Some(res)) = queue.buffer.front() {
                     match res {
                         Ok(_data) => {
                             // Print the result (will be replaced with send to another process)
-                            // println!("[seq={}] Result: {:?}", reorder.base_seq, data);
-                            reorder.buffer.pop_front();
-                            reorder.base_seq += 1;
+                            // println!("[seq={}] Result: {:?}", queue.next_drain_seq, data);
+                            queue.buffer.pop_front();
+                            queue.next_drain_seq += 1;
                         }
                         Err(_) => {
                             // Error found - signal to stop and break
-                            shared.has_error.store(true, Ordering::Release);
+                            state.error_flag.store(true, Ordering::Release);
                             // Print error and stop draining
-                            if let Some(Some(Err(e))) = reorder.buffer.pop_front() {
-                                eprintln!("[seq={}] Error: {}", reorder.base_seq, e);
+                            if let Some(Some(Err(e))) = queue.buffer.pop_front() {
+                                eprintln!("[seq={}] Error: {}", queue.next_drain_seq, e);
                             }
-                            reorder.base_seq += 1;
-                            shared.buffer_empty.notify_all();
+                            queue.next_drain_seq += 1;
+                            state.drain_signal.notify_all();
                             break;
                         }
                     }
                 }
 
                 // Notify if buffer is now empty
-                if reorder.buffer.is_empty() {
-                    shared.buffer_empty.notify_all();
+                if queue.buffer.is_empty() {
+                    state.drain_signal.notify_all();
                 }
             });
 
@@ -380,17 +370,17 @@ impl PrecompileHintsProcessor {
     /// * `Ok(())` - All hints processed successfully
     /// * `Err` - If an error occurred during processing
     fn wait_for_completion(&self) -> Result<()> {
-        let mut reorder = self.shared.reorder.lock().unwrap();
+        let mut queue = self.state.queue.lock().unwrap();
 
-        while !reorder.buffer.is_empty() {
-            if self.shared.has_error.load(Ordering::Acquire) {
+        while !queue.buffer.is_empty() {
+            if self.state.error_flag.load(Ordering::Acquire) {
                 return Err(anyhow::anyhow!("Processing stopped due to error"));
             }
             // Wait for notification that buffer state changed
-            reorder = self.shared.buffer_empty.wait(reorder).unwrap();
+            queue = self.state.drain_signal.wait(queue).unwrap();
         }
 
-        if self.shared.has_error.load(Ordering::Acquire) {
+        if self.state.error_flag.load(Ordering::Acquire) {
             return Err(anyhow::anyhow!("Processing stopped due to error"));
         }
 
@@ -405,13 +395,13 @@ impl PrecompileHintsProcessor {
     /// Increments the generation counter to invalidate any in-flight workers
     /// from the previous session, preventing them from corrupting the new state.
     fn reset(&self) {
-        self.shared.has_error.store(false, Ordering::Release);
-        self.shared.next_seq.store(0, Ordering::Release);
+        self.state.error_flag.store(false, Ordering::Release);
+        self.state.next_seq.store(0, Ordering::Release);
         // Increment generation to invalidate stale workers
-        self.shared.generation.fetch_add(1, Ordering::SeqCst);
-        let mut reorder = self.shared.reorder.lock().unwrap();
-        reorder.buffer.clear();
-        reorder.base_seq = 0;
+        self.state.generation.fetch_add(1, Ordering::SeqCst);
+        let mut queue = self.state.queue.lock().unwrap();
+        queue.buffer.clear();
+        queue.next_drain_seq = 0;
     }
 
     /// Dispatches a single hint to its appropriate handler based on hint type.
@@ -470,9 +460,8 @@ mod tests {
         ((hint_type as u64) << 32) | (length as u64)
     }
 
-    fn make_header_with_ctrl(base_type: u32, ctrl: u32, length: u32) -> u64 {
-        let hint_type = ((ctrl & 0xFF) << STREAM_CTRL_SHIFT) | (base_type & STREAM_BASE_MASK);
-        make_header(hint_type, length)
+    fn make_ctrl_header(ctrl: u32, length: u32) -> u64 {
+        make_header(ctrl, length)
     }
 
     fn processor() -> PrecompileHintsProcessor {
@@ -570,13 +559,13 @@ mod tests {
         p.process_hints(&batch1).unwrap();
 
         // Send START control; then a new hint
-        let start = vec![make_header_with_ctrl(HINTS_TYPE_RESULT, STREAM_CTRL_START, 0)];
+        let start = vec![make_ctrl_header(CTRL_START, 0)];
         p.process_hints(&start).unwrap();
 
         let batch2 = vec![make_header(HINTS_TYPE_RESULT, 1), 0x02];
         p.process_hints(&batch2).unwrap();
         // End the stream to ensure completion
-        let end = vec![make_header_with_ctrl(HINTS_TYPE_RESULT, STREAM_CTRL_END, 0)];
+        let end = vec![make_ctrl_header(CTRL_END, 0)];
         p.process_hints(&end).unwrap();
         p.wait_for_completion().unwrap();
     }
@@ -589,7 +578,7 @@ mod tests {
             vec![make_header(HINTS_TYPE_RESULT, 1), 0x10, make_header(HINTS_TYPE_RESULT, 1), 0x20];
         p.process_hints(&data).unwrap();
         // End control should cause internal wait during processing
-        let end = vec![make_header_with_ctrl(HINTS_TYPE_RESULT, STREAM_CTRL_END, 0)];
+        let end = vec![make_ctrl_header(CTRL_END, 0)];
         p.process_hints(&end).unwrap();
         // Subsequent explicit wait should be fast (already drained)
         p.wait_for_completion().unwrap();
@@ -598,7 +587,7 @@ mod tests {
     #[test]
     fn test_stream_cancel_returns_error() {
         let p = processor();
-        let cancel = vec![make_header_with_ctrl(HINTS_TYPE_RESULT, STREAM_CTRL_CANCEL, 0)];
+        let cancel = vec![make_ctrl_header(CTRL_CANCEL, 0)];
         let err = p.process_hints(&cancel).err().unwrap();
         assert!(err.to_string().contains("cancelled"));
     }
@@ -606,7 +595,7 @@ mod tests {
     #[test]
     fn test_stream_error_signal_returns_error() {
         let p = processor();
-        let signal_err = vec![make_header_with_ctrl(HINTS_TYPE_RESULT, STREAM_CTRL_ERROR, 0)];
+        let signal_err = vec![make_ctrl_header(CTRL_ERROR, 0)];
         let err = p.process_hints(&signal_err).err().unwrap();
         assert!(err.to_string().contains("error"));
     }
@@ -697,7 +686,7 @@ mod tests {
 
         for _iter in 0..ITERATIONS {
             // Reset at start of each iteration
-            let reset = vec![make_header_with_ctrl(HINTS_TYPE_RESULT, STREAM_CTRL_START, 0)];
+            let reset = vec![make_ctrl_header(CTRL_START, 0)];
             p.process_hints(&reset).unwrap();
 
             // Process batch
@@ -709,7 +698,7 @@ mod tests {
             p.process_hints(&data).unwrap();
 
             // End stream
-            let end = vec![make_header_with_ctrl(HINTS_TYPE_RESULT, STREAM_CTRL_END, 0)];
+            let end = vec![make_ctrl_header(CTRL_END, 0)];
             p.process_hints(&end).unwrap();
         }
 
