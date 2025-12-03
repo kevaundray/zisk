@@ -10,21 +10,30 @@ pub fn add_short(a: &[U256], b: &U256) -> Vec<U256> {
     #[cfg(debug_assertions)]
     {
         assert_ne!(len_a, 0, "Input 'a' must have at least one limb");
-        assert_ne!(a.last().unwrap(), &U256::ZERO, "Input 'a' must not have leading zeros");
-        assert_ne!(b, &U256::ZERO, "Input 'b' must be greater than zero");
+        assert!(!a[len_a - 1].is_zero(), "Input 'a' must not have leading zeros");
+        assert!(!b.is_zero(), "Input 'b' must be greater than zero");
     }
 
     let mut out = vec![U256::ONE; len_a + 1];
 
     // Start with a[0] + b
-    let mut params = SyscallAdd256Params { a: &a[0], b, cin: 0, c: &mut out[0] };
+    let mut params = SyscallAdd256Params {
+        a: a[0].as_limbs(),
+        b: b.as_limbs(),
+        cin: 0,
+        c: out[0].as_limbs_mut(),
+    };
     let mut carry = syscall_add256(&mut params);
 
     for i in 1..len_a {
         if carry == 1 {
             // Compute a[i] + carry
-            let mut params =
-                SyscallAdd256Params { a: &a[i], b: &U256::ZERO, cin: 1, c: &mut out[i] };
+            let mut params = SyscallAdd256Params {
+                a: a[i].as_limbs(),
+                b: U256::ZERO.as_limbs(),
+                cin: 1,
+                c: out[i].as_limbs_mut(),
+            };
             carry = syscall_add256(&mut params);
         } else {
             // Directly copy a[i] to out[i]

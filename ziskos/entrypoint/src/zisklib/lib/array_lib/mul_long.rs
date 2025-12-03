@@ -14,18 +14,18 @@ pub fn mul_long(a: &[U256], b: &[U256]) -> Vec<U256> {
     {
         assert_ne!(len_a, 0, "Input 'a' must have at least one limb");
         assert!(len_b > 1, "Input 'b' must have more than one limb");
-        assert_ne!(a.last().unwrap(), &U256::ZERO, "Input 'a' must not have leading zeros");
-        assert_ne!(b.last().unwrap(), &U256::ZERO, "Input 'b' must not have leading zeros");
+        assert!(!a[len_a - 1].is_zero(), "Input 'a' must not have leading zeros");
+        assert!(!b[len_b - 1].is_zero(), "Input 'b' must not have leading zeros");
     }
 
     let mut out = vec![U256::ZERO; len_a + len_b];
 
     // Start with a[0]·b[0]
     let mut params = SyscallArith256Params {
-        a: &a[0],
-        b: &b[0],
-        c: &U256::ZERO,
-        dl: &mut out[0],
+        a: a[0].as_limbs(),
+        b: b[0].as_limbs(),
+        c: U256::ZERO.as_limbs(),
+        dl: out[0].as_limbs_mut(),
         dh: &mut [0, 0, 0, 0],
     };
     syscall_arith256(&mut params);
@@ -36,11 +36,12 @@ pub fn mul_long(a: &[U256], b: &[U256]) -> Vec<U256> {
     // Finish the first row
     for j in 1..len_b {
         // Compute a[0]·b[j] + out[j]
+        let out_j = out[j];
         let mut params = SyscallArith256Params {
-            a: &a[0],
-            b: &b[j],
-            c: &out[j].clone(),
-            dl: &mut out[j],
+            a: a[0].as_limbs(),
+            b: b[j].as_limbs(),
+            c: out_j.as_limbs(),
+            dl: out[j].as_limbs_mut(),
             dh: &mut [0, 0, 0, 0],
         };
         syscall_arith256(&mut params);
@@ -54,10 +55,11 @@ pub fn mul_long(a: &[U256], b: &[U256]) -> Vec<U256> {
         let mut carry_flag = 0u64;
         for j in 0..(len_b - 1) {
             // Compute a[i]·b[j] + out[i + j]
+            let out_ij = out[i + j];
             let mut params_arith = SyscallArith256Params {
-                a: &a[i],
-                b: &b[j],
-                c: &out[i + j].clone(),
+                a: a[i].as_limbs(),
+                b: b[j].as_limbs(),
+                c: out_ij.as_limbs(),
                 dl: &mut [0, 0, 0, 0],
                 dh: &mut [0, 0, 0, 0],
             };
@@ -69,7 +71,7 @@ pub fn mul_long(a: &[U256], b: &[U256]) -> Vec<U256> {
             if carry_flag == 1 {
                 let mut params_add = SyscallAdd256Params {
                     a: &params_arith.dh.clone(),
-                    b: &U256::ZERO,
+                    b: U256::ZERO.as_limbs(),
                     cin: 1,
                     c: params_arith.dh,
                 };
@@ -79,11 +81,12 @@ pub fn mul_long(a: &[U256], b: &[U256]) -> Vec<U256> {
             }
 
             // Update out[i+j+1] with carry
+            let out_ij1 = out[i + j + 1];
             let mut params_add = SyscallAdd256Params {
-                a: &out[i + j + 1].clone(),
+                a: out_ij1.as_limbs(),
                 b: params_arith.dh,
                 cin: 0,
-                c: &mut out[i + j + 1],
+                c: out[i + j + 1].as_limbs_mut(),
             };
             carry_flag = syscall_add256(&mut params_add);
         }
@@ -91,19 +94,21 @@ pub fn mul_long(a: &[U256], b: &[U256]) -> Vec<U256> {
         // Last chunk isolated
 
         // Compute a[i]·b[len_b - 1] + out[i + len_b - 1]
+        let out_ilb1 = out[i + len_b - 1];
         let mut params_arith = SyscallArith256Params {
-            a: &a[i],
-            b: &b[len_b - 1],
-            c: &out[i + len_b - 1].clone(),
-            dl: &mut out[i + len_b - 1],
+            a: a[i].as_limbs(),
+            b: b[len_b - 1].as_limbs(),
+            c: out_ilb1.as_limbs(),
+            dl: out[i + len_b - 1].as_limbs_mut(),
             dh: &mut [0, 0, 0, 0],
         };
         syscall_arith256(&mut params_arith);
 
         if carry_flag == 1 {
+            let a_in = *params_arith.dh;
             let mut params_add = SyscallAdd256Params {
-                a: &params_arith.dh.clone(),
-                b: &U256::ZERO,
+                a: &a_in,
+                b: U256::ZERO.as_limbs(),
                 cin: 1,
                 c: params_arith.dh,
             };
@@ -116,7 +121,7 @@ pub fn mul_long(a: &[U256], b: &[U256]) -> Vec<U256> {
         out[i + len_b] = U256::from_u64s(params_arith.dh);
     }
 
-    if out[len_a + len_b - 1] == U256::ZERO {
+    if out[len_a + len_b - 1].is_zero() {
         out.pop();
     }
 

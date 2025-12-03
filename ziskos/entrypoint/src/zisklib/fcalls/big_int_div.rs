@@ -17,7 +17,12 @@ cfg_if! {
 /// Note that this is a *free-input call*, meaning the Zisk VM does not automatically verify the correctness
 /// of the result. It is the caller's responsibility to ensure it.
 #[allow(unused_variables)]
-pub fn fcall_division(a_value: &[u64], b_value: &[u64]) -> (Vec<u64>, Vec<u64>) {
+pub fn fcall_division(
+    a_value: &[u64],
+    b_value: &[u64],
+    quo: &mut [u64],
+    rem: &mut [u64],
+) -> (usize, usize) {
     #[cfg(not(all(target_os = "zkvm", target_vendor = "zisk")))]
     unreachable!();
     #[cfg(all(target_os = "zkvm", target_vendor = "zisk"))]
@@ -37,17 +42,15 @@ pub fn fcall_division(a_value: &[u64], b_value: &[u64]) -> (Vec<u64>, Vec<u64>) 
         ziskos_fcall!(FCALL_BIG_INT_DIV_ID);
 
         let len_quo = ziskos_fcall_get() as usize;
-        let mut quotient = vec![0u64; len_quo];
         for i in 0..len_quo {
-            quotient[i] = ziskos_fcall_get();
+            quo[i] = ziskos_fcall_get();
         }
 
         let len_rem = ziskos_fcall_get() as usize;
-        let mut remainder = vec![0u64; len_rem];
         for i in 0..len_rem {
-            remainder[i] = ziskos_fcall_get();
+            rem[i] = ziskos_fcall_get();
         }
 
-        (quotient, remainder)
+        (len_quo, len_rem)
     }
 }

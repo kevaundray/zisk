@@ -21,20 +21,20 @@ pub fn modexp(base: &[U256], exp: &[u64], modulus: &[U256]) -> Vec<U256> {
         assert_ne!(len_m, 0, "Modulus must have at least one limb");
 
         if len_b > 1 {
-            assert_ne!(base.last().unwrap(), &U256::ZERO, "Base must not have leading zeros");
+            assert!(!base[len_b - 1].is_zero(), "Base must not have leading zeros");
         }
         if len_e > 1 {
             assert_ne!(exp.last().unwrap(), &0, "Exponent must not have leading zeros");
         }
         if len_m > 1 {
-            assert_ne!(modulus.last().unwrap(), &U256::ZERO, "Modulus must not have leading zeros");
+            assert!(!modulus[len_m - 1].is_zero(), "Modulus must not have leading zeros");
         } else {
-            assert_ne!(modulus[0], U256::ZERO, "Modulus must not be zero");
+            assert!(!modulus[0].is_zero(), "Modulus must not be zero");
         }
     }
 
     // If modulus == 1, then base^exp (mod 1) is always 0
-    if len_m == 1 && modulus[0] == U256::ONE {
+    if len_m == 1 && modulus[0].is_one() {
         return vec![U256::ZERO];
     }
 
@@ -45,12 +45,12 @@ pub fn modexp(base: &[U256], exp: &[u64], modulus: &[U256]) -> Vec<U256> {
 
     if len_b == 1 {
         // If base == 0, then 0^exp (mod modulus) is 0
-        if base[0] == U256::ZERO {
+        if base[0].is_zero() {
             return vec![U256::ZERO];
         }
 
         // If base == 1, then 1^exp (mod modulus) is 1
-        if base[0] == U256::ONE {
+        if base[0].is_one() {
             return vec![U256::ONE];
         }
     }
@@ -58,7 +58,7 @@ pub fn modexp(base: &[U256], exp: &[u64], modulus: &[U256]) -> Vec<U256> {
     // We can assume from now on that base,modulus > 1 and exp > 0
 
     // Compute base = base (mod modulus)
-    let base = if U256::lt_slices_unchecked(base, modulus) {
+    let base = if U256::lt_slices(base, modulus) {
         base.to_vec()
     } else if len_m == 1 {
         vec![rem_short(base, &modulus[0])]
@@ -81,7 +81,7 @@ pub fn modexp(base: &[U256], exp: &[u64], modulus: &[U256]) -> Vec<U256> {
     // Initialize out = base
     let mut out = base.clone();
     for (bit_idx, &bit) in bits.iter().enumerate().skip(1) {
-        if out.len() == 1 && out[0] == U256::ZERO {
+        if out.len() == 1 && out[0].is_zero() {
             return vec![U256::ZERO];
         }
 
@@ -106,15 +106,6 @@ pub fn modexp(base: &[U256], exp: &[u64], modulus: &[U256]) -> Vec<U256> {
 }
 
 pub fn modexp_u64(base: &[u64], exp: &[u64], modulus: &[u64]) -> Vec<u64> {
-    fn pad_to_multiple_of_4(input: &[u64]) -> Vec<u64> {
-        let mut padded = input.to_vec();
-        let remainder = input.len() % 4;
-        if remainder != 0 {
-            padded.resize(input.len() + (4 - remainder), 0u64);
-        }
-        padded
-    }
-
     // Pad all inputs
     let padded_base = pad_to_multiple_of_4(base);
     let padded_modulus = pad_to_multiple_of_4(modulus);
@@ -124,8 +115,17 @@ pub fn modexp_u64(base: &[u64], exp: &[u64], modulus: &[u64]) -> Vec<u64> {
     let modulus_u256 = U256::slice_from_flat(&padded_modulus);
 
     // Call the main modexp function
-    let result_u256 = modexp(&base_u256, exp, &modulus_u256);
+    let result_u256 = modexp(base_u256, exp, modulus_u256);
 
     // Convert result back to u64 array
     U256::slice_to_flat(&result_u256).to_vec()
+}
+
+fn pad_to_multiple_of_4(input: &[u64]) -> Vec<u64> {
+    let mut padded = input.to_vec();
+    let remainder = input.len() % 4;
+    if remainder != 0 {
+        padded.resize(input.len() + (4 - remainder), 0u64);
+    }
+    padded
 }

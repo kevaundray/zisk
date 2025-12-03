@@ -10,8 +10,8 @@ pub fn mul_short(a: &[U256], b: &U256) -> Vec<U256> {
     #[cfg(debug_assertions)]
     {
         assert_ne!(len_a, 0, "Input 'a' must have at least one limb");
-        assert_ne!(a.last().unwrap(), &U256::ZERO, "Input 'a' must not have leading zeros");
-        assert_ne!(b, &U256::ZERO, "Input 'b' must be greater than zero");
+        assert!(!a[len_a - 1].is_zero(), "Input 'a' must not have leading zeros");
+        assert!(!b.is_zero(), "Input 'b' must be greater than zero");
     }
 
     let mut out = vec![U256::ZERO; len_a + 1];
@@ -19,17 +19,18 @@ pub fn mul_short(a: &[U256], b: &U256) -> Vec<U256> {
 
     for i in 0..len_a {
         // Compute a[i]·b + carry
+        let cin = carry;
         let mut params = SyscallArith256Params {
-            a: &a[i],
-            b,
-            c: &carry.clone(),
-            dl: &mut out[i],
-            dh: &mut carry,
+            a: a[i].as_limbs(),
+            b: b.as_limbs(),
+            c: cin.as_limbs(),
+            dl: out[i].as_limbs_mut(),
+            dh: carry.as_limbs_mut(),
         };
         syscall_arith256(&mut params);
     }
 
-    if carry != U256::ZERO {
+    if !carry.is_zero() {
         out[len_a] = carry;
     } else {
         out.pop();

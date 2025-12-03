@@ -22,7 +22,7 @@ pub fn square(a: &[U256]) -> Vec<U256> {
     #[cfg(debug_assertions)]
     {
         assert_ne!(len_a, 0, "Input 'a' must have at least one limb");
-        assert_ne!(a.last().unwrap(), &U256::ZERO, "Input 'a' must not have leading zeros");
+        assert!(!a[len_a - 1].is_zero(), "Input 'a' must not have leading zeros");
     }
 
     let mut out = vec![U256::ZERO; 2 * len_a];
@@ -33,10 +33,10 @@ pub fn square(a: &[U256]) -> Vec<U256> {
         //      a[i]·a[i] = dh·B + dl
         // and set out[2 * i] = dl and out[2 * i + 1] = dh
         let mut ai_ai = SyscallArith256Params {
-            a: &a[i],
-            b: &a[i],
-            c: &U256::ZERO,
-            dl: &mut out[2 * i],
+            a: a[i].as_limbs(),
+            b: a[i].as_limbs(),
+            c: U256::ZERO.as_limbs(),
+            dl: out[2 * i].as_limbs_mut(),
             dh: &mut [0, 0, 0, 0],
         };
         syscall_arith256(&mut ai_ai);
@@ -49,9 +49,9 @@ pub fn square(a: &[U256]) -> Vec<U256> {
         for j in (i + 1)..len_a {
             // First compute a[i]·a[j] = h₁·B + l₁
             let mut ai_aj = SyscallArith256Params {
-                a: &a[i],
-                b: &a[j],
-                c: &U256::ZERO,
+                a: a[i].as_limbs(),
+                b: a[j].as_limbs(),
+                c: U256::ZERO.as_limbs(),
                 dl: &mut [0, 0, 0, 0],
                 dh: &mut [0, 0, 0, 0],
             };
@@ -60,28 +60,21 @@ pub fn square(a: &[U256]) -> Vec<U256> {
             // Double the result 2·a[i]·a[j]
 
             // Start by doubling the lower chunk: 2·l₁ = [1/0]·B + l₂
-            let mut dbl_low = SyscallAdd256Params {
-                a: &ai_aj.dl.clone(),
-                b: &ai_aj.dl.clone(),
-                cin: 0,
-                c: &mut [0, 0, 0, 0],
-            };
+            let mut dbl_low =
+                SyscallAdd256Params { a: ai_aj.dl, b: ai_aj.dl, cin: 0, c: &mut [0, 0, 0, 0] };
             let dbl_low_carry = syscall_add256(&mut dbl_low);
 
             // Next, double the higher chunk: 2·h₁·B = [1/0]·B² + h₂·B
-            let mut dbl_high = SyscallAdd256Params {
-                a: &ai_aj.dh.clone(),
-                b: &ai_aj.dh.clone(),
-                cin: 0,
-                c: &mut [0, 0, 0, 0],
-            };
+            let mut dbl_high =
+                SyscallAdd256Params { a: ai_aj.dh, b: ai_aj.dh, cin: 0, c: &mut [0, 0, 0, 0] };
             let dbl_high_carry = syscall_add256(&mut dbl_high);
 
             // If there's a carry from doubling the low part, add it to the high part
             if dbl_low_carry != 0 {
+                let a_in = *dbl_high.c;
                 let mut add = SyscallAdd256Params {
-                    a: &dbl_high.c.clone(),
-                    b: &U256::ZERO,
+                    a: &a_in,
+                    b: U256::ZERO.as_limbs(),
                     cin: 1,
                     c: dbl_high.c,
                 };
@@ -96,7 +89,7 @@ pub fn square(a: &[U256]) -> Vec<U256> {
 
             // Update out[i+j]
             let mut add_low = SyscallAdd256Params {
-                a: &out[i + j].clone(),
+                a: out[i + j].as_limbs(),
                 b: dbl_low.c,
                 cin: 0,
                 c: &mut [0, 0, 0, 0],
@@ -105,20 +98,22 @@ pub fn square(a: &[U256]) -> Vec<U256> {
             out[i + j] = U256::from_u64s(add_low.c);
 
             if add_low_carry != 0 {
+                let a_in = out[i + j + 1];
                 let mut add = SyscallAdd256Params {
-                    a: &out[i + j + 1].clone(),
-                    b: &U256::ZERO,
+                    a: a_in.as_limbs(),
+                    b: U256::ZERO.as_limbs(),
                     cin: 1,
-                    c: &mut out[i + j + 1],
+                    c: out[i + j + 1].as_limbs_mut(),
                 };
                 let add_carry = syscall_add256(&mut add);
 
                 if add_carry != 0 {
+                    let a_in = out[i + j + 2];
                     let mut add2 = SyscallAdd256Params {
-                        a: &out[i + j + 2].clone(),
-                        b: &U256::ZERO,
+                        a: a_in.as_limbs(),
+                        b: U256::ZERO.as_limbs(),
                         cin: 1,
-                        c: &mut out[i + j + 2],
+                        c: out[i + j + 2].as_limbs_mut(),
                     };
                     let _carry = syscall_add256(&mut add2);
 
@@ -128,7 +123,7 @@ pub fn square(a: &[U256]) -> Vec<U256> {
 
             // Update out[i+j+1]
             let mut add_mid = SyscallAdd256Params {
-                a: &out[i + j + 1].clone(),
+                a: out[i + j + 1].as_limbs(),
                 b: dbl_high.c,
                 cin: 0,
                 c: &mut [0, 0, 0, 0],
@@ -137,11 +132,12 @@ pub fn square(a: &[U256]) -> Vec<U256> {
             out[i + j + 1] = U256::from_u64s(add_mid.c);
 
             if add_mid_carry != 0 {
+                let a_in = out[i + j + 2];
                 let mut add = SyscallAdd256Params {
-                    a: &out[i + j + 2].clone(),
-                    b: &U256::ZERO,
+                    a: a_in.as_limbs(),
+                    b: U256::ZERO.as_limbs(),
                     cin: 1,
-                    c: &mut out[i + j + 2],
+                    c: out[i + j + 2].as_limbs_mut(),
                 };
                 let _carry = syscall_add256(&mut add);
 
@@ -150,11 +146,12 @@ pub fn square(a: &[U256]) -> Vec<U256> {
 
             // Update out[i+j+2]
             if dbl_high_carry != 0 {
+                let a_in = out[i + j + 2];
                 let mut add = SyscallAdd256Params {
-                    a: &out[i + j + 2].clone(),
-                    b: &U256::ZERO,
+                    a: a_in.as_limbs(),
+                    b: U256::ZERO.as_limbs(),
                     cin: 1,
-                    c: &mut out[i + j + 2],
+                    c: out[i + j + 2].as_limbs_mut(),
                 };
                 let _carry = syscall_add256(&mut add);
 
@@ -163,7 +160,7 @@ pub fn square(a: &[U256]) -> Vec<U256> {
         }
     }
 
-    if out.last() == Some(&U256::ZERO) {
+    if out[2 * len_a - 1].is_zero() {
         out.pop();
     }
 
@@ -178,11 +175,7 @@ pub fn square_and_reduce(a: &[U256], modulus: &[U256]) -> Vec<U256> {
     #[cfg(debug_assertions)]
     {
         assert_ne!(len_m, 0, "Input 'modulus' must have at least one limb");
-        assert_ne!(
-            modulus.last().unwrap(),
-            &U256::ZERO,
-            "Input 'modulus' must not have leading zeros"
-        );
+        assert!(!modulus[len_m - 1].is_zero(), "Input 'modulus' must not have leading zeros");
     }
 
     let sq = square(a);
