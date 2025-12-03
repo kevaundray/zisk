@@ -32,7 +32,7 @@ use rom_setup::gen_elf_hash;
 use sm_rom::{RomInstance, RomSM};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use witness::WitnessComponent;
-use zisk_common::io::{ZiskIO, ZiskStdin};
+use zisk_common::io::{ZiskHintin, ZiskIO, ZiskStdin};
 
 use crate::DummyCounter;
 use data_bus::DataBusTrait;
@@ -79,6 +79,7 @@ enum MinimalTraceExecutionMode {
 /// machines, planning, and witness computation.
 pub struct ZiskExecutor<F: PrimeField64> {
     stdin: Mutex<ZiskStdin>,
+    hintin: Mutex<ZiskHintin>,
 
     /// ZisK ROM, a binary file containing the ZisK program to be executed.
     pub zisk_rom: Arc<ZiskRom>,
@@ -188,6 +189,7 @@ impl<F: PrimeField64> ZiskExecutor<F> {
 
         Self {
             stdin: Mutex::new(ZiskStdin::null()),
+            hintin: Mutex::new(ZiskHintin::null()),
             rom_path,
             asm_runner_path: asm_path,
             asm_rom_path,
@@ -217,6 +219,11 @@ impl<F: PrimeField64> ZiskExecutor<F> {
     pub fn set_stdin(&self, stdin: ZiskStdin) {
         let mut guard = self.stdin.lock().unwrap();
         *guard = stdin;
+    }
+
+    pub fn set_hintin(&self, hintin: ZiskHintin) {
+        let mut guard = self.hintin.lock().unwrap();
+        *guard = hintin;
     }
 
     #[allow(clippy::type_complexity)]

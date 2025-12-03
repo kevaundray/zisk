@@ -300,6 +300,7 @@ dependencies = [
  "mem-common",
  "mem-planner-cpp",
  "named-sem",
+ "precompiles-common",
  "rayon",
  "thiserror 2.0.17",
  "tracing",
@@ -3005,6 +3006,7 @@ dependencies = [
  "anyhow",
  "fields",
  "rayon",
+ "tracing",
  "zisk-common",
  "zisk-core",
 ]

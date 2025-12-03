@@ -215,6 +215,12 @@ impl ZiskWitnessLibrary<Goldilocks> for WitnessLib<Goldilocks> {
         }
     }
 
+    fn set_hintin(&self, hintin: zisk_common::io::ZiskHintin) {
+        if let Some(executor) = &self.executor {
+            executor.set_hintin(hintin);
+        }
+    }
+
     /// Returns the execution result of the witness computation.
     ///
     /// # Returns

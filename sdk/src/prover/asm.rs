@@ -11,7 +11,7 @@ use proofman_util::{timer_start_info, timer_stop_and_log_info};
 use rom_setup::DEFAULT_CACHE_PATH;
 use std::{collections::HashMap, path::PathBuf};
 use tracing::info;
-use zisk_common::io::ZiskStdin;
+use zisk_common::io::{ZiskHintin, ZiskStdin};
 use zisk_common::ExecutorStats;
 use zisk_distributed_common::LoggingConfig;
 
@@ -98,8 +98,13 @@ impl ProverEngine for AsmProver {
             .unwrap_or(0)
     }
 
-    fn execute(&self, stdin: ZiskStdin, output_path: Option<PathBuf>) -> Result<ZiskExecuteResult> {
-        self.core_prover.backend.execute(stdin, output_path)
+    fn execute(
+        &self,
+        stdin: ZiskStdin,
+        hintin: Option<ZiskHintin>,
+        output_path: Option<PathBuf>,
+    ) -> Result<ZiskExecuteResult> {
+        self.core_prover.backend.execute(stdin, hintin, output_path)
     }
 
     fn stats(

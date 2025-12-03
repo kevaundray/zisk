@@ -7,7 +7,7 @@ use crate::{
 use proofman::{AggProofs, ProofMan, ProvePhase, ProvePhaseInputs};
 use proofman_common::{initialize_logger, ParamsGPU, ProofOptions};
 use std::path::PathBuf;
-use zisk_common::io::ZiskStdin;
+use zisk_common::io::{ZiskHintin, ZiskStdin};
 use zisk_common::ExecutorStats;
 use zisk_distributed_common::LoggingConfig;
 
@@ -86,8 +86,16 @@ impl ProverEngine for EmuProver {
             .unwrap_or(0)
     }
 
-    fn execute(&self, stdin: ZiskStdin, output_path: Option<PathBuf>) -> Result<ZiskExecuteResult> {
-        self.core_prover.backend.execute(stdin, output_path)
+    fn execute(
+        &self,
+        stdin: ZiskStdin,
+        hintin: Option<ZiskHintin>,
+        output_path: Option<PathBuf>,
+    ) -> Result<ZiskExecuteResult> {
+        if hintin.is_some() {
+            return Err(anyhow::anyhow!("EMU prover does not support precompile hints"));
+        }
+        self.core_prover.backend.execute(stdin, None, output_path)
     }
 
     fn stats(

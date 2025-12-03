@@ -5,8 +5,11 @@ use tracing::info;
 use zisk_build::ZISK_VERSION_MESSAGE;
 use zisk_sdk::{ProverClient, ZiskExecuteResult};
 
-use crate::{commands::cli_fail_if_gpu_mode, ux::print_banner};
-use zisk_common::io::ZiskStdin;
+use crate::{
+    commands::cli_fail_if_gpu_mode,
+    ux::{print_banner, print_banner_field},
+};
+use zisk_common::io::{ZiskHintin, ZiskStdin};
 
 #[derive(Parser)]
 #[command(author, about, long_about = None, version = ZISK_VERSION_MESSAGE)]
@@ -40,6 +43,10 @@ pub struct ZiskExecute {
     /// Input path
     #[clap(short = 'i', long)]
     pub input: Option<PathBuf>,
+
+    /// Precompiles Hints path
+    #[clap(short = 'h', long)]
+    pub precompile_hints_path: Option<PathBuf>,
 
     /// Setup folder path
     #[clap(short = 'k', long)]
@@ -75,10 +82,26 @@ impl ZiskExecute {
 
         print_banner();
 
+        if self.input.is_some() {
+            print_banner_field("Input", &self.input.as_ref().unwrap().to_string_lossy());
+        }
+
+        if self.precompile_hints_path.is_some() {
+            print_banner_field(
+                "Prec. Hints",
+                &self.precompile_hints_path.as_ref().unwrap().to_string_lossy(),
+            );
+        }
+
         let stdin = self.create_stdin()?;
+        let hintin = self.create_hintin()?;
 
         let emulator = if cfg!(target_os = "macos") { true } else { self.emulator };
-        let result = if emulator { self.run_emu(stdin)? } else { self.run_asm(stdin)? };
+        let result = if emulator {
+            self.run_emu(stdin, Some(hintin))?
+        } else {
+            self.run_asm(stdin, Some(hintin))?
+        };
 
         info!(
             "Execution completed in {:.2?}, executed steps: {}",
@@ -100,7 +123,26 @@ impl ZiskExecute {
         Ok(stdin)
     }
 
-    pub fn run_emu(&mut self, stdin: ZiskStdin) -> Result<ZiskExecuteResult> {
+    fn create_hintin(&mut self) -> Result<ZiskHintin> {
+        let hintin = if let Some(hints_path) = &self.precompile_hints_path {
+            if !hints_path.exists() {
+                return Err(anyhow::anyhow!(
+                    "Precompile Hints file not found at {:?}",
+                    hints_path.display()
+                ));
+            }
+            ZiskHintin::from_file(hints_path)?
+        } else {
+            ZiskHintin::null()
+        };
+        Ok(hintin)
+    }
+
+    pub fn run_emu(
+        &mut self,
+        stdin: ZiskStdin,
+        hintin: Option<ZiskHintin>,
+    ) -> Result<ZiskExecuteResult> {
         let prover = ProverClient::builder()
             .emu()
             .witness()
@@ -112,10 +154,14 @@ impl ZiskExecute {
             .print_command_info()
             .build()?;
 
-        prover.execute(stdin)
+        prover.execute(stdin, hintin)
     }
 
-    pub fn run_asm(&mut self, stdin: ZiskStdin) -> Result<ZiskExecuteResult> {
+    pub fn run_asm(
+        &mut self,
+        stdin: ZiskStdin,
+        hintin: Option<ZiskHintin>,
+    ) -> Result<ZiskExecuteResult> {
         let prover = ProverClient::builder()
             .asm()
             .verify_constraints()
@@ -130,6 +176,6 @@ impl ZiskExecute {
             .print_command_info()
             .build()?;
 
-        prover.execute(stdin)
+        prover.execute(stdin, hintin)
     }
 }

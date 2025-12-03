@@ -9,7 +9,10 @@ use fields::Goldilocks;
 use proofman::{AggProofs, ProofInfo, ProofMan, ProvePhase, ProvePhaseInputs, ProvePhaseResult};
 use proofman_common::{DebugInfo, ProofOptions};
 use std::{fs::File, io::Write, path::PathBuf};
-use zisk_common::{io::ZiskStdin, ExecutorStats, ProofLog, ZiskExecutionResult, ZiskLib};
+use zisk_common::{
+    io::{ZiskHintin, ZiskStdin},
+    ExecutorStats, ProofLog, ZiskExecutionResult, ZiskLib,
+};
 use zstd::Encoder;
 
 pub(crate) struct ProverBackend {
@@ -31,9 +34,13 @@ impl ProverBackend {
     pub(crate) fn execute(
         &self,
         stdin: ZiskStdin,
+        hintin: Option<ZiskHintin>,
         output_path: Option<PathBuf>,
     ) -> Result<ZiskExecuteResult> {
         self.witness_lib.set_stdin(stdin);
+        if let Some(hintin) = hintin {
+            self.witness_lib.set_hintin(hintin);
+        }
 
         let start = std::time::Instant::now();
 
