@@ -7,7 +7,7 @@ use crate::zisklib::fcall_bin_decomp;
 
 use super::{
     mul_and_reduce_long, mul_and_reduce_short, rem_long, rem_short, square_and_reduce_long,
-    square_and_reduce_short, U256,
+    square_and_reduce_short, ShortScratch, U256,
 };
 
 /// Modular exponentiation of three large numbers
@@ -67,11 +67,10 @@ pub fn modexp(base: &[U256], exp: &[u64], modulus: &[U256]) -> Vec<U256> {
         let modulus = &modulus[0];
 
         // Scratch space
-        let mut scratch_quo = [0u64; 8];
-        let mut scratch_rem = [0u64; 4];
+        let mut scratch = ShortScratch::new();
 
         // Compute base = base (mod modulus)
-        let base = rem_short(base, modulus, &mut scratch_quo, &mut scratch_rem);
+        let base = rem_short(base, modulus, &mut scratch);
 
         // Hint exponent bits
         let (len, bits) = fcall_bin_decomp(exp);
@@ -93,12 +92,11 @@ pub fn modexp(base: &[U256], exp: &[u64], modulus: &[U256]) -> Vec<U256> {
             }
 
             // Compute out = out² (mod modulus)
-            out = square_and_reduce_short(&out, modulus, &mut scratch_quo, &mut scratch_rem);
+            out = square_and_reduce_short(&out, modulus, &mut scratch);
 
             if bit == 1 {
                 // Compute out = (out * base) (mod modulus);
-                out =
-                    mul_and_reduce_short(&out, &base, modulus, &mut scratch_quo, &mut scratch_rem);
+                out = mul_and_reduce_short(&out, &base, modulus, &mut scratch);
 
                 // Recompose the exponent
                 let bits_pos = len - 1 - bit_idx;
@@ -169,8 +167,8 @@ pub fn modexp_u64(base: &[u64], exp: &[u64], modulus: &[u64]) -> Vec<u64> {
     modulus_padded[..modulus.len()].copy_from_slice(modulus);
 
     // Convert u64 arrays to U256 chunks
-    let base_u256 = U256::slice_from_flat(&base_padded);
-    let modulus_u256 = U256::slice_from_flat(&modulus_padded);
+    let base_u256 = U256::flat_to_slice(&base_padded);
+    let modulus_u256 = U256::flat_to_slice(&modulus_padded);
 
     // Call the main modexp function
     let result_u256 = modexp(base_u256, exp, modulus_u256);

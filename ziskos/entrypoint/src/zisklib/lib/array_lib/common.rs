@@ -138,7 +138,7 @@ impl U256 {
     }
 
     #[inline(always)]
-    pub fn slice_from_flat(flat: &[u64]) -> &[U256] {
+    pub fn flat_to_slice(flat: &[u64]) -> &[U256] {
         debug_assert_eq!(flat.len() % 4, 0, "Flat slice length must be multiple of 4");
         // Safe because U256 is #[repr(transparent)] over [u64; 4]
         unsafe { core::slice::from_raw_parts(flat.as_ptr() as *const U256, flat.len() / 4) }
@@ -164,5 +164,25 @@ impl PartialEq for U256 {
             && self.0[2] == other.0[2]
             && self.0[1] == other.0[1]
             && self.0[0] == other.0[0]
+    }
+}
+
+pub struct ShortScratch {
+    pub quo: [u64; 8],
+    pub rem: [u64; 4],
+    pub q_b: [U256; 2],
+    pub q_b_r: [U256; 2],
+}
+
+impl ShortScratch {
+    #[inline(always)]
+    pub fn new() -> Self {
+        Self { quo: [0u64; 8], rem: [0u64; 4], q_b: [U256::ZERO; 2], q_b_r: [U256::ZERO; 2] }
+    }
+}
+
+impl Default for ShortScratch {
+    fn default() -> Self {
+        Self::new()
     }
 }

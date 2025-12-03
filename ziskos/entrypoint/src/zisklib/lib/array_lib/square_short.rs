@@ -1,6 +1,6 @@
 use crate::syscalls::{syscall_arith256, SyscallArith256Params};
 
-use super::{rem_short, U256};
+use super::{rem_short, ShortScratch, U256};
 
 pub fn square_short(a: &U256) -> ([U256; 2], usize) {
     #[cfg(debug_assertions)]
@@ -31,12 +31,7 @@ pub fn square_short(a: &U256) -> ([U256; 2], usize) {
     (out, len)
 }
 
-pub fn square_and_reduce_short(
-    a: &U256,
-    modulus: &U256,
-    quo: &mut [u64; 8],
-    rem: &mut [u64; 4],
-) -> U256 {
+pub fn square_and_reduce_short(a: &U256, modulus: &U256, scratch: &mut ShortScratch) -> U256 {
     #[cfg(debug_assertions)]
     {
         assert!(!modulus.is_zero(), "Input 'modulus' must not be zero");
@@ -44,5 +39,5 @@ pub fn square_and_reduce_short(
 
     let (sq, len) = square_short(a);
 
-    rem_short(&sq[..len], modulus, quo, rem)
+    rem_short(&sq[..len], modulus, scratch)
 }

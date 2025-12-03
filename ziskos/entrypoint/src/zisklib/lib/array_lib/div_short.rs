@@ -51,8 +51,8 @@ pub fn div_short(a: &[U256], b: &U256) -> (Vec<U256>, U256) {
     let mut quo_flat = vec![0u64; max_quo_len];
     let mut rem_flat = vec![0u64; 4];
     let (len_quo, len_rem) = fcall_division(a_flat, b.as_limbs(), &mut quo_flat, &mut rem_flat);
-    let quo = U256::slice_from_flat(&quo_flat[..len_quo]);
-    let rem = U256::slice_from_flat(&rem_flat[..len_rem])[0];
+    let quo = U256::flat_to_slice(&quo_flat[..len_quo]);
+    let rem = U256::flat_to_slice(&rem_flat[..len_rem])[0];
 
     // The quotient must satisfy 1 <= len(Q) <= len(inA)
     let len_quo = quo.len();
@@ -61,18 +61,35 @@ pub fn div_short(a: &[U256], b: &U256) -> (Vec<U256>, U256) {
     assert!(!quo[len_quo - 1].is_zero(), "Quotient must not have leading zeros");
 
     // Multiply the quotient by b
-    let q_b = mul_short(quo, b);
+    let mut q_b = [U256::ZERO; 2];
+    let q_b_len = mul_short(quo, b, &mut q_b);
 
     if rem.is_zero() {
         // If the remainder is zero, then a must be equal to q·b
-        assert!(U256::eq_slices(a, &q_b), "Remainder is zero, but a != q·b");
+        assert!(
+            U256::eq_slices(a, &q_b[..q_b_len]),
+            "Remainder is zero, but a != q·b\n a = {:?}\n q = {:?}\n b = {:?}\n q·b = {:?}",
+            a,
+            quo,
+            b,
+            q_b,
+        );
     } else {
         // If the remainder is non-zero, then a must be equal to q·b + r and r < b
-        assert!(!rem.is_zero(), "Remainder must be non-zero");
         assert!(rem.lt(b), "Remainder must be less than divisor");
 
-        let q_b_r = add_short(&q_b, &rem);
-        assert!(U256::eq_slices(a, &q_b_r), "a != q·b + r");
+        let mut q_b_r = [U256::ZERO; 2];
+        let q_b_r_len = add_short(&q_b[..q_b_len], &rem, &mut q_b_r);
+        assert!(
+            U256::eq_slices(a, &q_b_r[..q_b_r_len]),
+            "Remainder is not zero, but a != q·b + r\n a = {:?}\n q = {:?}\n b = {:?}\n r = {:?}\n q·b = {:?}\n q·b+r = {:?}",
+            a,
+            quo,
+            b,
+            rem,
+            q_b,
+            q_b_r,
+        );
     }
 
     (quo.to_vec(), rem)

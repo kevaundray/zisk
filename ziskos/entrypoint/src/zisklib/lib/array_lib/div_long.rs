@@ -51,8 +51,8 @@ pub fn div_long(a: &[U256], b: &[U256]) -> (Vec<U256>, Vec<U256>) {
     let mut quo_flat = vec![0u64; max_quo_len];
     let mut rem_flat = vec![0u64; max_rem_len];
     let (len_quo, len_rem) = fcall_division(a_flat, b_flat, &mut quo_flat, &mut rem_flat);
-    let quo = U256::slice_from_flat(&quo_flat[..len_quo]);
-    let rem = U256::slice_from_flat(&rem_flat[..len_rem]);
+    let quo = U256::flat_to_slice(&quo_flat[..len_quo]);
+    let rem = U256::flat_to_slice(&rem_flat[..len_rem]);
 
     // Since len(a) >= len(b), the division a = q·b + r must satisfy:
     //      1] max{len(q·b), len(r)} <= len(a) => len(q) + len(b) - 1 <= len(q·b) <= len(a)

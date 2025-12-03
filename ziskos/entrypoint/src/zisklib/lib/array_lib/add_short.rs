@@ -5,7 +5,7 @@ use super::U256;
 /// Addition of one large number (represented as an array of U256) and a short U256 number
 ///
 /// It assumes that a,b > 0
-pub fn add_short(a: &[U256], b: &U256) -> Vec<U256> {
+pub fn add_short(a: &[U256], b: &U256, out: &mut [U256]) -> usize {
     let len_a = a.len();
     #[cfg(debug_assertions)]
     {
@@ -13,8 +13,6 @@ pub fn add_short(a: &[U256], b: &U256) -> Vec<U256> {
         assert!(!a[len_a - 1].is_zero(), "Input 'a' must not have leading zeros");
         assert!(!b.is_zero(), "Input 'b' must be greater than zero");
     }
-
-    let mut out = vec![U256::ONE; len_a + 1];
 
     // Start with a[0] + b
     let mut params = SyscallAdd256Params {
@@ -42,8 +40,9 @@ pub fn add_short(a: &[U256], b: &U256) -> Vec<U256> {
     }
 
     if carry == 0 {
-        out.pop();
+        len_a
+    } else {
+        out[len_a] = U256::ONE;
+        len_a + 1
     }
-
-    out
 }

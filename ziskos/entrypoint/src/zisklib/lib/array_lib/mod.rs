@@ -13,7 +13,7 @@ mod square_short;
 
 pub use add_agtb::*;
 pub use add_short::*;
-pub use common::U256;
+pub use common::{ShortScratch, U256};
 pub use div_long::*;
 pub use div_short::*;
 pub use modexp::*;

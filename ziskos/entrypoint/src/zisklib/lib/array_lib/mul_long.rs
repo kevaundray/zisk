@@ -2,7 +2,7 @@ use crate::syscalls::{
     syscall_add256, syscall_arith256, SyscallAdd256Params, SyscallArith256Params,
 };
 
-use super::{mul_short, rem_long, U256};
+use super::{rem_long, U256};
 
 /// Multiplication of two large numbers (represented as arrays of U256)
 ///
@@ -139,7 +139,7 @@ pub fn mul_and_reduce_long(a: &[U256], b: &[U256], modulus: &[U256]) -> Vec<U256
         assert!(!modulus[len_m - 1].is_zero(), "Input 'modulus' must not have leading zeros");
     }
 
-    let mul = if b.len() == 1 { mul_short(a, &b[0]) } else { mul_long(a, b) };
+    let mul = mul_long(a, b);
 
     rem_long(&mul, modulus)
 }

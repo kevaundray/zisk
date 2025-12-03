@@ -1,11 +1,11 @@
 use crate::syscalls::{syscall_arith256, SyscallArith256Params};
 
-use super::{rem_short, U256};
+use super::{rem_short, ShortScratch, U256};
 
 /// Multiplication of a large number (represented as an array of U256) by a short U256 number
 ///
 /// It assumes that a,b > 0
-pub fn mul_short(a: &[U256], b: &U256) -> Vec<U256> {
+pub fn mul_short(a: &[U256], b: &U256, out: &mut [U256]) -> usize {
     let len_a = a.len();
     #[cfg(debug_assertions)]
     {
@@ -14,9 +14,7 @@ pub fn mul_short(a: &[U256], b: &U256) -> Vec<U256> {
         assert!(!b.is_zero(), "Input 'b' must be greater than zero");
     }
 
-    let mut out = vec![U256::ZERO; len_a + 1];
     let mut carry = U256::ZERO;
-
     for i in 0..len_a {
         // Compute a[i]·b + carry
         let cin = carry;
@@ -30,13 +28,12 @@ pub fn mul_short(a: &[U256], b: &U256) -> Vec<U256> {
         syscall_arith256(&mut params);
     }
 
-    if !carry.is_zero() {
-        out[len_a] = carry;
+    if carry.is_zero() {
+        len_a
     } else {
-        out.pop();
+        out[len_a] = carry;
+        len_a + 1
     }
-
-    out
 }
 
 pub fn mul_short_short(a: &U256, b: &U256) -> ([U256; 2], usize) {
@@ -73,8 +70,7 @@ pub fn mul_and_reduce_short(
     a: &U256,
     b: &U256,
     modulus: &U256,
-    quo: &mut [u64; 8],
-    rem: &mut [u64; 4],
+    scratch: &mut ShortScratch,
 ) -> U256 {
     #[cfg(debug_assertions)]
     {
@@ -84,5 +80,5 @@ pub fn mul_and_reduce_short(
     let (mul, len) = mul_short_short(a, b);
 
     // Use short division
-    rem_short(&mul[..len], modulus, quo, rem)
+    rem_short(&mul[..len], modulus, scratch)
 }
