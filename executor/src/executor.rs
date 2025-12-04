@@ -79,8 +79,10 @@ enum MinimalTraceExecutionMode {
 /// The `ZiskExecutor` struct orchestrates the execution of the ZisK ROM program, managing state
 /// machines, planning, and witness computation.
 pub struct ZiskExecutor<F: PrimeField64> {
+    /// Standard input for the ZisK program.
     stdin: Mutex<ZiskStdin>,
 
+    /// Pipeline for handling precompile hints.
     hints_pipeline: Mutex<HintsPipeline>,
 
     /// ZisK ROM, a binary file containing the ZisK program to be executed.
@@ -189,6 +191,7 @@ impl<F: PrimeField64> ZiskExecutor<F> {
             (None, None)
         };
 
+        // Generate shared memory names for hints pipeline based on assembly services.
         let hints_shmem_names = AsmServices::SERVICES
             .iter()
             .map(|service| {
@@ -204,6 +207,7 @@ impl<F: PrimeField64> ZiskExecutor<F> {
             })
             .collect::<Vec<_>>();
 
+        // Create hints pipeline with null hintin initially.
         let hints_pipeline = Mutex::new(HintsPipeline::new(
             ZiskHintin::null(),
             hints_shmem_names,
@@ -357,6 +361,7 @@ impl<F: PrimeField64> ZiskExecutor<F> {
             );
         });
 
+        // Process and write precompile atomically
         self.hints_pipeline
             .lock()
             .unwrap()
