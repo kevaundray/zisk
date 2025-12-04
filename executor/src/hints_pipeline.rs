@@ -148,7 +148,7 @@ impl HintsPipeline {
 
         let mut hintin = self.hintin.lock().unwrap();
 
-        let hints = Self::reinterpret_vec(hintin.read());
+        let hints = Self::reinterpret_vec(hintin.read())?;
 
         let processor = PrecompileHintsProcessor::new()?;
         let processed = processor.process_hints(&hints)?;
@@ -160,7 +160,7 @@ impl HintsPipeline {
 
         let mut full_input = Vec::with_capacity(shmem_input_size * 8);
         full_input.extend_from_slice(&processed.len().to_le_bytes());
-        full_input.extend_from_slice(&Self::reinterpret_vec(processed));
+        full_input.extend_from_slice(&Self::reinterpret_vec(processed)?);
 
         let shmem_writers = self.shmem_writers.lock().unwrap();
         for shmem_writer in shmem_writers.iter() {
@@ -172,32 +172,49 @@ impl HintsPipeline {
 
     /// Reinterprets a `Vec<T>` as a `Vec<U>` by transmuting the underlying memory.
     ///
-    /// # Safety
-    /// This function performs an unsafe transmutation. It assumes:
-    /// - The source vector is properly aligned for type `U`
-    /// - The total byte size is compatible between `T` and `U`
+    /// This function converts between vector types by reinterpreting the raw memory,
+    /// adjusting length and capacity based on the size ratio between types.
+    /// It performs internal unsafe operations but validates all safety requirements
+    /// before the conversion.
     ///
-    /// # Panics
-    /// Panics if the source vector is not properly aligned for type `U`
+    /// # Arguments
+    /// * `v` - The source vector to reinterpret.
+    ///
+    /// # Returns
+    /// * `Ok(Vec<U>)` - A new vector that owns the same memory as the input vector
+    /// * `Err` - If validation fails (size incompatibility or alignment issues)
     ///
     /// # Type Parameters
     /// * `T` - Source element type
     /// * `U` - Destination element type
-    fn reinterpret_vec<T, U>(v: Vec<T>) -> Vec<U> {
+    fn reinterpret_vec<T, U>(v: Vec<T>) -> Result<Vec<U>> {
         let size_t = std::mem::size_of::<T>();
         let size_u = std::mem::size_of::<U>();
 
-        assert_eq!(
-            v.as_ptr() as usize % std::mem::align_of::<U>(),
-            0,
-            "Vec is not properly aligned"
-        );
+        // Check that total byte size is compatible
+        if (v.len() * size_t) % size_u != 0 {
+            return Err(anyhow::anyhow!(
+                "Total byte size {} is not divisible by target type size {}",
+                v.len() * size_t,
+                size_u
+            ));
+        }
+
+        // Check that the pointer is properly aligned for U
+        if v.as_ptr() as usize % std::mem::align_of::<U>() != 0 {
+            return Err(anyhow::anyhow!(
+                "Vec<{}> is not properly aligned for Vec<{}> (requires {}-byte alignment)",
+                std::any::type_name::<T>(),
+                std::any::type_name::<U>(),
+                std::mem::align_of::<U>()
+            ));
+        }
 
         let len = (v.len() * size_t) / size_u;
         let cap = (v.capacity() * size_t) / size_u;
         let ptr = v.as_ptr() as *mut U;
 
         std::mem::forget(v);
-        unsafe { Vec::from_raw_parts(ptr, len, cap) }
+        Ok(unsafe { Vec::from_raw_parts(ptr, len, cap) })
     }
 }
