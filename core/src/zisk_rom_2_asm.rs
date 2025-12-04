@@ -121,6 +121,8 @@ pub struct ZiskAsmContext {
     mem_rsp: String,                        // Backup of rsp register value from caller
     mem_free_input: String, // Free input address (0x90000000) used in free call operations
     mem_precompile_results_address: String, // Address where precompile results are read from
+    mem_precompile_written_address: String, // Address where precompile written counter is stored
+    mem_precompile_read_address: String, // Address where precompile read counter is stored
 
     comments: bool, // true if we want to generate comments in the assembly source code
     boc: String,    // begin of comment: '/*', ';', '#', etc.
@@ -219,7 +221,7 @@ impl ZiskAsmContext {
         self.precompile_results
     }
     pub fn precompile_results_keccak(&self) -> bool {
-        self.precompile_results() && false
+        self.precompile_results() && true
     }
     pub fn precompile_results_sha256(&self) -> bool {
         self.precompile_results() && false
@@ -273,6 +275,9 @@ impl ZiskAsmContext {
         self.precompile_results() && false
     }
     pub fn precompile_results_add256(&self) -> bool {
+        self.precompile_results() && false
+    }
+    pub fn call_wait_for_prec_avail(&self) -> bool {
         self.precompile_results() && false
     }
 }
@@ -501,6 +506,8 @@ impl ZiskRom2Asm {
         ctx.mem_free_input = format!("qword {}[MEM_FREE_INPUT]", ctx.ptr);
         ctx.mem_precompile_results_address =
             format!("qword {}[MEM_PRECOMPILE_RESULTS_ADDRESS]", ctx.ptr);
+        ctx.mem_precompile_written_address = format!("qword {}[0x70000000]", ctx.ptr);
+        ctx.mem_precompile_read_address = format!("qword {}[0x70000008]", ctx.ptr);
 
         // Preamble
         *code += ".intel_syntax noprefix\n";
@@ -589,7 +596,8 @@ impl ZiskRom2Asm {
         *code += ".extern chunk_done\n";
         *code += ".extern print_fcall_ctx\n";
         *code += ".extern print_pc\n";
-        *code += ".extern realloc_trace\n\n";
+        *code += ".extern realloc_trace\n";
+        *code += ".extern wait_for_prec_avail\n\n";
 
         if ctx.minimal_trace()
             || ctx.main_trace()
@@ -604,7 +612,9 @@ impl ZiskRom2Asm {
             *code += ".extern trace_address\n\n";
             *code += ".extern trace_address_threshold\n\n";
             if ctx.precompile_results() {
-                *code += ".extern precompile_result_address\n\n";
+                *code += ".extern precompile_result_address\n";
+                *code += ".extern precompile_written_address\n";
+                *code += ".extern precompile_read_address\n\n";
             }
         }
 
@@ -792,14 +802,17 @@ impl ZiskRom2Asm {
                     REG_AUX,
                     ctx.comment_str("aux = precompile_results_address")
                 );
-                *code += &format!("\tadd {}, 8 {}\n", REG_AUX, ctx.comment_str("aux += 8"));
                 *code += &format!(
                     "\tmov {}, {} {}\n",
                     ctx.mem_precompile_results_address,
                     REG_AUX,
-                    ctx.comment_str(
-                        "mem_precompile_results_counter = precompile_results_address + "
-                    )
+                    ctx.comment_str("mem_precompile_results_counter = precompile_results_address")
+                );
+
+                *code += &format!(
+                    "\tmov {}, 0 {}\n",
+                    ctx.mem_precompile_read_address,
+                    ctx.comment_str("precompile_read = 0")
                 );
             }
         }
@@ -5098,7 +5111,7 @@ impl ZiskRom2Asm {
 
                     // Get result from precompile results data
                     if ctx.precompile_results_keccak() {
-                        Self::precompile_results_array(ctx, code, "rdi", 25);
+                        Self::precompile_results_array(ctx, code, unusual_code, "rdi", 25);
                     } else {
                         // Call the keccak function
                         Self::push_internal_registers(ctx, code, false);
@@ -5178,7 +5191,7 @@ impl ZiskRom2Asm {
                     // Get result from precompile results data
                     if ctx.precompile_results_sha256() {
                         *code += &format!("\tmov rdi, [rdi]\n");
-                        Self::precompile_results_array(ctx, code, "rdi", 4);
+                        Self::precompile_results_array(ctx, code, unusual_code, "rdi", 4);
                     } else {
                         // Call the SHA256 function
                         Self::push_internal_registers(ctx, code, false);
@@ -5290,9 +5303,9 @@ impl ZiskRom2Asm {
                     // Get result from precompile results data
                     if ctx.precompile_results_arith256() {
                         *code += &format!("\tmov {REG_FLAG}, [rdi+3*8]\n");
-                        Self::precompile_results_array(ctx, code, REG_FLAG, 4);
+                        Self::precompile_results_array(ctx, code, unusual_code, REG_FLAG, 4);
                         *code += &format!("\tmov {REG_FLAG}, [rdi+4*8]\n");
-                        Self::precompile_results_array(ctx, code, REG_FLAG, 4);
+                        Self::precompile_results_array(ctx, code, unusual_code, REG_FLAG, 4);
                         *code += &format!("\tmov {REG_FLAG}, 0\n"); // Is this needed?
                     } else {
                         // Call the arith256 function
@@ -5351,7 +5364,7 @@ impl ZiskRom2Asm {
                     // Get result from precompile results data
                     if ctx.precompile_results_arith256mod() {
                         *code += &format!("\tmov rdi, [rdi + 4*8]\n");
-                        Self::precompile_results_array(ctx, code, "rdi", 4);
+                        Self::precompile_results_array(ctx, code, unusual_code, "rdi", 4);
                     } else {
                         // Call the arith256_mod function
                         Self::push_internal_registers(ctx, code, false);
@@ -5432,7 +5445,7 @@ impl ZiskRom2Asm {
                     // Get result from precompile results data
                     if ctx.precompile_results_secp256k1add() {
                         *code += &format!("\tmov rdi, [rdi]\n");
-                        Self::precompile_results_array(ctx, code, "rdi", 8);
+                        Self::precompile_results_array(ctx, code, unusual_code, "rdi", 8);
                     } else {
                         // Call the secp256k1_add function
                         Self::push_internal_registers(ctx, code, false);
@@ -5537,7 +5550,7 @@ impl ZiskRom2Asm {
                 {
                     // Get result from precompile results data
                     if ctx.precompile_results_secp256k1dbl() {
-                        Self::precompile_results_array(ctx, code, "rdi", 8);
+                        Self::precompile_results_array(ctx, code, unusual_code, "rdi", 8);
                     } else {
                         // Call the secp256k1_dbl function
                         Self::push_internal_registers(ctx, code, false);
@@ -5839,7 +5852,7 @@ impl ZiskRom2Asm {
                     // Get result from precompile results data
                     if ctx.precompile_results_bn254curveadd() {
                         *code += &format!("\tmov rdi, [rdi]\n");
-                        Self::precompile_results_array(ctx, code, "rdi", 8);
+                        Self::precompile_results_array(ctx, code, unusual_code, "rdi", 8);
                     } else {
                         // Call the bn254_curve_add function
                         Self::push_internal_registers(ctx, code, false);
@@ -5945,7 +5958,7 @@ impl ZiskRom2Asm {
                 {
                     // Get result from precompile results data
                     if ctx.precompile_results_bn254curvedbl() {
-                        Self::precompile_results_array(ctx, code, "rdi", 8);
+                        Self::precompile_results_array(ctx, code, unusual_code, "rdi", 8);
                     } else {
                         // Call the bn254_curve_dbl function
                         Self::push_internal_registers(ctx, code, false);
@@ -6027,7 +6040,7 @@ impl ZiskRom2Asm {
                     // Get result from precompile results data
                     if ctx.precompile_results_bn254complexadd() {
                         *code += &format!("\tmov rdi, [rdi]\n");
-                        Self::precompile_results_array(ctx, code, "rdi", 8);
+                        Self::precompile_results_array(ctx, code, unusual_code, "rdi", 8);
                     } else {
                         // Call the bn254_complex_add function
                         Self::push_internal_registers(ctx, code, false);
@@ -6109,7 +6122,7 @@ impl ZiskRom2Asm {
                     // Get result from precompile results data
                     if ctx.precompile_results_bn254complexsub() {
                         *code += &format!("\tmov rdi, [rdi]\n");
-                        Self::precompile_results_array(ctx, code, "rdi", 8);
+                        Self::precompile_results_array(ctx, code, unusual_code, "rdi", 8);
                     } else {
                         // Call the bn254_complex_sub function
                         Self::push_internal_registers(ctx, code, false);
@@ -6191,7 +6204,7 @@ impl ZiskRom2Asm {
                     // Get result from precompile results data
                     if ctx.precompile_results_bn254complexmul() {
                         *code += &format!("\tmov rdi, [rdi]\n");
-                        Self::precompile_results_array(ctx, code, "rdi", 8);
+                        Self::precompile_results_array(ctx, code, unusual_code, "rdi", 8);
                     } else {
                         // Call the bn254_complex_mul function
                         Self::push_internal_registers(ctx, code, false);
@@ -6281,7 +6294,7 @@ impl ZiskRom2Asm {
                     // Get result from precompile results data
                     if ctx.precompile_results_arith384mod() {
                         *code += &format!("\tmov rdi, [rdi + 4*8]\n");
-                        Self::precompile_results_array(ctx, code, "rdi", 6);
+                        Self::precompile_results_array(ctx, code, unusual_code, "rdi", 6);
                     } else {
                         // Call the arith384_mod function
                         Self::push_internal_registers(ctx, code, false);
@@ -6363,7 +6376,7 @@ impl ZiskRom2Asm {
                     // Get result from precompile results data
                     if ctx.precompile_results_bls12_381curveadd() {
                         *code += &format!("\tmov rdi, [rdi]\n");
-                        Self::precompile_results_array(ctx, code, "rdi", 12);
+                        Self::precompile_results_array(ctx, code, unusual_code, "rdi", 12);
                     } else {
                         // Call the bls12_381_curve_add function
                         Self::push_internal_registers(ctx, code, false);
@@ -6469,7 +6482,7 @@ impl ZiskRom2Asm {
                 {
                     // Get result from precompile results data
                     if ctx.precompile_results_bls12_381curvedbl() {
-                        Self::precompile_results_array(ctx, code, "rdi", 12);
+                        Self::precompile_results_array(ctx, code, unusual_code, "rdi", 12);
                     } else {
                         // Call the bls12_381_curve_dbl function
                         Self::push_internal_registers(ctx, code, false);
@@ -6555,7 +6568,7 @@ impl ZiskRom2Asm {
                     // Get result from precompile results data
                     if ctx.precompile_results_bls12_381complexadd() {
                         *code += &format!("\tmov rdi, [rdi]\n");
-                        Self::precompile_results_array(ctx, code, "rdi", 12);
+                        Self::precompile_results_array(ctx, code, unusual_code, "rdi", 12);
                     } else {
                         // Call the bls12_381_complex_add function
                         Self::push_internal_registers(ctx, code, false);
@@ -6641,7 +6654,7 @@ impl ZiskRom2Asm {
                     // Get result from precompile results data
                     if ctx.precompile_results_bls12_381complexsub() {
                         *code += &format!("\tmov rdi, [rdi]\n");
-                        Self::precompile_results_array(ctx, code, "rdi", 12);
+                        Self::precompile_results_array(ctx, code, unusual_code, "rdi", 12);
                     } else {
                         // Call the bls12_381_complex_sub function
                         Self::push_internal_registers(ctx, code, false);
@@ -6727,7 +6740,7 @@ impl ZiskRom2Asm {
                     // Get result from precompile results data
                     if ctx.precompile_results_bls12_381complexmul() {
                         *code += &format!("\tmov rdi, [rdi]\n");
-                        Self::precompile_results_array(ctx, code, "rdi", 12);
+                        Self::precompile_results_array(ctx, code, unusual_code, "rdi", 12);
                     } else {
                         // Call the bls12_381_complex_mul function
                         Self::push_internal_registers(ctx, code, false);
@@ -6831,7 +6844,7 @@ impl ZiskRom2Asm {
                     // Get result from precompile results data
                     if ctx.precompile_results_add256() {
                         *code += &format!("\tmov rdi, [rdi+3*8]\n");
-                        Self::precompile_results_array(ctx, code, "rdi", 4);
+                        Self::precompile_results_array(ctx, code, unusual_code, "rdi", 4);
                         Self::precompile_results_register(ctx, code, REG_C);
                     } else {
                         // Call the add256 function
@@ -7873,9 +7886,14 @@ impl ZiskRom2Asm {
     fn precompile_results_array(
         ctx: &mut ZiskAsmContext,
         code: &mut String,
+        unusual_code: &mut String,
         reg_address: &str,
         size: u64,
     ) {
+        if ctx.call_wait_for_prec_avail() {
+            Self::wait_for_prec_avail(ctx, code, unusual_code);
+        }
+
         *code += &format!(
             "\tmov {}, {} {}\n",
             REG_AUX,
@@ -7910,6 +7928,14 @@ impl ZiskRom2Asm {
             REG_AUX,
             ctx.comment_str("precompile_results_address = aux")
         );
+        if ctx.call_wait_for_prec_avail() {
+            *code += &format!(
+                "\tadd {}, {}*8 {}\n",
+                ctx.mem_precompile_read_address,
+                size,
+                ctx.comment(format!("read += {}*8", size))
+            );
+        }
     }
 
     // Copies 1 u64 element from precompile_results_address to the register reg,
@@ -7998,6 +8024,49 @@ impl ZiskRom2Asm {
             REG_AUX,
             ctx.comment_str("precompile_results_address = aux")
         );
+    }
+
+    fn wait_for_prec_avail(ctx: &mut ZiskAsmContext, code: &mut String, unusual_code: &mut String) {
+        *code += &ctx.full_line_comment("Wait for precompile results available".to_string());
+
+        // if *precompile_written_address == *precompile_read_address -> call wait_for_prec_avail
+        *code += &format!(
+            "\tmov {}, {} {}\n",
+            REG_AUX,
+            ctx.mem_precompile_written_address,
+            ctx.comment_str("aux = precompile_written")
+        );
+        *code += &format!(
+            "\tmov {}, {} {}\n",
+            REG_VALUE,
+            ctx.mem_precompile_read_address,
+            ctx.comment_str("value = precompile_read")
+        );
+        *code += &format!(
+            "\tcmp {}, {} {}\n",
+            REG_AUX,
+            ctx.mem_precompile_read_address,
+            ctx.comment_str("written ?= read")
+        );
+        *code += &format!(
+            "\tjz pc_{:x}_wait_for_prec_avail {}\n",
+            ctx.pc,
+            ctx.comment_str("if there is data, done")
+        );
+        *code += &format!("pc_{:x}_wait_for_prec_avail_done:\n", ctx.pc,);
+
+        // Call wait_for_prec_avail()
+        *unusual_code += &format!("pc_{:x}_wait_for_prec_avail:\n", ctx.pc,);
+        Self::push_internal_registers(ctx, unusual_code, false);
+        *unusual_code += "\tcall _wait_for_prec_avail\n"; // TODO: handle error -1 ret
+        Self::pop_internal_registers(ctx, unusual_code, false);
+
+        *unusual_code += &format!("\tjmp pc_{:x}_wait_for_prec_avail_done\n", ctx.pc,);
+
+        // TODO:
+        // else if *precompile_written_address - *precompile_read_address < threshold -> call post_prec_read
+
+        //*code += &format!("pc_{:x}_wait_for_prec_avail_end:\n", ctx.pc,);
     }
 
     /*******************/
