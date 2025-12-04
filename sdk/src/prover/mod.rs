@@ -11,7 +11,10 @@ use proofman_common::ProofOptions;
 use crate::Proof;
 use anyhow::Result;
 use std::{path::PathBuf, time::Duration};
-use zisk_common::{io::ZiskStdin, ExecutorStats, ZiskExecutionResult};
+use zisk_common::{
+    io::{ZiskHintin, ZiskStdin},
+    ExecutorStats, ZiskExecutionResult,
+};
 
 pub struct ZiskExecuteResult {
     pub execution: ZiskExecutionResult,
@@ -46,7 +49,12 @@ pub trait ProverEngine {
 
     fn executed_steps(&self) -> u64;
 
-    fn execute(&self, stdin: ZiskStdin, output_path: Option<PathBuf>) -> Result<ZiskExecuteResult>;
+    fn execute(
+        &self,
+        stdin: ZiskStdin,
+        hintin: Option<ZiskHintin>,
+        output_path: Option<PathBuf>,
+    ) -> Result<ZiskExecuteResult>;
 
     fn stats(
         &self,
@@ -121,8 +129,12 @@ impl<C: ZiskBackend> ZiskProver<C> {
 
     /// Execute the prover with the given standard input and output path.
     /// It only runs the execution without generating a proof.
-    pub fn execute(&self, stdin: ZiskStdin) -> Result<ZiskExecuteResult> {
-        self.prover.execute(stdin, None)
+    pub fn execute(
+        &self,
+        stdin: ZiskStdin,
+        hintin: Option<ZiskHintin>,
+    ) -> Result<ZiskExecuteResult> {
+        self.prover.execute(stdin, hintin, None)
     }
 
     /// Get the execution statistics with the given standard input and debug information.

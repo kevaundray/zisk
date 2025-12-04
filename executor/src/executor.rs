@@ -31,10 +31,12 @@ use rayon::prelude::*;
 use rom_setup::gen_elf_hash;
 use sm_rom::{RomInstance, RomSM};
 use std::sync::atomic::{AtomicUsize, Ordering};
+use tracing::debug;
 use witness::WitnessComponent;
-use zisk_common::io::{ZiskIO, ZiskStdin};
+use zisk_common::io::{ZiskHintin, ZiskIO, ZiskStdin};
+use zisk_hints::PrecompileHintsProcessor;
 
-use crate::DummyCounter;
+use crate::{DummyCounter, HintsShmem};
 use data_bus::DataBusTrait;
 use sm_main::{MainInstance, MainPlanner, MainSM};
 use zisk_common::{
@@ -42,6 +44,7 @@ use zisk_common::{
     InstanceCtx, InstanceType, Plan, Stats, ZiskExecutionResult,
 };
 use zisk_common::{ChunkId, PayloadType};
+use zisk_hints::HintsPipeline;
 use zisk_pil::{
     RomRomTrace, ZiskPublicValues, INPUT_DATA_AIR_IDS, MAIN_AIR_IDS, MEM_AIR_IDS, ROM_AIR_IDS,
     ROM_DATA_AIR_IDS, ZISK_AIRGROUP_ID,
@@ -75,10 +78,16 @@ enum MinimalTraceExecutionMode {
     AsmWithCounter,
 }
 
+type HintsProcessorShmem = HintsPipeline<PrecompileHintsProcessor, HintsShmem>;
+
 /// The `ZiskExecutor` struct orchestrates the execution of the ZisK ROM program, managing state
 /// machines, planning, and witness computation.
 pub struct ZiskExecutor<F: PrimeField64> {
+    /// Standard input for the ZisK program.
     stdin: Mutex<ZiskStdin>,
+
+    /// Pipeline for handling precompile hints.
+    hints_pipeline: Mutex<HintsProcessorShmem>,
 
     /// ZisK ROM, a binary file containing the ZisK program to be executed.
     pub zisk_rom: Arc<ZiskRom>,
@@ -186,8 +195,51 @@ impl<F: PrimeField64> ZiskExecutor<F> {
             (None, None)
         };
 
+        // Generate shared memory names for hints pipeline.
+        let hints_shmem_names = AsmServices::SERVICES
+            .iter()
+            .map(|service| {
+                AsmSharedMemory::<AsmMTHeader>::shmem_precompile_name(
+                    if let Some(base_port) = base_port {
+                        AsmServices::port_for(service, base_port, local_rank)
+                    } else {
+                        AsmServices::default_port(service, local_rank)
+                    },
+                    *service,
+                    local_rank,
+                )
+            })
+            .collect::<Vec<_>>();
+
+        // Generate shared memory control names for hints pipeline.
+        let hints_shmem_control_names = AsmServices::SERVICES
+            .iter()
+            .map(|service| {
+                AsmSharedMemory::<AsmMTHeader>::shmem_control_name(
+                    if let Some(base_port) = base_port {
+                        AsmServices::port_for(service, base_port, local_rank)
+                    } else {
+                        AsmServices::default_port(service, local_rank)
+                    },
+                    *service,
+                    local_rank,
+                )
+            })
+            .collect::<Vec<_>>();
+
+        // Create hints pipeline with null hintin initially.
+        let hints_processor =
+            PrecompileHintsProcessor::new().expect("Failed to create PrecompileHintsProcessor");
+
+        let hints_shmem =
+            HintsShmem::new(hints_shmem_names, hints_shmem_control_names, unlock_mapped_memory);
+
+        let hints_pipeline =
+            Mutex::new(HintsPipeline::new(hints_processor, hints_shmem, ZiskHintin::null()));
+
         Self {
             stdin: Mutex::new(ZiskStdin::null()),
+            hints_pipeline,
             rom_path,
             asm_runner_path: asm_path,
             asm_rom_path,
@@ -217,6 +269,10 @@ impl<F: PrimeField64> ZiskExecutor<F> {
     pub fn set_stdin(&self, stdin: ZiskStdin) {
         let mut guard = self.stdin.lock().unwrap();
         *guard = stdin;
+    }
+
+    pub fn set_hintin(&self, hintin: ZiskHintin) {
+        self.hints_pipeline.lock().unwrap().set_hintin(hintin);
     }
 
     #[allow(clippy::type_complexity)]
@@ -295,15 +351,15 @@ impl<F: PrimeField64> ZiskExecutor<F> {
                 AsmServices::default_port(service, self.local_rank)
             };
 
+            // Write inputs to shared memory
             let shmem_input_name =
                 AsmSharedMemory::<AsmMTHeader>::shmem_input_name(port, *service, self.local_rank);
 
             let mut input_writer = self.shmem_input_writer[idx].lock().unwrap();
             if input_writer.is_none() {
-                tracing::info!(
+                debug!(
                     "Initializing SharedMemoryWriter for service {:?} at '{}'",
-                    service,
-                    shmem_input_name
+                    service, shmem_input_name
                 );
                 *input_writer = Some(
                     SharedMemoryWriter::new(
@@ -327,6 +383,13 @@ impl<F: PrimeField64> ZiskExecutor<F> {
                 ExecutorStatsEvent::End,
             );
         });
+
+        // Process and write precompile atomically
+        self.hints_pipeline
+            .lock()
+            .unwrap()
+            .write_hints()
+            .expect("Failed to write hints to shared memory");
 
         let chunk_size = self.chunk_size;
         let (world_rank, local_rank, base_port) =

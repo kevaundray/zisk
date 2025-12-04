@@ -1334,6 +1334,7 @@ dependencies = [
 name = "executor"
 version = "0.15.0"
 dependencies = [
+ "anyhow",
  "asm-runner",
  "crossbeam",
  "data-bus",
@@ -1362,6 +1363,7 @@ dependencies = [
  "witness",
  "zisk-common",
  "zisk-core",
+ "zisk-hints",
  "zisk-pil",
  "ziskemu",
 ]
@@ -5716,8 +5718,12 @@ dependencies = [
 name = "zisk-hints"
 version = "0.15.0"
 dependencies = [
+ "anyhow",
  "lib-c",
  "precompiles-helpers",
+ "rayon",
+ "tracing",
+ "zisk-common",
  "ziskos",
 ]
 

@@ -276,6 +276,20 @@ impl<H: AsmShmemHeader> AsmSharedMemory<H> {
         format!("{}_{}_input", AsmServices::shmem_prefix(port, local_rank), asm_service.as_str())
     }
 
+    /// Shared memory name for precompile hints data
+    pub fn shmem_precompile_name(port: u16, asm_service: AsmService, local_rank: i32) -> String {
+        format!(
+            "{}_{}_precompile",
+            AsmServices::shmem_prefix(port, local_rank),
+            asm_service.as_str()
+        )
+    }
+
+    /// Shared memory name for precompile hints data control
+    pub fn shmem_control_name(port: u16, asm_service: AsmService, local_rank: i32) -> String {
+        format!("{}_{}_control", AsmServices::shmem_prefix(port, local_rank), asm_service.as_str())
+    }
+
     pub fn shmem_output_name(port: u16, asm_service: AsmService, local_rank: i32) -> String {
         format!("{}_{}_output", AsmServices::shmem_prefix(port, local_rank), asm_service.as_str())
     }

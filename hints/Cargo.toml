@@ -15,3 +15,7 @@ path = "src/lib.rs"
 ziskos = { workspace = true }
 lib-c = { workspace = true }
 precompiles-helpers = { workspace = true }
+anyhow = { workspace = true }
+rayon = { workspace = true }
+tracing = { workspace = true }
+zisk-common = { workspace = true }
