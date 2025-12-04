@@ -2,16 +2,23 @@ use crate::syscalls::{syscall_arith256, SyscallArith256Params};
 
 use super::{rem_short, ShortScratch, U256};
 
-/// Multiplication of a large number (represented as an array of U256) by a short U256 number
+/// Multiplies a large number by a short number: out = a · b
 ///
-/// It assumes that a,b > 0
+/// # Assumptions
+/// - `len(a) > 0`
+/// - `a` has no leading zeros (unless zero)
+/// - `out` has at least `len(a) + 1` limbs
+///
+/// # Returns
+/// The number of limbs in the result
 pub fn mul_short(a: &[U256], b: &U256, out: &mut [U256]) -> usize {
     let len_a = a.len();
     #[cfg(debug_assertions)]
     {
         assert_ne!(len_a, 0, "Input 'a' must have at least one limb");
-        assert!(!a[len_a - 1].is_zero(), "Input 'a' must not have leading zeros");
-        assert!(!b.is_zero(), "Input 'b' must be greater than zero");
+        if len_a > 1 {
+            assert!(!a[len_a - 1].is_zero(), "Input 'a' must not have leading zeros");
+        }
     }
 
     let mut carry = U256::ZERO;
@@ -36,13 +43,11 @@ pub fn mul_short(a: &[U256], b: &U256, out: &mut [U256]) -> usize {
     }
 }
 
-pub fn mul_short_short(a: &U256, b: &U256) -> ([U256; 2], usize) {
-    #[cfg(debug_assertions)]
-    {
-        assert!(!a.is_zero(), "Input 'a' must not have leading zeros");
-        assert!(!b.is_zero(), "Input 'b' must not be zero");
-    }
-
+/// Multiplies two single-limb numbers: returns (result, len)
+///
+/// # Returns
+/// A tuple of (result array, number of limbs used)
+pub fn mul_short_one_limb(a: &U256, b: &U256) -> ([U256; 2], usize) {
     let mut out = [U256::ZERO; 2];
 
     // Compute a * b
@@ -66,6 +71,13 @@ pub fn mul_short_short(a: &U256, b: &U256) -> ([U256; 2], usize) {
     (out, len)
 }
 
+/// Multiplies two short numbers and reduces modulo a short modulus
+///
+/// # Assumptions
+/// - `modulus > 0`
+///
+/// # Returns
+/// The remainder: `(a · b) mod modulus`
 pub fn mul_and_reduce_short(
     a: &U256,
     b: &U256,
@@ -77,8 +89,7 @@ pub fn mul_and_reduce_short(
         assert!(!modulus.is_zero(), "Input 'modulus' must not be zero");
     }
 
-    let (mul, len) = mul_short_short(a, b);
+    let (mul, len) = mul_short_one_limb(a, b);
 
-    // Use short division
     rem_short(&mul[..len], modulus, scratch)
 }

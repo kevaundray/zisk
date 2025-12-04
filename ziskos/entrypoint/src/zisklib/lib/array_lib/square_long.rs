@@ -2,30 +2,42 @@ use crate::syscalls::{
     syscall_add256, syscall_arith256, SyscallAdd256Params, SyscallArith256Params,
 };
 
-use super::{rem_long, U256};
+use super::{rem_long, LongScratch, U256};
 
-/// Squaring of a large number (represented as an array of U256)
-//                                        a3    a2    a1      a0
-//                                      * a3    a2    a1      a0
-//         ------------------------------------------------------- 0
-//                               Y       2*a0*a2   2*a0*a1  a0*a0
-//         ------------------------------------------------------- 1
-//               2*a1*a3+Z    2*a1*a2     a1*a1        X      0
-//         ------------------------------------------------------- 2
-//  Z   Y     2*a2*a3   a2*a2        X      X          0      0
-//         ------------------------------------------------------- 3
-//    a3*a3     X        X          X           0      0      0
-//         ------------------------------------------------------- 4
-//                          RESULT
-pub fn square_long(a: &[U256]) -> Vec<U256> {
+/// Squares a large number: out = a²
+///
+/// # Assumptions
+/// - `len(a) > 0`
+/// - `a` has no leading zeros
+/// - `out` has at least `2 * len(a)` limbs
+///
+/// # Returns
+/// The number of limbs in the result
+///
+/// # Note
+/// Not optimal for `len(a) == 1`, use `square_short` instead
+pub fn square_long(a: &[U256], out: &mut [U256]) -> usize {
+    //                                        a3    a2    a1      a0
+    //                                      * a3    a2    a1      a0
+    //         ------------------------------------------------------- 0
+    //                               Y       2*a0*a2   2*a0*a1  a0*a0
+    //         ------------------------------------------------------- 1
+    //               2*a1*a3+Z    2*a1*a2     a1*a1        X      0
+    //         ------------------------------------------------------- 2
+    //  Z   Y     2*a2*a3   a2*a2        X      X          0      0
+    //         ------------------------------------------------------- 3
+    //    a3*a3     X        X          X           0      0      0
+    //         ------------------------------------------------------- 4
+    //                          RESULT
+
     let len_a = a.len();
     #[cfg(debug_assertions)]
     {
         assert_ne!(len_a, 0, "Input 'a' must have at least one limb");
-        assert!(!a[len_a - 1].is_zero(), "Input 'a' must not have leading zeros");
+        if len_a > 1 {
+            assert!(!a[len_a - 1].is_zero(), "Input 'a' must not have leading zeros");
+        }
     }
-
-    let mut out = vec![U256::ZERO; 2 * len_a];
 
     // Step 1: Compute all diagonal terms a[i] * a[i]
     for i in 0..len_a {
@@ -161,16 +173,26 @@ pub fn square_long(a: &[U256]) -> Vec<U256> {
     }
 
     if out[2 * len_a - 1].is_zero() {
-        out.pop();
+        2 * len_a - 1
+    } else {
+        2 * len_a
     }
-
-    out
 }
 
-/// Squaring of a large number (represented as an array of U256) followed by reduction modulo a second large number
+/// Squares a large number and reduces modulo a large modulus
 ///
-/// It assumes that modulus > 0
-pub fn square_and_reduce_long(a: &[U256], modulus: &[U256]) -> Vec<U256> {
+/// # Assumptions
+/// - `len(modulus) > 0`
+/// - `modulus > 0`
+/// - `modulus` has no leading zeros
+///
+/// # Returns
+/// The remainder: a² mod modulus
+pub fn square_and_reduce_long(
+    a: &[U256],
+    modulus: &[U256],
+    scratch: &mut LongScratch,
+) -> Vec<U256> {
     #[cfg(debug_assertions)]
     {
         let len_m = modulus.len();
@@ -178,7 +200,7 @@ pub fn square_and_reduce_long(a: &[U256], modulus: &[U256]) -> Vec<U256> {
         assert!(!modulus[len_m - 1].is_zero(), "Input 'modulus' must not have leading zeros");
     }
 
-    let sq = square_long(a);
+    let sq_len = square_long(a, &mut scratch.mul);
 
-    rem_long(&sq, modulus)
+    rem_long(&scratch.mul[..sq_len], modulus, &mut scratch.rem)
 }

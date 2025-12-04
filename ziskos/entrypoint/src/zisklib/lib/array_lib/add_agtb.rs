@@ -2,21 +2,29 @@ use crate::syscalls::{syscall_add256, SyscallAdd256Params};
 
 use super::U256;
 
-/// Addition of two large numbers (represented as arrays of U256)
+/// Adds two large numbers: out = a + b
 ///
-/// It assumes that a,b > 0 and len(a) >= len(b)
-pub fn add_agtb(a: &[U256], b: &[U256]) -> Vec<U256> {
+/// # Assumptions
+/// - `len(a) >= len(b) > 0`
+/// - `a` and `b` have no leading zeros (unless zero)
+/// - `out` has at least `len(a) + 1` limbs
+///
+/// # Returns
+/// The number of limbs in the result
+pub fn add_agtb(a: &[U256], b: &[U256], out: &mut [U256]) -> usize {
     let len_a = a.len();
     let len_b = b.len();
     #[cfg(debug_assertions)]
     {
         assert_ne!(len_b, 0, "Input 'b' must have at least one limb");
-        assert!(len_a >= len_b, "Input 'a' must be greater than 'b'");
-        assert!(!a[len_a - 1].is_zero(), "Input 'a' must not have leading zeros");
-        assert!(!b[len_b - 1].is_zero(), "Input 'b' must not have leading zeros");
+        assert!(len_a >= len_b, "Input 'a' must have at least as many limbs as 'b'");
+        if len_a > 1 {
+            assert!(!a[len_a - 1].is_zero(), "Input 'a' must not have leading zeros");
+        }
+        if len_b > 1 {
+            assert!(!b[len_b - 1].is_zero(), "Input 'b' must not have leading zeros");
+        }
     }
-
-    let mut out: Vec<U256> = vec![U256::ONE; len_a + 1];
 
     // Start with a[0] + b[0]
     let mut params = SyscallAdd256Params {
@@ -55,8 +63,9 @@ pub fn add_agtb(a: &[U256], b: &[U256]) -> Vec<U256> {
     }
 
     if carry == 0 {
-        out.pop();
+        len_a
+    } else {
+        out[len_a] = U256::ONE;
+        len_a + 1
     }
-
-    out
 }

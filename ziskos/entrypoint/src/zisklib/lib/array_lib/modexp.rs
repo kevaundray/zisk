@@ -6,8 +6,8 @@ use std::vec;
 use crate::zisklib::fcall_bin_decomp;
 
 use super::{
-    mul_and_reduce_long, mul_and_reduce_short, rem_long, rem_short, square_and_reduce_long,
-    square_and_reduce_short, ShortScratch, U256,
+    mul_and_reduce_long, mul_and_reduce_short, rem_long_init, rem_short_init,
+    square_and_reduce_long, square_and_reduce_short, LongScratch, ShortScratch, U256,
 };
 
 /// Modular exponentiation of three large numbers
@@ -66,11 +66,8 @@ pub fn modexp(base: &[U256], exp: &[u64], modulus: &[U256]) -> Vec<U256> {
     if len_m == 1 {
         let modulus = &modulus[0];
 
-        // Scratch space
-        let mut scratch = ShortScratch::new();
-
         // Compute base = base (mod modulus)
-        let base = rem_short(base, modulus, &mut scratch);
+        let base = rem_short_init(base, modulus);
 
         // Hint exponent bits
         let (len, bits) = fcall_bin_decomp(exp);
@@ -83,6 +80,9 @@ pub fn modexp(base: &[U256], exp: &[u64], modulus: &[U256]) -> Vec<U256> {
         let limb_idx = bits_pos / 64;
         let bit_in_limb = bits_pos % 64;
         rec_exp[limb_idx] = 1u64 << bit_in_limb;
+
+        // Scratch space
+        let mut scratch = ShortScratch::new();
 
         // Initialize out = base
         let mut out = base;
@@ -110,10 +110,8 @@ pub fn modexp(base: &[U256], exp: &[u64], modulus: &[U256]) -> Vec<U256> {
 
         vec![out]
     } else {
-        // TODO: Optimize scratch space allocation
-
         // Compute base = base (mod modulus)
-        let base = rem_long(base, modulus);
+        let base = rem_long_init(base, modulus);
 
         // Hint exponent bits
         let (len, bits) = fcall_bin_decomp(exp);
@@ -127,6 +125,9 @@ pub fn modexp(base: &[U256], exp: &[u64], modulus: &[U256]) -> Vec<U256> {
         let bit_in_limb = bits_pos % 64;
         rec_exp[limb_idx] = 1u64 << bit_in_limb;
 
+        // Scratch space
+        let mut scratch = LongScratch::new(len_m);
+
         // Initialize out = base
         let mut out = base.clone();
         for (bit_idx, &bit) in bits.iter().enumerate().skip(1) {
@@ -135,12 +136,11 @@ pub fn modexp(base: &[U256], exp: &[u64], modulus: &[U256]) -> Vec<U256> {
             }
 
             // Compute out = out² (mod modulus)
-            out = square_and_reduce_long(&out, modulus);
+            out = square_and_reduce_long(&out, modulus, &mut scratch);
 
             if bit == 1 {
                 // Compute out = (out * base) (mod modulus);
-                out = mul_and_reduce_long(&out, &base, modulus);
-
+                out = mul_and_reduce_long(&out, &base, modulus, &mut scratch);
                 // Recompose the exponent
                 let bits_pos = len - 1 - bit_idx;
                 let limb_idx = bits_pos / 64;

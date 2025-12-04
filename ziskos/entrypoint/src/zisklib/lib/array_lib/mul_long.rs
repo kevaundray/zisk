@@ -2,23 +2,34 @@ use crate::syscalls::{
     syscall_add256, syscall_arith256, SyscallAdd256Params, SyscallArith256Params,
 };
 
-use super::{rem_long, U256};
+use super::{mul_short, rem_long, LongScratch, U256};
 
-/// Multiplication of two large numbers (represented as arrays of U256)
+/// Multiplies two large numbers: out = a · b
 ///
-/// It assumes that a,b > 0 and len(b) > 1
-pub fn mul_long(a: &[U256], b: &[U256]) -> Vec<U256> {
+/// # Assumptions
+/// - `len(a) > 0` and `len(b) > 0`
+/// - `a` and `b` have no leading zeros (unless zero)
+/// - `out` has at least `len(a) + len(b)` limbs
+///
+/// # Returns
+/// The number of limbs in the result
+///
+/// # Note
+/// Not optimal for `len(b) == 1`, use `mul_short` instead
+pub fn mul_long(a: &[U256], b: &[U256], out: &mut [U256]) -> usize {
     let len_a = a.len();
     let len_b = b.len();
     #[cfg(debug_assertions)]
     {
         assert_ne!(len_a, 0, "Input 'a' must have at least one limb");
-        assert!(len_b > 1, "Input 'b' must have more than one limb");
-        assert!(!a[len_a - 1].is_zero(), "Input 'a' must not have leading zeros");
-        assert!(!b[len_b - 1].is_zero(), "Input 'b' must not have leading zeros");
+        assert_ne!(len_b, 0, "Input 'b' must have at least one limb");
+        if len_a > 1 {
+            assert!(!a[len_a - 1].is_zero(), "Input 'a' must not have leading zeros");
+        }
+        if len_b > 1 {
+            assert!(!b[len_b - 1].is_zero(), "Input 'b' must not have leading zeros");
+        }
     }
-
-    let mut out = vec![U256::ZERO; len_a + len_b];
 
     // Start with a[0]·b[0]
     let mut params = SyscallArith256Params {
@@ -122,16 +133,27 @@ pub fn mul_long(a: &[U256], b: &[U256]) -> Vec<U256> {
     }
 
     if out[len_a + len_b - 1].is_zero() {
-        out.pop();
+        len_a + len_b - 1
+    } else {
+        len_a + len_b
     }
-
-    out
 }
 
-/// Multiplication of two large numbers (represented as arrays of U256) followed by reduction modulo a third large number
+/// Multiplies two large numbers and reduces modulo a large modulus
 ///
-/// It assumes that modulus > 0
-pub fn mul_and_reduce_long(a: &[U256], b: &[U256], modulus: &[U256]) -> Vec<U256> {
+/// # Assumptions
+/// - `len(modulus) > 0`
+/// - `modulus > 0`
+/// - `modulus` has no leading zeros
+///
+/// # Returns
+/// The remainder: `(a · b) mod modulus`
+pub fn mul_and_reduce_long(
+    a: &[U256],
+    b: &[U256],
+    modulus: &[U256],
+    scratch: &mut LongScratch,
+) -> Vec<U256> {
     #[cfg(debug_assertions)]
     {
         let len_m = modulus.len();
@@ -139,7 +161,11 @@ pub fn mul_and_reduce_long(a: &[U256], b: &[U256], modulus: &[U256]) -> Vec<U256
         assert!(!modulus[len_m - 1].is_zero(), "Input 'modulus' must not have leading zeros");
     }
 
-    let mul = mul_long(a, b);
+    let mul_len = if b.len() == 1 {
+        mul_short(a, &b[0], &mut scratch.mul)
+    } else {
+        mul_long(a, b, &mut scratch.mul)
+    };
 
-    rem_long(&mul, modulus)
+    rem_long(&scratch.mul[..mul_len], modulus, &mut scratch.rem)
 }

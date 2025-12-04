@@ -2,16 +2,23 @@ use crate::syscalls::{syscall_add256, SyscallAdd256Params};
 
 use super::U256;
 
-/// Addition of one large number (represented as an array of U256) and a short U256 number
+/// Adds a large number and a short number: out = a + b
 ///
-/// It assumes that a,b > 0
+/// # Assumptions
+/// - `len(a) > 0`
+/// - `a` has no leading zeros (unless zero)
+/// - `out` has at least `len(a) + 1` limbs
+///
+/// # Returns
+/// The number of limbs in the result
 pub fn add_short(a: &[U256], b: &U256, out: &mut [U256]) -> usize {
     let len_a = a.len();
     #[cfg(debug_assertions)]
     {
         assert_ne!(len_a, 0, "Input 'a' must have at least one limb");
-        assert!(!a[len_a - 1].is_zero(), "Input 'a' must not have leading zeros");
-        assert!(!b.is_zero(), "Input 'b' must be greater than zero");
+        if len_a > 1 {
+            assert!(!a[len_a - 1].is_zero(), "Input 'a' must not have leading zeros");
+        }
     }
 
     // Start with a[0] + b

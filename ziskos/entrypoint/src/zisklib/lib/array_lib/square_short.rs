@@ -2,6 +2,13 @@ use crate::syscalls::{syscall_arith256, SyscallArith256Params};
 
 use super::{rem_short, ShortScratch, U256};
 
+/// Squares a single-limb number: returns (result, len)
+///
+/// # Assumptions
+/// - `a > 0`
+///
+/// # Returns
+/// A tuple of (result array, number of limbs used)
 pub fn square_short(a: &U256) -> ([U256; 2], usize) {
     #[cfg(debug_assertions)]
     {
@@ -31,6 +38,13 @@ pub fn square_short(a: &U256) -> ([U256; 2], usize) {
     (out, len)
 }
 
+/// Squares a short number and reduces modulo a short modulus
+///
+/// # Assumptions
+/// - `modulus > 0`
+///
+/// # Returns
+/// The remainder: a² mod modulus
 pub fn square_and_reduce_short(a: &U256, modulus: &U256, scratch: &mut ShortScratch) -> U256 {
     #[cfg(debug_assertions)]
     {
