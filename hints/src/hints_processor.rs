@@ -47,10 +47,12 @@
 
 use anyhow::Result;
 use rayon::{ThreadPool, ThreadPoolBuilder};
-use ziskos::syscalls::SyscallPoint256;
 use std::collections::VecDeque;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::{Arc, Condvar, Mutex};
+use ziskos::syscalls::SyscallPoint256;
+
+use crate::secp256k1_ecdsa_verify;
 
 // TODO! COnvert Control Code to an enum and HINT TYPE to an enum as well
 
@@ -473,20 +475,30 @@ impl PrecompileHintsProcessor {
 
     /// Processes a [`HINTS_TYPE_ECRECOVER`] hint.
     fn process_hint_ecrecover(hint: &PrecompileHint) -> Result<Vec<u64>> {
-        if hint.data.len() != 8 + 4 + 4 + 4 {
+        const EXPECTED_LEN: usize = 8 + 4 + 4 + 4; // pk(8) + z(4) + r(4) + s(4)
+
+        if hint.data.len() != EXPECTED_LEN {
             return Err(anyhow::anyhow!(
-                "Invalid ECRECOVER hint length: expected 20, got {}",
+                "Invalid ECRECOVER hint length: expected {}, got {}",
+                EXPECTED_LEN,
                 hint.data.len()
             ));
         }
 
-        // let pk: &SyscallPoint256 = unsafe { &(hint.data[i] as const SyscallPoint256) };
-        // let z: &[u64; 4] = unsafe { &(hints[i + 8] as const [u64; 4]) };
-        // let r: &[u64; 4] = unsafe { &(hints[i + 8 + 4] as const [u64; 4]) };
-        // let s: &[u64; 4] = unsafe { &(hints[i + 8 + 4 + 4] as const [u64; 4]) };
-        // secp256k1_ecdsa_verify(pk, z, r, s, &mut processedhints);
+        let mut processed_hints = Vec::new();
 
-        Ok(vec![])
+        // Safety: We've validated the length above
+        unsafe {
+            let ptr = hint.data.as_ptr();
+            let pk = &*(ptr as *const SyscallPoint256);
+            let z = &*(ptr.add(8) as *const [u64; 4]);
+            let r = &*(ptr.add(12) as *const [u64; 4]);
+            let s = &*(ptr.add(16) as *const [u64; 4]);
+
+            secp256k1_ecdsa_verify(pk, z, r, s, &mut processed_hints);
+        }
+
+        Ok(processed_hints)
     }
 }
 
