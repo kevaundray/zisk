@@ -1,83 +1,36 @@
-//! HintsPipeline is responsible for processing precompile hints and writing them to shared memory.
-//!
-//! It uses a ZiskHintin as the source of hints, and writes the processed hints to shared memories
-//! specified by their names.
-//! The pipeline ensures that the shared memory writers are initialized before writing hints.
+//! HintsPipeline is responsible for processing precompile hints and submitting them to a sink.
+//! It uses a ZiskHintin as the source of hints, and writes the processed hints to a HintsSink.
 
 use anyhow::Result;
-use asm_runner::SharedMemoryWriter;
 use std::sync::Mutex;
-use tracing::{debug, info, warn};
+use tracing::info;
 use zisk_common::io::{ZiskHintin, ZiskIO};
-use zisk_hints::PrecompileHintsProcessor;
+use zisk_hints::{HintsProcessor, HintsSink};
 
 /// HintsPipeline struct manages the processing of precompile hints and writing them to shared memory.
-pub struct HintsPipeline {
+pub struct HintsPipeline<HP: HintsProcessor, HS: HintsSink> {
+    /// The hints processor used to process hints before writing.
+    hints_processor: HP,
+
+    /// The hints sink used to submit processed hints.
+    hints_sink: HS,
+
     /// The ZiskHintin source for reading hints.
     hintin: Mutex<ZiskHintin>,
-
-    /// Names of the shared memories to write hints to.
-    shmem_names: Vec<String>,
-
-    /// Whether to unlock mapped memory after writing.
-    unlock_mapped_memory: bool,
-
-    /// Shared memory writers for writing processed hints.
-    shmem_writers: Mutex<Vec<SharedMemoryWriter>>,
 }
 
-impl HintsPipeline {
-    const MAX_PRECOMPILE_SIZE: u64 = 0x10000000; // 256MB
-
-    /// Create a new HintsPipeline with the given ZiskHintin, shared memory names, and unlock option.
+impl<HP: HintsProcessor, HS: HintsSink> HintsPipeline<HP, HS> {
+    /// Create a new HintsPipeline with the given processor, ZiskHintin, and sink.
     ///
     /// # Arguments
+    /// * `hints_processor` - The processor used to process hints.
+    /// * `hints_sink` - The sink used to submit processed hints.
     /// * `hintin` - The ZiskHintin source for reading hints.
-    /// * `shmem_names` - A vector of shared memory names to write hints to.
-    /// * `unlock_mapped_memory` - Whether to unlock mapped memory after writing.
     ///
     /// # Returns
     /// A new `HintsPipeline` instance with uninitialized writers.
-    pub fn new(hintin: ZiskHintin, shmem_names: Vec<String>, unlock_mapped_memory: bool) -> Self {
-        Self {
-            hintin: Mutex::new(hintin),
-            shmem_names,
-            unlock_mapped_memory,
-            shmem_writers: Mutex::new(Vec::new()),
-        }
-    }
-
-    /// Add a shared memory name to the pipeline.
-    ///
-    /// This method must be called before initialization.
-    ///
-    /// # Arguments
-    /// * `name` - The name of the shared memory to add.
-    ///
-    /// # Returns
-    /// * `Ok(())` - If the name was successfully added or already exists
-    /// * `Err` - If writers have already been initialized
-    pub fn add_shmem_name(&mut self, name: String) -> Result<()> {
-        // Check if the writers have already been initialized
-        let shmem_writers = self.shmem_writers.lock().unwrap();
-        if !shmem_writers.is_empty() {
-            return Err(anyhow::anyhow!(
-                "Cannot add shared memory name '{}' after initialization",
-                name
-            ));
-        }
-
-        // Check if the name already exists
-        if self.shmem_names.contains(&name) {
-            warn!(
-                "Shared memory name '{}' already exists in the pipeline. Skipping addition.",
-                name
-            );
-            return Ok(());
-        }
-
-        self.shmem_names.push(name);
-        Ok(())
+    pub fn new(hints_processor: HP, hints_sink: HS, hintin: ZiskHintin) -> Self {
+        Self { hints_processor, hints_sink, hintin: Mutex::new(hintin) }
     }
 
     /// Set a new ZiskHintin for the pipeline.
@@ -89,88 +42,25 @@ impl HintsPipeline {
         *guard = hintin;
     }
 
-    /// Check if the shared memory writers have been initialized.
-    fn is_initialized(&self) -> bool {
-        let shmem_writers = self.shmem_writers.lock().unwrap();
-        !shmem_writers.is_empty()
-    }
-
-    /// Initialize the shared memory writers for the pipeline.
-    ///
-    /// This method creates SharedMemoryWriter instances for each shared memory name.
-    /// If writers are already initialized it logs a warning and does nothing.
-    fn initialize(&self) {
-        let mut shmem_writer = self.shmem_writers.lock().unwrap();
-
-        if !shmem_writer.is_empty() {
-            warn!(
-                "SharedMemoryWriters for precompile hints is already initialized at '{}'. Skipping",
-                self.shmem_names.join(", ")
-            );
-        } else {
-            debug!(
-                "Initializing SharedMemoryWriter for precompile hints at '{}'",
-                self.shmem_names.join(", ")
-            );
-
-            *shmem_writer = self
-                .shmem_names
-                .iter()
-                .map(|name| {
-                    SharedMemoryWriter::new(
-                        &name,
-                        Self::MAX_PRECOMPILE_SIZE as usize,
-                        self.unlock_mapped_memory,
-                    )
-                    .expect("Failed to create SharedMemoryWriter for precompile hints")
-                })
-                .collect();
-        }
-    }
-
     /// Process and write precompile hints to all shared memory writers.
     ///
     /// This method:
     /// 1. Reads hints from the ZiskHintin source
     /// 2. Processes them using PrecompileHintsProcessor
-    /// 3. Prepares the data with a length prefix (u64) followed by the processed hints
-    /// 4. Writes the data to all configured shared memory writers
-    ///
-    /// The shared memory writers will be automatically initialized if needed.
+    /// 3. Submits the processed hints to the HintsSink
     ///
     /// # Returns
-    /// * `Ok(())` - If hints were successfully processed and written
-    /// * `Err` - If processing or writing fails
+    /// * `Ok(())` - If hints were successfully processed and submitted
+    /// * `Err` - If processing or submission fails
     pub fn write_hints(&self) -> Result<()> {
-        if !self.is_initialized() {
-            self.initialize();
-        }
-
         let mut hintin = self.hintin.lock().unwrap();
 
         let hints = zisk_common::reinterpret_vec(hintin.read())?;
 
-        let processor = PrecompileHintsProcessor::new()?;
-        let processed = processor.process_hints(&hints)?;
+        let processed = self.hints_processor.process_hints(&hints)?;
 
         info!("Precompile hints have generated {} u64 values", processed.len());
 
-        // Input size includes length prefix as u64
-        let shmem_input_size = processed.len() + 1;
-
-        let mut full_input = Vec::with_capacity(shmem_input_size);
-        // Prefix with length as u64
-        full_input.extend_from_slice(&[processed.len() as u64]);
-        // Append processed hints
-        full_input.extend_from_slice(&processed);
-
-        println!("full_input size: {}", full_input.len());
-
-        let shmem_writers = self.shmem_writers.lock().unwrap();
-        for shmem_writer in shmem_writers.iter() {
-            shmem_writer.write_input(&full_input)?;
-        }
-
-        Ok(())
+        self.hints_sink.submit(processed)
     }
 }

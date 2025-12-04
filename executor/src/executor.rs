@@ -34,8 +34,9 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use tracing::debug;
 use witness::WitnessComponent;
 use zisk_common::io::{ZiskHintin, ZiskIO, ZiskStdin};
+use zisk_hints::PrecompileHintsProcessor;
 
-use crate::{DummyCounter, HintsPipeline};
+use crate::{DummyCounter, HintsPipeline, HintsShmem};
 use data_bus::DataBusTrait;
 use sm_main::{MainInstance, MainPlanner, MainSM};
 use zisk_common::{
@@ -76,6 +77,8 @@ enum MinimalTraceExecutionMode {
     AsmWithCounter,
 }
 
+type HintsProcessorShmem = HintsPipeline<PrecompileHintsProcessor, HintsShmem>;
+
 /// The `ZiskExecutor` struct orchestrates the execution of the ZisK ROM program, managing state
 /// machines, planning, and witness computation.
 pub struct ZiskExecutor<F: PrimeField64> {
@@ -83,7 +86,7 @@ pub struct ZiskExecutor<F: PrimeField64> {
     stdin: Mutex<ZiskStdin>,
 
     /// Pipeline for handling precompile hints.
-    hints_pipeline: Mutex<HintsPipeline>,
+    hints_pipeline: Mutex<HintsProcessorShmem>,
 
     /// ZisK ROM, a binary file containing the ZisK program to be executed.
     pub zisk_rom: Arc<ZiskRom>,
@@ -208,11 +211,13 @@ impl<F: PrimeField64> ZiskExecutor<F> {
             .collect::<Vec<_>>();
 
         // Create hints pipeline with null hintin initially.
-        let hints_pipeline = Mutex::new(HintsPipeline::new(
-            ZiskHintin::null(),
-            hints_shmem_names,
-            unlock_mapped_memory,
-        ));
+        let hints_processor =
+            PrecompileHintsProcessor::new().expect("Failed to create PrecompileHintsProcessor");
+
+        let hints_shmem = HintsShmem::new(hints_shmem_names, unlock_mapped_memory);
+
+        let hints_pipeline =
+            Mutex::new(HintsPipeline::new(hints_processor, hints_shmem, ZiskHintin::null()));
 
         Self {
             stdin: Mutex::new(ZiskStdin::null()),

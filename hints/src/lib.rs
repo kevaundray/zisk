@@ -10,3 +10,11 @@ pub use hints_processor::{
     PrecompileHint, PrecompileHintsProcessor, HINTS_TYPE_ECRECOVER, HINTS_TYPE_RESULT,
 };
 pub use secp256k1::*;
+
+pub trait HintsProcessor {
+    fn process_hints(&self, hints: &[u64]) -> anyhow::Result<Vec<u64>>;
+}
+
+pub trait HintsSink {
+    fn submit(&self, processed: Vec<u64>) -> anyhow::Result<()>;
+}

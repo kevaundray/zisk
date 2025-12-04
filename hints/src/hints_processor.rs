@@ -52,7 +52,7 @@ use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::{Arc, Condvar, Mutex};
 use ziskos::syscalls::SyscallPoint256;
 
-use crate::secp256k1_ecdsa_verify;
+use crate::{secp256k1_ecdsa_verify, HintsProcessor};
 
 // TODO! COnvert Control Code to an enum and HINT TYPE to an enum as well
 
@@ -76,6 +76,9 @@ pub const HINTS_TYPE_RESULT: u32 = 0x04;
 
 /// Hint type indicating that the data contains inputs for the ecrecover precompile.
 pub const HINTS_TYPE_ECRECOVER: u32 = 0x05;
+
+/// Number if hint types defined.
+pub const NUM_HINT_TYPES: u32 = 6;
 
 /// Represents a single precompile hint parsed from a `u64` slice.
 ///
@@ -180,8 +183,12 @@ impl HintProcessorState {
 pub struct PrecompileHintsProcessor {
     /// The thread pool used for parallel hint processing.
     pool: ThreadPool,
+
     /// Shared state for parallel hint processing
     state: Arc<HintProcessorState>,
+
+    /// Optional statistics collected during hint processing.
+    stats: [AtomicUsize; NUM_HINT_TYPES as usize],
 }
 
 impl PrecompileHintsProcessor {
@@ -215,7 +222,7 @@ impl PrecompileHintsProcessor {
             .build()
             .map_err(|e| anyhow::anyhow!("Failed to create thread pool: {}", e))?;
 
-        Ok(Self { pool, state: Arc::new(HintProcessorState::new()) })
+        Ok(Self { pool, state: Arc::new(HintProcessorState::new()), stats: Default::default() })
     }
 
     /// Processes hints in parallel with non-blocking, ordered output.
@@ -251,6 +258,8 @@ impl PrecompileHintsProcessor {
 
             let hint = PrecompileHint::from_u64_slice(hints, idx)?;
             let length = hint.data.len();
+
+            self.stats[hint.hint_type as usize].fetch_add(1, Ordering::Relaxed);
 
             // Check if this is a control code or data hint type
             match hint.hint_type {
@@ -396,6 +405,11 @@ impl PrecompileHintsProcessor {
             idx += length + 1;
         }
 
+        println!("Processed hints stats:");
+        for (i, count) in self.stats.iter().enumerate() {
+            println!("Hint type {}: {}", i, count.load(Ordering::Relaxed));
+        }
+
         Ok(processed)
     }
 
@@ -499,6 +513,12 @@ impl PrecompileHintsProcessor {
         }
 
         Ok(processed_hints)
+    }
+}
+
+impl HintsProcessor for PrecompileHintsProcessor {
+    fn process_hints(&self, hints: &[u64]) -> Result<Vec<u64>> {
+        self.process_hints(hints)
     }
 }
 
