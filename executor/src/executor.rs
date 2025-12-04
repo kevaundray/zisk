@@ -20,8 +20,9 @@
 //! maintaining clarity and modularity in the computation process.
 
 use asm_runner::{
-    write_input, AsmMTHeader, AsmRunnerMO, AsmRunnerMT, AsmRunnerRH, AsmServices, AsmSharedMemory,
-    MinimalTraces, PreloadedMO, PreloadedMT, PreloadedRH, SharedMemoryWriter, Task, TaskFactory,
+    write_input, write_precompile, AsmMTHeader, AsmRunnerMO, AsmRunnerMT, AsmRunnerRH, AsmServices,
+    AsmSharedMemory, MinimalTraces, PreloadedMO, PreloadedMT, PreloadedRH, SharedMemoryWriter,
+    Task, TaskFactory,
 };
 use fields::PrimeField64;
 use pil_std_lib::Std;
@@ -31,6 +32,7 @@ use rayon::prelude::*;
 use rom_setup::gen_elf_hash;
 use sm_rom::{RomInstance, RomSM};
 use std::sync::atomic::{AtomicUsize, Ordering};
+use tracing::debug;
 use witness::WitnessComponent;
 use zisk_common::io::{ZiskHintin, ZiskIO, ZiskStdin};
 
@@ -145,6 +147,7 @@ pub struct ZiskExecutor<F: PrimeField64> {
     asm_shmem_rh: Arc<Mutex<Option<PreloadedRH>>>,
 
     shmem_input_writer: [Arc<Mutex<Option<SharedMemoryWriter>>>; AsmServices::SERVICES.len()],
+    shmem_precompile_writer: [Arc<Mutex<Option<SharedMemoryWriter>>>; AsmServices::SERVICES.len()],
 }
 
 impl<F: PrimeField64> ZiskExecutor<F> {
@@ -213,6 +216,7 @@ impl<F: PrimeField64> ZiskExecutor<F> {
             asm_shmem_mo: Arc::new(Mutex::new(asm_shmem_mo)),
             asm_shmem_rh: Arc::new(Mutex::new(None)),
             shmem_input_writer: std::array::from_fn(|_| Arc::new(Mutex::new(None))),
+            shmem_precompile_writer: std::array::from_fn(|_| Arc::new(Mutex::new(None))),
         }
     }
 
@@ -302,15 +306,15 @@ impl<F: PrimeField64> ZiskExecutor<F> {
                 AsmServices::default_port(service, self.local_rank)
             };
 
+            // Write inputs to shared memory
             let shmem_input_name =
                 AsmSharedMemory::<AsmMTHeader>::shmem_input_name(port, *service, self.local_rank);
 
             let mut input_writer = self.shmem_input_writer[idx].lock().unwrap();
             if input_writer.is_none() {
-                tracing::info!(
+                debug!(
                     "Initializing SharedMemoryWriter for service {:?} at '{}'",
-                    service,
-                    shmem_input_name
+                    service, shmem_input_name
                 );
                 *input_writer = Some(
                     SharedMemoryWriter::new(
@@ -323,6 +327,36 @@ impl<F: PrimeField64> ZiskExecutor<F> {
             }
 
             write_input(&mut self.stdin.lock().unwrap(), input_writer.as_ref().unwrap());
+
+            // Write precompile hints to shared memory
+            let shmem_prcompile_name = AsmSharedMemory::<AsmMTHeader>::shmem_precompile_name(
+                port,
+                *service,
+                self.local_rank,
+            );
+
+            let mut precompile_writer = self.shmem_precompile_writer[idx].lock().unwrap();
+            if precompile_writer.is_none() {
+                debug!(
+                    "Initializing SharedMemoryWriter for precompile hints for service {:?} at '{}'",
+                    service, shmem_prcompile_name
+                );
+                const MAX_PRECOMPILE_SIZE: u64 = 0x10000000; // 256MB
+                *precompile_writer = Some(
+                    SharedMemoryWriter::new(
+                        &shmem_prcompile_name,
+                        MAX_PRECOMPILE_SIZE as usize,
+                        self.unlock_mapped_memory,
+                    )
+                    .expect("Failed to create SharedMemoryWriter for precompile hints"),
+                );
+            }
+
+            // TODO! Remove this let _ = ... and change it to ? when execute_with_assembly return Result<...>
+            let _ = write_precompile(
+                &mut self.hintin.lock().unwrap(),
+                precompile_writer.as_ref().unwrap(),
+            );
 
             // Add to executor stats
             #[cfg(feature = "stats")]

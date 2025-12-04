@@ -235,7 +235,9 @@ impl PrecompileHintsProcessor {
     ///
     /// * `Ok(())` - Hints were successfully dispatched (does not mean processing is complete)
     /// * `Err` - If a previous error occurred or hints are malformed
-    pub fn process_hints(&self, hints: &[u64]) -> Result<()> {
+    pub fn process_hints(&self, hints: &[u64]) -> Result<Vec<u64>> {
+        let mut processed = Vec::new();
+
         // Parse hints and dispatch to pool
         let mut idx = 0;
         while idx < hints.len() {
@@ -289,60 +291,29 @@ impl PrecompileHintsProcessor {
                 (gen, seq)
             };
 
-            // Spawn processing task
-            let state = Arc::clone(&self.state);
-            self.pool.spawn(move || {
-                // TODO! Is it necessary? TO increase performance maybe is enough to check error_flag only when storing result
-                // Check if we should stop due to error
-                if state.error_flag.load(Ordering::Acquire) {
-                    return;
-                }
+            // Handle HINTS_TYPE_RESULT synchronously - it doesn't need async processing
+            if hint.hint_type == HINTS_TYPE_RESULT {
+                processed.extend_from_slice(&hint.data);
 
-                // Process the hint
-                let result = Self::process_hint(&hint);
-
-                // Store result and try to drain
-                let mut queue = state.queue.lock().unwrap();
-
-                // Check generation first to detect stale workers from previous sessions
-                let current_gen = state.generation.load(Ordering::SeqCst);
-                if generation != current_gen {
-                    // Worker belongs to old generation; ignore result
-                    return;
-                }
-
-                // Calculate offset in buffer; handle drained slots
-                if seq_id < queue.next_drain_seq {
-                    // This result belongs to a previous stream/session; ignore
-                    return;
-                }
+                // Immediately mark this slot as complete and drain
+                let mut queue = self.state.queue.lock().unwrap();
                 let offset = seq_id - queue.next_drain_seq;
-
-                // Check error flag again before storing to avoid processing after error
-                if state.error_flag.load(Ordering::Acquire) {
-                    return;
-                }
-
-                queue.buffer[offset] = Some(result);
+                queue.buffer[offset] = Some(Ok(hint.data.clone()));
 
                 // Drain consecutive ready results from the front
                 while let Some(Some(res)) = queue.buffer.front() {
                     match res {
                         Ok(_data) => {
-                            // Print the result (will be replaced with send to another process)
-                            // println!("[seq={}] Result: {:?}", queue.next_drain_seq, data);
                             queue.buffer.pop_front();
                             queue.next_drain_seq += 1;
                         }
                         Err(_) => {
-                            // Error found - signal to stop and break
-                            state.error_flag.store(true, Ordering::Release);
-                            // Print error and stop draining
+                            self.state.error_flag.store(true, Ordering::Release);
                             if let Some(Some(Err(e))) = queue.buffer.pop_front() {
                                 eprintln!("[seq={}] Error: {}", queue.next_drain_seq, e);
                             }
                             queue.next_drain_seq += 1;
-                            state.drain_signal.notify_all();
+                            self.state.drain_signal.notify_all();
                             break;
                         }
                     }
@@ -350,14 +321,79 @@ impl PrecompileHintsProcessor {
 
                 // Notify if buffer is now empty
                 if queue.buffer.is_empty() {
-                    state.drain_signal.notify_all();
+                    self.state.drain_signal.notify_all();
                 }
-            });
+            } else {
+                // Spawn processing task
+                let state = Arc::clone(&self.state);
+                self.pool.spawn(move || {
+                    // TODO! Is it necessary? TO increase performance maybe is enough to check error_flag only when storing result
+                    // Check if we should stop due to error
+                    if state.error_flag.load(Ordering::Acquire) {
+                        return;
+                    }
+
+                    // Process the hint
+                    let result = Self::process_hint(&hint);
+
+                    // Store result and try to drain
+                    let mut queue = state.queue.lock().unwrap();
+
+                    // Check generation first to detect stale workers from previous sessions
+                    let current_gen = state.generation.load(Ordering::SeqCst);
+                    if generation != current_gen {
+                        // Worker belongs to old generation; ignore result
+                        return;
+                    }
+
+                    // Calculate offset in buffer; handle drained slots
+                    if seq_id < queue.next_drain_seq {
+                        // This result belongs to a previous stream/session; ignore
+                        return;
+                    }
+                    let offset = seq_id - queue.next_drain_seq;
+
+                    // Check error flag again before storing to avoid processing after error
+                    if state.error_flag.load(Ordering::Acquire) {
+                        return;
+                    }
+
+                    queue.buffer[offset] = Some(result);
+
+                    // Drain consecutive ready results from the front
+                    while let Some(Some(res)) = queue.buffer.front() {
+                        match res {
+                            Ok(_data) => {
+                                // Print the result (will be replaced with send to another process)
+                                // println!("[seq={}] Result: {:?}", queue.next_drain_seq, data);
+                                queue.buffer.pop_front();
+                                queue.next_drain_seq += 1;
+                            }
+                            Err(_) => {
+                                // Error found - signal to stop and break
+                                state.error_flag.store(true, Ordering::Release);
+                                // Print error and stop draining
+                                if let Some(Some(Err(e))) = queue.buffer.pop_front() {
+                                    eprintln!("[seq={}] Error: {}", queue.next_drain_seq, e);
+                                }
+                                queue.next_drain_seq += 1;
+                                state.drain_signal.notify_all();
+                                break;
+                            }
+                        }
+                    }
+
+                    // Notify if buffer is now empty
+                    if queue.buffer.is_empty() {
+                        state.drain_signal.notify_all();
+                    }
+                });
+            }
 
             idx += length + 1;
         }
 
-        Ok(())
+        Ok(processed)
     }
 
     /// Waits for all pending hints to be processed and drained.

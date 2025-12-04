@@ -216,10 +216,11 @@ impl ZiskAsmContext {
     }
 
     pub fn precompile_results(&self) -> bool {
-        self.precompile_results
+        // self.precompile_results
+        true
     }
     pub fn precompile_results_keccak(&self) -> bool {
-        self.precompile_results() && false
+        self.precompile_results() && true //false
     }
     pub fn precompile_results_sha256(&self) -> bool {
         self.precompile_results() && false
