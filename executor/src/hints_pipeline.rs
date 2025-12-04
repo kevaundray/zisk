@@ -89,11 +89,17 @@ impl HintsPipeline {
         *guard = hintin;
     }
 
+    /// Check if the shared memory writers have been initialized.
+    fn is_initialized(&self) -> bool {
+        let shmem_writers = self.shmem_writers.lock().unwrap();
+        !shmem_writers.is_empty()
+    }
+
     /// Initialize the shared memory writers for the pipeline.
     ///
     /// This method creates SharedMemoryWriter instances for each shared memory name.
     /// If writers are already initialized it logs a warning and does nothing.
-    pub fn initialize(&self) {
+    fn initialize(&self) {
         let mut shmem_writer = self.shmem_writers.lock().unwrap();
 
         if !shmem_writer.is_empty() {
@@ -136,13 +142,7 @@ impl HintsPipeline {
     /// * `Ok(())` - If hints were successfully processed and written
     /// * `Err` - If processing or writing fails
     pub fn write_hints(&self) -> Result<()> {
-        // Check if initialization is needed without holding the lock
-        let needs_init = {
-            let shmem_writers = self.shmem_writers.lock().unwrap();
-            shmem_writers.is_empty()
-        };
-
-        if needs_init {
+        if !self.is_initialized() {
             self.initialize();
         }
 
