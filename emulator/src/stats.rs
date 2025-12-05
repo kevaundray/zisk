@@ -60,6 +60,7 @@ pub struct Stats {
     rois_by_address: BTreeMap<u32, u32>,
     rois: Vec<RegionsOfInterest>,
     current_roi: Option<usize>,
+    previous_roi: Option<usize>,
     top_rois: usize,
     roi_callers: usize,
     top_rois_detail: bool,
@@ -77,6 +78,10 @@ pub struct Stats {
     individual_cost_marks: bool,
     main_name: String,
     profile_tags: HashMap<u16, String>,
+    #[cfg(feature = "debug_stats_trace")]
+    debug_step_stack: Vec<u64>,
+    #[cfg(feature = "debug_stats_trace")]
+    previous_stack_depth: usize,
 }
 
 impl Default for Stats {
@@ -91,6 +96,7 @@ impl Default for Stats {
             rois: Vec::new(),
             rois_by_address: BTreeMap::new(),
             current_roi: None,
+            previous_roi: None,
             top_rois: 25,
             roi_callers: 10,
             ops_cost: 0,
@@ -110,6 +116,10 @@ impl Default for Stats {
             individual_cost_marks: false,
             main_name: "main".to_string(),
             profile_tags: HashMap::new(),
+            #[cfg(feature = "debug_stats_trace")]
+            debug_step_stack: Vec::new(),
+            #[cfg(feature = "debug_stats_trace")]
+            previous_stack_depth: 0,
         }
     }
 }
@@ -171,6 +181,8 @@ impl Stats {
         }
     }
     pub fn check_roi(&mut self, pc: u32, regs: &[u64]) {
+        self.previous_roi = self.current_roi;
+
         // First, handle RETURN even if we're not changing ROI
         let return_call = if self.is_return && !self.call_stack.is_empty() {
             self.call_stack.pop()
@@ -180,11 +192,21 @@ impl Stats {
 
         let previous_roi_index = self.current_roi;
 
-        self.current_roi = if let Some((_, index)) = self.rois_by_address.range(..=pc).next_back() {
-            Some(*index as usize)
+        let update_roi = if let Some(previous_index) = self.current_roi {
+            let roi = &self.rois[previous_index];
+            pc < roi.from_pc || pc > roi.to_pc
         } else {
-            None
+            true
         };
+
+        if update_roi {
+            self.current_roi =
+                if let Some((_, index)) = self.rois_by_address.range(..=pc).next_back() {
+                    Some(*index as usize)
+                } else {
+                    None
+                };
+        }
 
         if previous_roi_index != self.current_roi && !self.is_return && !self.is_call {
             if let Some(roi_index) = self.current_roi {
@@ -374,6 +396,8 @@ impl Stats {
         // println!("##PC## 0x{pc:08X}");
         self.costs.steps += 1;
         self.check_roi(pc as u32, regs);
+        #[cfg(feature = "debug_stats_trace")]
+        self.debug_stats_trace(pc);
         // If the operation is a usual operation, then increase the usual counter
 
         if instruction.op == 0 && instruction.a_src == SRC_REG && instruction.b_src == SRC_IMM {
@@ -618,9 +642,6 @@ impl Stats {
     }
     /// Returns a string containing a human-readable text showing all counters
     pub fn report(&self, rom: &ZiskRom) -> String {
-        #[cfg(feature = "debug_stats")]
-        println!("CALL_STACK:{}", self.call_stack.len());
-
         if self.legacy_stats {
             return self.legacy_report();
         }
@@ -670,7 +691,11 @@ impl Stats {
             let top_step_rois = self.get_top_rois(true);
             for (index, _) in top_step_rois.iter() {
                 let roi = &self.rois[*index];
-                report.add_top_step_calls_perc(&roi.name, roi.get_steps(), roi.calls);
+                let steps = roi.get_steps();
+                if steps == 0 {
+                    continue;
+                }
+                report.add_top_step_calls_perc(&roi.name, steps, roi.calls);
             }
 
             report.title_autowidth("TOP COST FUNCTIONS (COST, % COST, CALLS, FUNCTION)");
@@ -678,13 +703,19 @@ impl Stats {
             // Create a vector with ROI indices and their steps for sorting
             let top_cost_rois = self.get_top_rois(false);
 
+            let mut final_top_cost_rois = Vec::new();
             for (index, _) in top_cost_rois.iter() {
                 let roi = &self.rois[*index];
-                report.add_top_cost_calls_perc(&roi.name, roi.get_cost(), roi.calls);
+                let cost = roi.get_cost();
+                if cost == 0 {
+                    continue;
+                }
+                final_top_cost_rois.push(*index);
+                report.add_top_cost_calls_perc(&roi.name, cost, roi.calls);
             }
 
             if self.top_rois_detail {
-                for (index, _) in top_cost_rois.iter() {
+                for index in final_top_cost_rois.iter() {
                     let roi = &self.rois[*index];
                     let mut roi_report = StatsReport::new();
                     roi_report.set_total_cost(roi.get_cost());
@@ -799,6 +830,39 @@ impl Stats {
     }
     pub fn set_main_name(&mut self, value: String) {
         self.main_name = value;
+    }
+    #[cfg(feature = "debug_stats_trace")]
+    pub fn debug_stats_trace(&mut self, pc: u64) {
+        if self.costs.steps == 1 || self.previous_roi != self.current_roi {
+            let func_name = if let Some(roi_index) = self.current_roi {
+                &self.rois[roi_index].name
+            } else {
+                &"".to_string()
+            };
+
+            let stack_depth = self.call_stack.len();
+            let mut down = false;
+            let mut jmp_type = 'J';
+            if stack_depth != self.previous_stack_depth {
+                for index in self.previous_stack_depth..stack_depth {
+                    if index >= self.debug_step_stack.len() {
+                        self.debug_step_stack.push(self.costs.steps);
+                    } else {
+                        self.debug_step_stack[index] = self.costs.steps;
+                    }
+                }
+                down = stack_depth < self.previous_stack_depth;
+                jmp_type = if down { 'R' } else { 'C' };
+            }
+
+            println!(
+                "#T: {:>10} {:>7} {jmp_type} {:>10} 0x{pc:08x} {func_name}",
+                self.costs.steps,
+                self.call_stack.len(),
+                if down { self.costs.steps - self.debug_step_stack[stack_depth - 1] } else { 0 }
+            );
+            self.previous_stack_depth = stack_depth;
+        }
     }
 }
 
