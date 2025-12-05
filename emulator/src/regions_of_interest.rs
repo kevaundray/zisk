@@ -17,7 +17,6 @@ pub struct RegionsOfInterest {
     costs: StatsCosts,
     pub calls: usize,
     pub callers: BTreeMap<usize, CallerInfo>,
-    pub last_caller_index: Option<usize>,
     pub call_stack_rc: usize,
     call_stack_depth: Option<usize>,
 }
@@ -32,7 +31,6 @@ impl RegionsOfInterest {
             calls: 0,
             name: name.to_string(),
             callers: BTreeMap::new(),
-            last_caller_index: None,
             call_stack_rc: 0,
             call_stack_depth: None,
         }
@@ -41,14 +39,6 @@ impl RegionsOfInterest {
         pc >= self.from_pc && pc <= self.to_pc
     }
     pub fn caller_call(&mut self) {
-        #[cfg(feature = "debug_stats")]
-        println!(
-            "\x1B[1;34mCALL_CALLER ROI[{}]:{} RC:{} => {}\x1B[0m",
-            self.id,
-            self.name,
-            self.call_stack_rc,
-            self.call_stack_rc + 1
-        );
         self.call_stack_rc += 1;
     }
     pub fn update_call_depth(&mut self, call_stack_depth: usize) {
@@ -67,42 +57,30 @@ impl RegionsOfInterest {
                 .entry(caller_id)
                 .and_modify(|info| {
                     info.calls += 1;
-                    info.steps += 1;
                 })
-                .or_insert(CallerInfo { calls: 1, steps: 1 });
-            self.last_caller_index = Some(caller_id);
+                .or_insert(CallerInfo { calls: 1, steps: 0 });
+        }
+    }
+    pub fn tail_jmp(&mut self, source: Option<usize>) {
+        if let Some(source_id) = source {
+            self.callers
+                .entry(source_id)
+                .and_modify(|info| {
+                    info.calls += 1;
+                })
+                .or_insert(CallerInfo { calls: 1, steps: 0 });
         }
     }
     pub fn return_call(&mut self, call_stack_depth: usize) {
-        let _rc = self.call_stack_rc;
+        let rc = self.call_stack_rc;
         if self.call_stack_rc > 0 {
             self.call_stack_rc -= 1;
         }
         self.update_call_depth(call_stack_depth);
-        #[cfg(feature = "debug_stats")]
-        println!(
-            "\x1B[1;33mRETURN_CALL ROI:[{}]:{} RC:{} => {}\x1B[0m",
-            self.id, self.name, _rc, self.call_stack_rc
-        );
-        assert!(_rc > self.call_stack_rc);
-    }
-    pub fn inc_step(&mut self) {
-        if self.call_stack_rc == 0 {
-            self.costs.steps += 1;
-            if let Some(index) = self.last_caller_index {
-                self.callers.entry(index).and_modify(|info| {
-                    info.steps += 1;
-                });
-            }
-        }
+        assert!(rc > self.call_stack_rc);
     }
     pub fn get_callers(&self) -> impl Iterator<Item = (&usize, &CallerInfo)> {
         self.callers.iter()
-    }
-    pub fn add_op(&mut self, op: u8) {
-        if self.call_stack_rc == 0 {
-            self.costs.ops[op as usize] += 1;
-        }
     }
     pub fn update_costs(&mut self) {
         let (cost, precompiles_cost) = get_ops_costs(&self.costs.ops);
@@ -121,27 +99,36 @@ impl RegionsOfInterest {
     pub fn get_callstack_rc(&self) -> usize {
         self.call_stack_rc
     }
-    pub fn memory_write(&mut self, address: u64, width: u64, value: u64) {
-        if self.call_stack_rc == 0 {
-            self.costs.mops.memory_write(address, width, value);
-        }
-    }
-    pub fn memory_read(&mut self, address: u64, width: u64) {
-        if self.call_stack_rc == 0 {
-            self.costs.mops.memory_read(address, width);
-        }
-    }
     pub fn get_ops_costs(&self) -> &[u64; 256] {
         &self.costs.ops
     }
     pub fn get_call_stack_depth(&self) -> Option<usize> {
         self.call_stack_depth
     }
-    pub fn add_delta_costs(&mut self, reference: &StatsCosts, current: &StatsCosts) -> Option<u64> {
+    pub fn add_delta_costs(&mut self, reference: &StatsCosts, current: &StatsCosts) -> u64 {
         if self.call_stack_rc == 0 {
-            Some(self.costs.add_delta(reference, current))
+            self.costs.add_delta(reference, current)
         } else {
-            None
+            self.costs.get_delta_steps(reference, current)
         }
+    }
+    pub fn get_delta_steps(&mut self, reference: &StatsCosts, current: &StatsCosts) -> u64 {
+        self.costs.get_delta_steps(reference, current)
+    }
+    pub fn update_caller_steps(&mut self, caller_id: usize, steps: u64) {
+        self.callers.entry(caller_id).and_modify(|info| {
+            info.steps += steps as usize;
+        });
+    }
+    pub fn update_caller(
+        &mut self,
+        caller_id: usize,
+        reference: &StatsCosts,
+        current: &StatsCosts,
+    ) {
+        let steps = self.get_delta_steps(reference, current);
+        self.callers.entry(caller_id).and_modify(|info| {
+            info.steps += steps as usize;
+        });
     }
 }

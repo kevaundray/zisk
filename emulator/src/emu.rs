@@ -1542,6 +1542,12 @@ impl<'a> Emu<'a> {
                     );
                 }
                 println!("Loaded {} function symbols", count);
+                count = 0;
+                for (id, tag) in elf.profile_tags() {
+                    count += 1;
+                    self.ctx.stats.add_profile_tag(*id, tag);
+                }
+                println!("Loaded {} profile tags", count);
                 self.ctx.stats.set_top_rois(options.top_roi);
                 self.ctx.stats.set_roi_callers(options.roi_callers);
                 self.ctx.stats.set_top_roi_detail(options.top_roi_detail);

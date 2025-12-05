@@ -85,7 +85,7 @@ pub struct EmuOptions {
     /// Requires options: -S -X
     #[clap(short = 'D', long, value_name = "TOP_ROI_DETAIL", default_value = "false")]
     pub top_roi_detail: bool,
-    /// Show detailed analysis for the top callers of each Region of Interest (ROI).
+    /// Define the program's main entry point name (default: main).
     /// Requires options: -S -X -D
     #[clap(short = 'M', long, value_name = "MAIN_NAME", default_value = "main")]
     pub main_name: String,

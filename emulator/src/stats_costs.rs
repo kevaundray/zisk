@@ -24,15 +24,19 @@ impl StatsCosts {
     pub fn memory_read(&mut self, address: u64, width: u64) {
         self.mops.memory_read(address, width);
     }
+    pub fn get_delta_steps(&mut self, reference: &StatsCosts, current: &StatsCosts) -> u64 {
+        current.steps - reference.steps - 1
+    }
     pub fn add_delta(&mut self, reference: &StatsCosts, current: &StatsCosts) -> u64 {
-        self.steps += current.steps - reference.steps;
+        let delta_steps = current.steps - reference.steps - 1;
+        self.steps += delta_steps;
         self.cost += current.cost - reference.cost;
         for i in 0..256 {
             self.ops[i] += current.ops[i] - reference.ops[i];
             self.frops_ops[i] += current.frops_ops[i] - reference.frops_ops[i];
         }
         self.mops.add_delta(&reference.mops, &current.mops);
-        current.steps - reference.steps
+        delta_steps
     }
     // steps, ops costs, precompiles costs, memory costs
     pub fn summary(&self) -> (u64, u64, u64, u64) {
