@@ -91,7 +91,7 @@ pub struct EmuOptions {
     pub main_name: String,
     /// Show coverage of opcodes and precompiles.
     /// Requires option: -X
-    #[clap(short, long, value_name = "COVERAGE", default_value = "false")]
+    #[clap(long, value_name = "COVERAGE", default_value = "false")]
     pub coverage: bool,
 }
 

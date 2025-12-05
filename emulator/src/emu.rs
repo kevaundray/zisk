@@ -1551,10 +1551,13 @@ impl<'a> Emu<'a> {
                 self.ctx.stats.set_top_rois(options.top_roi);
                 self.ctx.stats.set_roi_callers(options.roi_callers);
                 self.ctx.stats.set_top_roi_detail(options.top_roi_detail);
-                self.ctx.stats.set_coverage(options.coverage);
                 self.ctx.stats.set_main_name(options.main_name.clone());
             }
         }
+        if options.coverage && !options.stats {
+            panic!("Coverage feature needs at least stats option");
+        }
+        self.ctx.stats.set_coverage(options.coverage);
 
         self.ctx.stats.set_legacy_stats(options.legacy_stats);
         self.ctx.stats.set_store_ops(options.store_op_output.is_some());
