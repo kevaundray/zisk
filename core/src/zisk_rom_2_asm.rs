@@ -279,7 +279,7 @@ impl ZiskAsmContext {
         self.precompile_results() && false
     }
     pub fn call_wait_for_prec_avail(&self) -> bool {
-        self.precompile_results() && false
+        self.precompile_results() && true
     }
 }
 
@@ -8059,7 +8059,10 @@ impl ZiskRom2Asm {
         // Call wait_for_prec_avail()
         *unusual_code += &format!("pc_{:x}_wait_for_prec_avail:\n", ctx.pc,);
         Self::push_internal_registers(ctx, unusual_code, false);
-        *unusual_code += "\tcall _wait_for_prec_avail\n"; // TODO: handle error -1 ret
+        *unusual_code += "\tcall _wait_for_prec_avail\n";
+        *unusual_code += "\tcmp rax, 0\n";
+        *unusual_code += "\tjne execute_end\n";
+
         Self::pop_internal_registers(ctx, unusual_code, false);
 
         *unusual_code += &format!("\tjmp pc_{:x}_wait_for_prec_avail_done\n", ctx.pc,);

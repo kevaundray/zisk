@@ -1729,20 +1729,10 @@ void client_setup (void)
         //shm_unlink(shmem_precompile_name);
 
         // Create the precompile results shared memory
-        shmem_precompile_fd = shm_open(shmem_precompile_name, O_RDWR | O_CREAT, 0666);
+        shmem_precompile_fd = shm_open(shmem_precompile_name, O_RDWR, 0666);
         if (shmem_precompile_fd < 0)
         {
             printf("ERROR: Failed calling precompile shm_open(%s) errno=%d=%s\n", shmem_precompile_name, errno, strerror(errno));
-            fflush(stdout);
-            fflush(stderr);
-            exit(-1);
-        }
-
-        // Size it
-        result = ftruncate(shmem_precompile_fd, MAX_PRECOMPILE_SIZE);
-        if (result != 0)
-        {
-            printf("ERROR: Failed calling ftruncate(%s) errno=%d=%s\n", shmem_precompile_name, errno, strerror(errno));
             fflush(stdout);
             fflush(stderr);
             exit(-1);
@@ -1766,24 +1756,11 @@ void client_setup (void)
         precompile_results_address = (uint64_t *)pPrecompile;
         if (verbose) printf("mmap(precompile) mapped %lu B and returned address %p in %lu us\n", MAX_PRECOMPILE_SIZE, precompile_results_address, duration);
 
-        // Make sure the precompile results shared memory is deleted
-        shm_unlink(shmem_control_name);
-
         // Create the control shared memory
-        shmem_control_fd = shm_open(shmem_control_name, O_RDWR | O_CREAT, 0666);
+        shmem_control_fd = shm_open(shmem_control_name, O_RDWR, 0666);
         if (shmem_control_fd < 0)
         {
             printf("ERROR: Failed calling control shm_open(%s) errno=%d=%s\n", shmem_control_name, errno, strerror(errno));
-            fflush(stdout);
-            fflush(stderr);
-            exit(-1);
-        }
-
-        // Size it
-        result = ftruncate(shmem_control_fd, CONTROL_SIZE);
-        if (result != 0)
-        {
-            printf("ERROR: Failed calling ftruncate(%s) errno=%d=%s\n", shmem_control_name, errno, strerror(errno));
             fflush(stdout);
             fflush(stderr);
             exit(-1);
@@ -4611,14 +4588,31 @@ int _wait_for_prec_avail (void)
     // Tell the writer that we have read the precompile results
     sem_post(sem_prec_read);
 
-    // Check if there are precompile results available
+    // Make sure the semaphore is reset before checking the condition
     sem_trywait(sem_prec_avail);
+
+    // Sync precompile shared memory
+    if (msync((void *)shmem_control_address, CONTROL_SIZE, MS_SYNC) != 0) {
+        printf("ERROR: msync failed for shmem_control_address errno=%d=%s\n", errno, strerror(errno));
+        fflush(stdout);
+        fflush(stderr);
+        exit(-1);
+    }
+
+    // Check if there are precompile results available
     if (*precompile_written_address > *precompile_read_address)
     {
+        // Sync precompile shared memory
+        if (msync((void *)shmem_precompile_address, MAX_PRECOMPILE_SIZE, MS_SYNC) != 0) {
+            printf("ERROR: msync failed for shmem_precompile_address errno=%d=%s\n", errno, strerror(errno));
+            fflush(stdout);
+            fflush(stderr);
+            exit(-1);
+        }
         return 0;
     }
 
-    // Check again, but blocking this time
+    // Wait again, but blocking this time
     int result = sem_wait(sem_prec_avail);
     if (result == -1)
     {
@@ -4627,10 +4621,27 @@ int _wait_for_prec_avail (void)
         fflush(stderr);
         exit(-1);
     }
+
+    // Sync precompile shared memory
+    if (msync((void *)shmem_control_address, CONTROL_SIZE, MS_SYNC) != 0) {
+        printf("ERROR: msync failed for shmem_control_address errno=%d=%s\n", errno, strerror(errno));
+        fflush(stdout);
+        fflush(stderr);
+        exit(-1);
+    }
+
     if (*precompile_written_address == *precompile_read_address)
     {
         printf("ERROR: wait_for_prec_avail() found written=%lu == read=%lu\n", *precompile_written_address, *precompile_read_address);
         return -1;
+    }
+
+    // Sync precompile shared memory
+    if (msync((void *)shmem_precompile_address, MAX_PRECOMPILE_SIZE, MS_SYNC) != 0) {
+        printf("ERROR: msync failed for shmem_precompile_address errno=%d=%s\n", errno, strerror(errno));
+        fflush(stdout);
+        fflush(stderr);
+        exit(-1);
     }
 
     return 0;
