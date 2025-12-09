@@ -3449,11 +3449,14 @@ void server_run (void)
     }
 
     // Sync precompile shared memory
-    if (msync((void *)shmem_precompile_address, MAX_PRECOMPILE_SIZE, MS_SYNC) != 0) {
-        printf("ERROR: msync failed for shmem_precompile_address errno=%d=%s\n", errno, strerror(errno));
-        fflush(stdout);
-        fflush(stderr);
-        exit(-1);
+    if (precompile_results_enabled)
+    {
+        if (msync((void *)shmem_precompile_address, MAX_PRECOMPILE_SIZE, MS_SYNC) != 0) {
+            printf("ERROR: msync failed for shmem_precompile_address errno=%d=%s\n", errno, strerror(errno));
+            fflush(stdout);
+            fflush(stderr);
+            exit(-1);
+        }
     }
 
     /*******/
