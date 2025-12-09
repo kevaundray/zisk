@@ -8,7 +8,7 @@ use tracing::info;
 use zisk_common::io::{StreamRead, StreamSource};
 
 /// HintsPipeline struct manages the processing of precompile hints and writing them to shared memory.
-pub struct HintsPipeline<HP: HintsProcessor, HS: HintsSink> {
+pub struct HintsStream<HP: HintsProcessor, HS: HintsSink> {
     /// The Hints source stream for reading hints.
     stream_src: Mutex<StreamSource>,
 
@@ -19,7 +19,7 @@ pub struct HintsPipeline<HP: HintsProcessor, HS: HintsSink> {
     hints_sink: HS,
 }
 
-impl<HP: HintsProcessor, HS: HintsSink> HintsPipeline<HP, HS> {
+impl<HP: HintsProcessor, HS: HintsSink> HintsStream<HP, HS> {
     /// Create a new HintsPipeline with the given processor, StreamSource, and sink.
     ///
     /// # Arguments
@@ -29,7 +29,7 @@ impl<HP: HintsProcessor, HS: HintsSink> HintsPipeline<HP, HS> {
     ///
     /// # Returns
     /// A new `HintsPipeline` instance with uninitialized writers.
-    pub fn new(hints_processor: HP, hints_sink: HS, stream: StreamSource) -> Self {
+    pub fn new(stream: StreamSource, hints_processor: HP, hints_sink: HS) -> Self {
         Self { stream_src: Mutex::new(stream), hints_processor, hints_sink }
     }
 

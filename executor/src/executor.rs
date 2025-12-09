@@ -44,7 +44,7 @@ use zisk_common::{
     InstanceCtx, InstanceType, Plan, Stats, ZiskExecutionResult,
 };
 use zisk_common::{ChunkId, PayloadType};
-use zisk_hints::HintsPipeline;
+use zisk_hints::HintsStream;
 use zisk_pil::{
     RomRomTrace, ZiskPublicValues, INPUT_DATA_AIR_IDS, MAIN_AIR_IDS, MEM_AIR_IDS, ROM_AIR_IDS,
     ROM_DATA_AIR_IDS, ZISK_AIRGROUP_ID,
@@ -78,7 +78,7 @@ enum MinimalTraceExecutionMode {
     AsmWithCounter,
 }
 
-type HintsProcessorShmem = HintsPipeline<PrecompileHintsProcessor, HintsShmem>;
+type HintsProcessorShmem = HintsStream<PrecompileHintsProcessor, HintsShmem>;
 
 /// The `ZiskExecutor` struct orchestrates the execution of the ZisK ROM program, managing state
 /// machines, planning, and witness computation.
@@ -235,7 +235,7 @@ impl<F: PrimeField64> ZiskExecutor<F> {
             HintsShmem::new(hints_shmem_control_names, hints_shmem_names, unlock_mapped_memory);
 
         let hints_pipeline =
-            Mutex::new(HintsPipeline::new(hints_processor, hints_shmem, StreamSource::null()));
+            Mutex::new(HintsStream::new(StreamSource::null(), hints_processor, hints_shmem));
 
         Self {
             stdin: Mutex::new(ZiskStdin::null()),
