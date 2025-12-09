@@ -3,14 +3,13 @@
 
 use crate::{HintsProcessor, HintsSink};
 use anyhow::Result;
-use std::sync::Mutex;
 use tracing::info;
 use zisk_common::io::{StreamRead, StreamSource};
 
 /// HintsPipeline struct manages the processing of precompile hints and writing them to shared memory.
 pub struct HintsStream<HP: HintsProcessor, HS: HintsSink> {
     /// The Hints source stream for reading hints.
-    stream_src: Mutex<StreamSource>,
+    stream: StreamSource,
 
     /// The hints processor used to process hints before writing.
     hints_processor: HP,
@@ -30,16 +29,15 @@ impl<HP: HintsProcessor, HS: HintsSink> HintsStream<HP, HS> {
     /// # Returns
     /// A new `HintsPipeline` instance with uninitialized writers.
     pub fn new(stream: StreamSource, hints_processor: HP, hints_sink: HS) -> Self {
-        Self { stream_src: Mutex::new(stream), hints_processor, hints_sink }
+        Self { stream, hints_processor, hints_sink }
     }
 
     /// Set a new StreamSource for the pipeline.
     ///
     /// # Arguments
     /// * `stream` - The new StreamSource source for reading hints.
-    pub fn set_hints_stream(&self, stream: StreamSource) {
-        let mut guard = self.stream_src.lock().unwrap();
-        *guard = stream;
+    pub fn set_hints_stream(&mut self, stream: StreamSource) {
+        self.stream = stream;
     }
 
     /// Process and write precompile hints to all shared memory writers.
@@ -52,12 +50,10 @@ impl<HP: HintsProcessor, HS: HintsSink> HintsStream<HP, HS> {
     /// # Returns
     /// * `Ok(())` - If hints were successfully processed and submitted
     /// * `Err` - If processing or submission fails
-    pub fn write_hints(&self) -> Result<()> {
-        let mut stream = self.stream_src.lock().unwrap();
-
+    pub fn write_hints(&mut self) -> Result<()> {
         let mut processed = Vec::new();
 
-        while let Some(hints) = stream.next()? {
+        while let Some(hints) = self.stream.next()? {
             let hints = zisk_common::reinterpret_vec(hints)?;
 
             processed.extend(self.hints_processor.process_hints(&hints)?);
