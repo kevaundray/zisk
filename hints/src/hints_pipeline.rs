@@ -9,14 +9,14 @@ use zisk_common::io::{StreamRead, StreamSource};
 
 /// HintsPipeline struct manages the processing of precompile hints and writing them to shared memory.
 pub struct HintsPipeline<HP: HintsProcessor, HS: HintsSink> {
+    /// The Hints source stream for reading hints.
+    stream_src: Mutex<StreamSource>,
+
     /// The hints processor used to process hints before writing.
     hints_processor: HP,
 
     /// The hints sink used to submit processed hints.
     hints_sink: HS,
-
-    /// The Hints source stream for reading hints.
-    stream_src: Mutex<StreamSource>,
 }
 
 impl<HP: HintsProcessor, HS: HintsSink> HintsPipeline<HP, HS> {
@@ -30,7 +30,7 @@ impl<HP: HintsProcessor, HS: HintsSink> HintsPipeline<HP, HS> {
     /// # Returns
     /// A new `HintsPipeline` instance with uninitialized writers.
     pub fn new(hints_processor: HP, hints_sink: HS, stream: StreamSource) -> Self {
-        Self { hints_processor, hints_sink, stream_src: Mutex::new(stream) }
+        Self { stream_src: Mutex::new(stream), hints_processor, hints_sink }
     }
 
     /// Set a new StreamSource for the pipeline.
