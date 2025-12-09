@@ -98,7 +98,7 @@ impl ZiskExecute {
 
         let emulator = if cfg!(target_os = "macos") { true } else { self.emulator };
         let result = if emulator {
-            self.run_emu(stdin, Some(hintin))?
+            self.run_emu(stdin, None)?
         } else {
             self.run_asm(stdin, Some(hintin))?
         };
