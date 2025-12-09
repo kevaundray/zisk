@@ -34,12 +34,12 @@ impl ProverBackend {
     pub(crate) fn execute(
         &self,
         stdin: ZiskStdin,
-        hintin: Option<StreamSource>,
+        hints_stream: Option<StreamSource>,
         output_path: Option<PathBuf>,
     ) -> Result<ZiskExecuteResult> {
         self.witness_lib.set_stdin(stdin);
-        if let Some(hintin) = hintin {
-            self.witness_lib.set_hintin(hintin);
+        if let Some(stream) = hints_stream {
+            self.witness_lib.set_hints_stream(stream);
         }
 
         let start = std::time::Instant::now();

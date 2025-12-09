@@ -227,7 +227,7 @@ impl<F: PrimeField64> ZiskExecutor<F> {
             })
             .collect::<Vec<_>>();
 
-        // Create hints pipeline with null hintin initially.
+        // Create hints pipeline with null hints stream initially.
         let hints_processor =
             PrecompileHintsProcessor::new().expect("Failed to create PrecompileHintsProcessor");
 
@@ -271,8 +271,8 @@ impl<F: PrimeField64> ZiskExecutor<F> {
         *guard = stdin;
     }
 
-    pub fn set_hintin(&self, hintin: StreamSource) {
-        self.hints_pipeline.lock().unwrap().set_hintin(hintin);
+    pub fn set_hints_stream(&self, stream: StreamSource) {
+        self.hints_pipeline.lock().unwrap().set_hints_stream(stream);
     }
 
     #[allow(clippy::type_complexity)]

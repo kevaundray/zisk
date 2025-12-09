@@ -101,10 +101,10 @@ impl ProverEngine for AsmProver {
     fn execute(
         &self,
         stdin: ZiskStdin,
-        hintin: Option<StreamSource>,
+        hints_stream: Option<StreamSource>,
         output_path: Option<PathBuf>,
     ) -> Result<ZiskExecuteResult> {
-        self.core_prover.backend.execute(stdin, hintin, output_path)
+        self.core_prover.backend.execute(stdin, hints_stream, output_path)
     }
 
     fn stats(

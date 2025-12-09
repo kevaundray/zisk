@@ -52,7 +52,7 @@ pub trait ProverEngine {
     fn execute(
         &self,
         stdin: ZiskStdin,
-        hintin: Option<StreamSource>,
+        hints_stream: Option<StreamSource>,
         output_path: Option<PathBuf>,
     ) -> Result<ZiskExecuteResult>;
 
@@ -132,9 +132,9 @@ impl<C: ZiskBackend> ZiskProver<C> {
     pub fn execute(
         &self,
         stdin: ZiskStdin,
-        hintin: Option<StreamSource>,
+        hints_stream: Option<StreamSource>,
     ) -> Result<ZiskExecuteResult> {
-        self.prover.execute(stdin, hintin, None)
+        self.prover.execute(stdin, hints_stream, None)
     }
 
     /// Get the execution statistics with the given standard input and debug information.

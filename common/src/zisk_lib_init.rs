@@ -33,7 +33,7 @@ pub struct Stats {
 /// Extension trait that provides execution result access without Any boxing
 pub trait ZiskWitnessLibrary<F: PrimeField64> {
     fn set_stdin(&self, stdin: ZiskStdin);
-    fn set_hintin(&self, hintin: StreamSource);
+    fn set_hints_stream(&self, stream: StreamSource);
     fn execution_result(&self) -> Option<(ZiskExecutionResult, ExecutorStats)>;
 }
 

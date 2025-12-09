@@ -89,10 +89,10 @@ impl ProverEngine for EmuProver {
     fn execute(
         &self,
         stdin: ZiskStdin,
-        hintin: Option<StreamSource>,
+        hints_stream: Option<StreamSource>,
         output_path: Option<PathBuf>,
     ) -> Result<ZiskExecuteResult> {
-        if hintin.is_some() {
+        if hints_stream.is_some() {
             return Err(anyhow::anyhow!("EMU prover does not support precompile hints"));
         }
         self.core_prover.backend.execute(stdin, None, output_path)

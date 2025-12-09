@@ -94,11 +94,11 @@ impl ZiskExecute {
         }
 
         let stdin = self.create_stdin()?;
-        let hintin = self.create_hintin()?;
+        let stream = self.create_hints_stream()?;
 
         let emulator = if cfg!(target_os = "macos") { true } else { self.emulator };
         let result =
-            if emulator { self.run_emu(stdin, None)? } else { self.run_asm(stdin, Some(hintin))? };
+            if emulator { self.run_emu(stdin)? } else { self.run_asm(stdin, Some(stream))? };
 
         info!(
             "Execution completed in {:.2?}, executed steps: {}",
@@ -120,8 +120,8 @@ impl ZiskExecute {
         Ok(stdin)
     }
 
-    fn create_hintin(&mut self) -> Result<StreamSource> {
-        let hintin = if let Some(hints_path) = &self.precompile_hints_path {
+    fn create_hints_stream(&mut self) -> Result<StreamSource> {
+        let stream = if let Some(hints_path) = &self.precompile_hints_path {
             if !hints_path.exists() {
                 return Err(anyhow::anyhow!(
                     "Precompile Hints file not found at {:?}",
@@ -132,14 +132,10 @@ impl ZiskExecute {
         } else {
             StreamSource::null()
         };
-        Ok(hintin)
+        Ok(stream)
     }
 
-    pub fn run_emu(
-        &mut self,
-        stdin: ZiskStdin,
-        hintin: Option<StreamSource>,
-    ) -> Result<ZiskExecuteResult> {
+    pub fn run_emu(&mut self, stdin: ZiskStdin) -> Result<ZiskExecuteResult> {
         let prover = ProverClient::builder()
             .emu()
             .witness()
@@ -151,13 +147,13 @@ impl ZiskExecute {
             .print_command_info()
             .build()?;
 
-        prover.execute(stdin, hintin)
+        prover.execute(stdin, None)
     }
 
     pub fn run_asm(
         &mut self,
         stdin: ZiskStdin,
-        hintin: Option<StreamSource>,
+        stream: Option<StreamSource>,
     ) -> Result<ZiskExecuteResult> {
         let prover = ProverClient::builder()
             .asm()
@@ -173,6 +169,6 @@ impl ZiskExecute {
             .print_command_info()
             .build()?;
 
-        prover.execute(stdin, hintin)
+        prover.execute(stdin, stream)
     }
 }

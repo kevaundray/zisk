@@ -8,7 +8,8 @@ pub trait StreamRead: Send + 'static {
     fn open(&mut self) -> Result<()>;
 
     /// Read the next item from the stream
-    fn next(&mut self) -> Result<Vec<u8>>;
+    /// Returns None when the stream is finished
+    fn next(&mut self) -> Result<Option<Vec<u8>>>;
 
     /// Close the stream
     fn close(&mut self) -> Result<()>;
@@ -25,7 +26,7 @@ pub enum StreamSource {
 impl StreamSource {
     /// Create a null stdin
     pub fn null() -> Self {
-        StreamSource::Null(NullStreamReader)
+        StreamSource::Null(NullStreamReader::new())
     }
 
     /// Create a file-based stdin
@@ -38,32 +39,32 @@ impl StreamRead for StreamSource {
     /// Open/initialize the stream for reading
     fn open(&mut self) -> Result<()> {
         match self {
-            StreamSource::File(file_hintin) => file_hintin.open(),
-            StreamSource::Null(null_hintin) => null_hintin.open(),
+            StreamSource::File(file_stream) => file_stream.open(),
+            StreamSource::Null(null_stream) => null_stream.open(),
         }
     }
 
     /// Read the next item from the stream
-    fn next(&mut self) -> Result<Vec<u8>> {
+    fn next(&mut self) -> Result<Option<Vec<u8>>> {
         match self {
-            StreamSource::File(file_hintin) => file_hintin.next(),
-            StreamSource::Null(null_hintin) => null_hintin.next(),
+            StreamSource::File(file_stream) => file_stream.next(),
+            StreamSource::Null(null_stream) => null_stream.next(),
         }
     }
 
     /// Close the stream
     fn close(&mut self) -> Result<()> {
         match self {
-            StreamSource::File(file_hintin) => file_hintin.close(),
-            StreamSource::Null(null_hintin) => null_hintin.close(),
+            StreamSource::File(file_stream) => file_stream.close(),
+            StreamSource::Null(null_stream) => null_stream.close(),
         }
     }
 
     /// Check if the stream is currently active
     fn is_active(&self) -> bool {
         match self {
-            StreamSource::File(file_hintin) => file_hintin.is_active(),
-            StreamSource::Null(null_hintin) => null_hintin.is_active(),
+            StreamSource::File(file_stream) => file_stream.is_active(),
+            StreamSource::Null(null_stream) => null_stream.is_active(),
         }
     }
 }
