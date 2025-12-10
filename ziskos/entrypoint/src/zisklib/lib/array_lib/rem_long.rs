@@ -71,10 +71,10 @@ pub fn rem_long_init(a: &[U256], b: &[U256]) -> Vec<U256> {
 /// # Note
 /// Not optimal for `len(b) == 1`, use `rem_short` instead
 pub fn rem_long(a: &[U256], b: &[U256], scratch: &mut RemLongScratch) -> Vec<U256> {
-    let len_a = a.len();
-    let len_b = b.len();
     #[cfg(debug_assertions)]
     {
+        let len_a = a.len();
+        let len_b = b.len();
         assert_ne!(len_a, 0, "Input 'a' must have at least one limb");
         assert_ne!(len_b, 0, "Input 'b' must have at least one limb");
         assert!(!b[len_b - 1].is_zero(), "Input 'b' must not have leading zeros");

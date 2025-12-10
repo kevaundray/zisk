@@ -12,7 +12,7 @@ use super::{
 
 /// Modular exponentiation of three large numbers
 ///
-/// It assumes that modulus > 0 and len(base),len(exp) > 0
+/// It assumes that modulus > 0 and len(base),len(exp),len(modulus) > 0
 pub fn modexp(base: &[U256], exp: &[u64], modulus: &[U256]) -> Vec<U256> {
     let len_b = base.len();
     let len_e = exp.len();
@@ -175,4 +175,53 @@ pub fn modexp_u64(base: &[u64], exp: &[u64], modulus: &[u64]) -> Vec<u64> {
 
     // Convert result back to u64 array
     U256::slice_to_flat(&result_u256).to_vec()
+}
+
+/// Compute modular exponentiation of three large numbers
+///
+/// ### Safety
+///
+/// The caller must ensure that:
+/// - `base_ptr` points to an array of `base_len` u64 elements
+/// - `exp_ptr` points to an array of `exp_len` u64 elements
+/// - `modulus_ptr` points to an array of `modulus_len` u64 elements
+/// - `result_ptr` points to an array of at least `modulus_len` u64 elements
+#[no_mangle]
+pub unsafe extern "C" fn modexp_u64_c(
+    base_ptr: *const u64,
+    base_len: usize,
+    exp_ptr: *const u64,
+    exp_len: usize,
+    modulus_ptr: *const u64,
+    modulus_len: usize,
+    result_ptr: *mut u64,
+) -> usize {
+    let base = std::slice::from_raw_parts(base_ptr, base_len);
+    let exp = std::slice::from_raw_parts(exp_ptr, exp_len);
+    let modulus = std::slice::from_raw_parts(modulus_ptr, modulus_len);
+
+    // Round up to multiple of 4
+    let base_len = (base.len() + 3) & !3;
+    let modulus_len = (modulus.len() + 3) & !3;
+
+    let mut base_padded = vec![0u64; base_len];
+    let mut modulus_padded = vec![0u64; modulus_len];
+
+    base_padded[..base.len()].copy_from_slice(base);
+    modulus_padded[..modulus.len()].copy_from_slice(modulus);
+
+    // Convert u64 arrays to U256 chunks
+    let base_u256 = U256::flat_to_slice(&base_padded);
+    let modulus_u256 = U256::flat_to_slice(&modulus_padded);
+
+    // Call the main modexp function
+    let result_u256 = modexp(base_u256, exp, modulus_u256);
+    let result_slice = U256::slice_to_flat(&result_u256);
+    let result_len = result_slice.len();
+
+    // Convert result back to u64 array
+    let result = std::slice::from_raw_parts_mut(result_ptr, modulus_len);
+    result[..result_len].copy_from_slice(result_slice);
+
+    result_len
 }
