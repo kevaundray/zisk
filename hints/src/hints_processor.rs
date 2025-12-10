@@ -48,6 +48,7 @@
 use anyhow::Result;
 use rayon::{ThreadPool, ThreadPoolBuilder};
 use std::collections::VecDeque;
+use std::mem::ManuallyDrop;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::{Arc, Condvar, Mutex};
 use tracing::debug;
@@ -154,12 +155,14 @@ struct ResultQueue {
 struct HintProcessorState {
     /// Ordered results ready for draining
     queue: Mutex<ResultQueue>,
-    /// Notifies when queue becomes empty or error occurs
+    /// Notifies drainer thread when a hint completes
     drain_signal: Condvar,
     /// Next sequence ID to assign to incoming hints
     next_seq: AtomicUsize,
     /// Signals processing should stop
     error_flag: AtomicBool,
+    /// Signals drainer thread to shut down
+    shutdown: AtomicBool,
     /// Invalidates stale workers after reset
     generation: AtomicUsize,
 }
@@ -171,6 +174,7 @@ impl HintProcessorState {
             drain_signal: Condvar::new(),
             next_seq: AtomicUsize::new(0),
             error_flag: AtomicBool::new(false),
+            shutdown: AtomicBool::new(false),
             generation: AtomicUsize::new(0),
         }
     }
@@ -181,7 +185,7 @@ impl HintProcessorState {
 /// This struct provides methods to parse and process a stream of concatenated
 /// hints, using a dedicated Rayon thread pool for parallel processing while
 /// preserving the original order of results.
-pub struct PrecompileHintsProcessor<HS: HintsSink + Send + Sync> {
+pub struct PrecompileHintsProcessor<HS: HintsSink + Send + Sync + 'static> {
     /// The thread pool used for parallel hint processing.
     pool: ThreadPool,
 
@@ -191,11 +195,15 @@ pub struct PrecompileHintsProcessor<HS: HintsSink + Send + Sync> {
     /// Optional statistics collected during hint processing.
     stats: [AtomicUsize; NUM_HINT_TYPES as usize],
 
-    /// The hints sink used to submit processed hints.
+    /// The hints sink used to submit processed hints (kept for ownership).
+    #[allow(dead_code)]
     hints_sink: Arc<HS>,
+
+    /// Handle to the drainer thread (wrapped in ManuallyDrop to join in Drop)
+    drainer_thread: ManuallyDrop<std::thread::JoinHandle<()>>,
 }
 
-impl<HS: HintsSink + Send + Sync> PrecompileHintsProcessor<HS> {
+impl<HS: HintsSink + Send + Sync + 'static> PrecompileHintsProcessor<HS> {
     const DEFAULT_NUM_THREADS: usize = 32;
 
     /// Creates a new processor with the default number of threads.
@@ -227,36 +235,48 @@ impl<HS: HintsSink + Send + Sync> PrecompileHintsProcessor<HS> {
             .build()
             .map_err(|e| anyhow::anyhow!("Failed to create thread pool: {}", e))?;
 
+        let state = Arc::new(HintProcessorState::new());
+        let hints_sink = Arc::new(hints_sink);
+
+        // Spawn drainer thread
+        let drainer_state = Arc::clone(&state);
+        let drainer_sink = Arc::clone(&hints_sink);
+        let drainer_thread = std::thread::spawn(move || {
+            Self::drainer_thread(drainer_state, drainer_sink);
+        });
+
         Ok(Self {
             pool,
-            state: Arc::new(HintProcessorState::new()),
+            state,
             stats: Default::default(),
-            hints_sink: Arc::new(hints_sink),
+            hints_sink,
+            drainer_thread: ManuallyDrop::new(drainer_thread),
         })
     }
 
     /// Processes hints in parallel with non-blocking, ordered output.
     ///
     /// This method dispatches each hint to the thread pool for parallel processing.
-    /// Results are collected in a reorder buffer and drained (printed!!!!!!!!!!!!!!!!!!!!!) in the original
+    /// Results are collected in a reorder buffer and submitted to the sink in the original
     /// order as soon as consecutive results become available.
     ///
     /// # Key characteristics:
-    /// - **Non-blocking**: Returns immediately after dispatching work to the pool
-    /// - **Global sequence**: Sequence IDs are maintained across multiple calls
-    /// - **Ordered output**: Results are printed!!!!!!!!!!!!!!!!!!!! in the order hints were received
+    /// - **Non-blocking**: Returns immediately after enqueuing hints
+    /// - **Global sequence**: Sequence IDs maintained across multiple batch calls
+    /// - **Ordered submission**: Results submitted to sink in order hints were received
     /// - **Error handling**: Stops processing on first error
     ///
     /// # Arguments
     ///
     /// * `hints` - A slice of `u64` values containing concatenated hints
+    /// * `first_batch` - Whether this is the first batch (for CTRL_START validation)
     ///
     /// # Returns
     ///
-    /// * `Ok((Vec<u64>, bool))` - Tuple of (processed data, has_ctrl_end) where has_ctrl_end is true if CTRL_END was encountered
+    /// * `Ok(true)` - CTRL_END was encountered
+    /// * `Ok(false)` - Batch processed successfully, no CTRL_END
     /// * `Err` - If a previous error occurred or hints are malformed
     pub fn process_hints(&self, hints: &[u64], first_batch: bool) -> Result<bool> {
-        let mut processed = Vec::new();
         let mut has_ctrl_end = false;
 
         // Parse hints and dispatch to pool
@@ -342,36 +362,15 @@ impl<HS: HintsSink + Send + Sync> PrecompileHintsProcessor<HS> {
 
             // Handle HINTS_TYPE_RESULT synchronously - it doesn't need async processing
             if hint.hint_type == HINTS_TYPE_RESULT {
-                processed.extend_from_slice(&hint.data);
-
-                // Immediately mark this slot as complete and drain
-                let mut queue = self.state.queue.lock().unwrap();
-                let offset = seq_id - queue.next_drain_seq;
-                queue.buffer[offset] = Some(Ok(hint.data.clone()));
-
-                // Drain consecutive ready results from the front
-                while let Some(Some(res)) = queue.buffer.front() {
-                    match res {
-                        Ok(_data) => {
-                            queue.buffer.pop_front();
-                            queue.next_drain_seq += 1;
-                        }
-                        Err(_) => {
-                            self.state.error_flag.store(true, Ordering::Release);
-                            if let Some(Some(Err(e))) = queue.buffer.pop_front() {
-                                eprintln!("[seq={}] Error: {}", queue.next_drain_seq, e);
-                            }
-                            queue.next_drain_seq += 1;
-                            self.state.drain_signal.notify_all();
-                            break;
-                        }
-                    }
+                // Immediately mark this slot as complete
+                {
+                    let mut queue = self.state.queue.lock().unwrap();
+                    let offset = seq_id - queue.next_drain_seq;
+                    queue.buffer[offset] = Some(Ok(hint.data.clone()));
                 }
 
-                // Notify if buffer is now empty
-                if queue.buffer.is_empty() {
-                    self.state.drain_signal.notify_all();
-                }
+                // Notify drainer thread
+                self.state.drain_signal.notify_one();
             } else {
                 // Spawn processing task
                 let state = Arc::clone(&self.state);
@@ -409,33 +408,11 @@ impl<HS: HintsSink + Send + Sync> PrecompileHintsProcessor<HS> {
 
                     queue.buffer[offset] = Some(result);
 
-                    // Drain consecutive ready results from the front
-                    while let Some(Some(res)) = queue.buffer.front() {
-                        match res {
-                            Ok(_data) => {
-                                // Print the result (will be replaced with send to another process)
-                                // println!("[seq={}] Result: {:?}", queue.next_drain_seq, data);
-                                queue.buffer.pop_front();
-                                queue.next_drain_seq += 1;
-                            }
-                            Err(_) => {
-                                // Error found - signal to stop and break
-                                state.error_flag.store(true, Ordering::Release);
-                                // Print error and stop draining
-                                if let Some(Some(Err(e))) = queue.buffer.pop_front() {
-                                    eprintln!("[seq={}] Error: {}", queue.next_drain_seq, e);
-                                }
-                                queue.next_drain_seq += 1;
-                                state.drain_signal.notify_all();
-                                break;
-                            }
-                        }
-                    }
+                    // Release lock before notifying
+                    drop(queue);
 
-                    // Notify if buffer is now empty
-                    if queue.buffer.is_empty() {
-                        state.drain_signal.notify_all();
-                    }
+                    // Notify drainer thread
+                    state.drain_signal.notify_one();
                 });
             }
 
@@ -447,11 +424,65 @@ impl<HS: HintsSink + Send + Sync> PrecompileHintsProcessor<HS> {
             debug!("Hint type {}: {}", i, count.load(Ordering::Relaxed));
         }
 
-        if !processed.is_empty() {
-            self.hints_sink.submit(processed)?;
-        }
-
         Ok(has_ctrl_end)
+    }
+
+    /// Drainer thread that waits for hints to complete and drains ready results from queue.
+    fn drainer_thread(state: Arc<HintProcessorState>, hints_sink: Arc<HS>) {
+        loop {
+            let mut queue = state.queue.lock().unwrap();
+
+            // Check for shutdown
+            if state.shutdown.load(Ordering::Acquire) {
+                break;
+            }
+
+            // Drain all consecutive ready results from the front
+            while let Some(Some(res)) = queue.buffer.front() {
+                match res {
+                    Ok(data) => {
+                        // Clone data before dropping lock
+                        let data_to_submit = data.clone();
+                        queue.buffer.pop_front();
+                        queue.next_drain_seq += 1;
+
+                        // Drop lock before submitting to avoid blocking workers
+                        drop(queue);
+
+                        // Submit to sink
+                        if let Err(e) = hints_sink.submit(data_to_submit) {
+                            eprintln!("Error submitting to sink: {}", e);
+                            state.error_flag.store(true, Ordering::Release);
+                            state.drain_signal.notify_all();
+                            return;
+                        }
+
+                        // Re-acquire lock for next iteration
+                        queue = state.queue.lock().unwrap();
+                    }
+                    Err(e) => {
+                        // Error found - signal to stop
+                        state.error_flag.store(true, Ordering::Release);
+                        eprintln!("[seq={}] Error: {}", queue.next_drain_seq, e);
+                        queue.buffer.pop_front();
+                        queue.next_drain_seq += 1;
+                        state.drain_signal.notify_all();
+                        return;
+                    }
+                }
+            }
+
+            // Notify waiters if buffer is now empty
+            if queue.buffer.is_empty() {
+                state.drain_signal.notify_all();
+            }
+
+            // Wait for notification that a hint completed
+            #[allow(unused_assignments)]
+            {
+                queue = state.drain_signal.wait(queue).unwrap();
+            }
+        }
     }
 
     /// Waits for all pending hints to be processed and drained.
@@ -557,7 +588,22 @@ impl<HS: HintsSink + Send + Sync> PrecompileHintsProcessor<HS> {
     }
 }
 
-impl<HS: HintsSink + Send + Sync> HintsProcessor for PrecompileHintsProcessor<HS> {
+impl<HS: HintsSink + Send + Sync + 'static> Drop for PrecompileHintsProcessor<HS> {
+    fn drop(&mut self) {
+        // Signal drainer thread to shut down
+        self.state.shutdown.store(true, Ordering::Release);
+        self.state.drain_signal.notify_all();
+
+        // Join the drainer thread to ensure clean shutdown
+        // Safety: We only take the value once in drop
+        unsafe {
+            let handle = ManuallyDrop::take(&mut self.drainer_thread);
+            let _ = handle.join();
+        }
+    }
+}
+
+impl<HS: HintsSink + Send + Sync + 'static> HintsProcessor for PrecompileHintsProcessor<HS> {
     fn process_hints(&self, hints: &[u64], first_batch: bool) -> Result<bool> {
         self.process_hints(hints, first_batch)
     }
