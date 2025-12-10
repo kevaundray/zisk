@@ -48,11 +48,13 @@
 use anyhow::Result;
 use rayon::{ThreadPool, ThreadPoolBuilder};
 use std::collections::VecDeque;
+use std::mem::ManuallyDrop;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::{Arc, Condvar, Mutex};
+use tracing::debug;
 use ziskos::syscalls::SyscallPoint256;
 
-use crate::{secp256k1_ecdsa_verify, HintsProcessor};
+use crate::{secp256k1_ecdsa_verify, HintsProcessor, HintsSink};
 
 // TODO! COnvert Control Code to an enum and HINT TYPE to an enum as well
 
@@ -153,12 +155,14 @@ struct ResultQueue {
 struct HintProcessorState {
     /// Ordered results ready for draining
     queue: Mutex<ResultQueue>,
-    /// Notifies when queue becomes empty or error occurs
+    /// Notifies drainer thread when a hint completes
     drain_signal: Condvar,
     /// Next sequence ID to assign to incoming hints
     next_seq: AtomicUsize,
     /// Signals processing should stop
     error_flag: AtomicBool,
+    /// Signals drainer thread to shut down
+    shutdown: AtomicBool,
     /// Invalidates stale workers after reset
     generation: AtomicUsize,
 }
@@ -170,6 +174,7 @@ impl HintProcessorState {
             drain_signal: Condvar::new(),
             next_seq: AtomicUsize::new(0),
             error_flag: AtomicBool::new(false),
+            shutdown: AtomicBool::new(false),
             generation: AtomicUsize::new(0),
         }
     }
@@ -180,7 +185,7 @@ impl HintProcessorState {
 /// This struct provides methods to parse and process a stream of concatenated
 /// hints, using a dedicated Rayon thread pool for parallel processing while
 /// preserving the original order of results.
-pub struct PrecompileHintsProcessor {
+pub struct PrecompileHintsProcessor<HS: HintsSink + Send + Sync + 'static> {
     /// The thread pool used for parallel hint processing.
     pool: ThreadPool,
 
@@ -189,21 +194,28 @@ pub struct PrecompileHintsProcessor {
 
     /// Optional statistics collected during hint processing.
     stats: [AtomicUsize; NUM_HINT_TYPES as usize],
+
+    /// The hints sink used to submit processed hints (kept for ownership).
+    #[allow(dead_code)]
+    hints_sink: Arc<HS>,
+
+    /// Handle to the drainer thread (wrapped in ManuallyDrop to join in Drop)
+    drainer_thread: ManuallyDrop<std::thread::JoinHandle<()>>,
 }
 
-impl PrecompileHintsProcessor {
+impl<HS: HintsSink + Send + Sync + 'static> PrecompileHintsProcessor<HS> {
     const DEFAULT_NUM_THREADS: usize = 32;
 
     /// Creates a new processor with the default number of threads.
     ///
-    /// The default is the number of available CPU cores.
+    /// The default is 32 threads.
     ///
     /// # Returns
     ///
     /// * `Ok(PrecompileHintsProcessor)` - The configured processor
     /// * `Err` - If the thread pool fails to initialize
-    pub fn new() -> Result<Self> {
-        Self::with_num_threads(Self::DEFAULT_NUM_THREADS)
+    pub fn new(hints_sink: HS) -> Result<Self> {
+        Self::with_num_threads(Self::DEFAULT_NUM_THREADS, hints_sink)
     }
 
     /// Creates a new processor with the specified number of threads.
@@ -211,42 +223,61 @@ impl PrecompileHintsProcessor {
     /// # Arguments
     ///
     /// * `num_threads` - The number of worker threads in the pool
+    /// * `hints_sink` - The sink used to submit processed hints
     ///
     /// # Returns
     ///
     /// * `Ok(PrecompileHintsProcessor)` - The configured processor
     /// * `Err` - If the thread pool fails to initialize
-    pub fn with_num_threads(num_threads: usize) -> Result<Self> {
+    pub fn with_num_threads(num_threads: usize, hints_sink: HS) -> Result<Self> {
         let pool = ThreadPoolBuilder::new()
             .num_threads(num_threads)
             .build()
             .map_err(|e| anyhow::anyhow!("Failed to create thread pool: {}", e))?;
 
-        Ok(Self { pool, state: Arc::new(HintProcessorState::new()), stats: Default::default() })
+        let state = Arc::new(HintProcessorState::new());
+        let hints_sink = Arc::new(hints_sink);
+
+        // Spawn drainer thread
+        let drainer_state = Arc::clone(&state);
+        let drainer_sink = Arc::clone(&hints_sink);
+        let drainer_thread = std::thread::spawn(move || {
+            Self::drainer_thread(drainer_state, drainer_sink);
+        });
+
+        Ok(Self {
+            pool,
+            state,
+            stats: Default::default(),
+            hints_sink,
+            drainer_thread: ManuallyDrop::new(drainer_thread),
+        })
     }
 
     /// Processes hints in parallel with non-blocking, ordered output.
     ///
     /// This method dispatches each hint to the thread pool for parallel processing.
-    /// Results are collected in a reorder buffer and drained (printed!!!!!!!!!!!!!!!!!!!!!) in the original
+    /// Results are collected in a reorder buffer and submitted to the sink in the original
     /// order as soon as consecutive results become available.
     ///
     /// # Key characteristics:
-    /// - **Non-blocking**: Returns immediately after dispatching work to the pool
-    /// - **Global sequence**: Sequence IDs are maintained across multiple calls
-    /// - **Ordered output**: Results are printed!!!!!!!!!!!!!!!!!!!! in the order hints were received
+    /// - **Non-blocking**: Returns immediately after enqueuing hints
+    /// - **Global sequence**: Sequence IDs maintained across multiple batch calls
+    /// - **Ordered submission**: Results submitted to sink in order hints were received
     /// - **Error handling**: Stops processing on first error
     ///
     /// # Arguments
     ///
     /// * `hints` - A slice of `u64` values containing concatenated hints
+    /// * `first_batch` - Whether this is the first batch (for CTRL_START validation)
     ///
     /// # Returns
     ///
-    /// * `Ok(())` - Hints were successfully dispatched (does not mean processing is complete)
+    /// * `Ok(true)` - CTRL_END was encountered
+    /// * `Ok(false)` - Batch processed successfully, no CTRL_END
     /// * `Err` - If a previous error occurred or hints are malformed
-    pub fn process_hints(&self, hints: &[u64]) -> Result<Vec<u64>> {
-        let mut processed = Vec::new();
+    pub fn process_hints(&self, hints: &[u64], first_batch: bool) -> Result<bool> {
+        let mut has_ctrl_end = false;
 
         // Parse hints and dispatch to pool
         let mut idx = 0;
@@ -259,11 +290,28 @@ impl PrecompileHintsProcessor {
             let hint = PrecompileHint::from_u64_slice(hints, idx)?;
             let length = hint.data.len();
 
+            // Validate hint type is in valid range before accessing stats array
+            if hint.hint_type >= NUM_HINT_TYPES {
+                return Err(anyhow::anyhow!("Invalid hint type: {}", hint.hint_type));
+            }
+
             self.stats[hint.hint_type as usize].fetch_add(1, Ordering::Relaxed);
 
             // Check if this is a control code or data hint type
             match hint.hint_type {
                 CTRL_START => {
+                    // CTRL_START must be the first message of the first batch
+                    if !first_batch {
+                        return Err(anyhow::anyhow!(
+                            "CTRL_START can only be sent as the first message in the stream"
+                        ));
+                    }
+                    if idx != 0 {
+                        return Err(anyhow::anyhow!(
+                            "CTRL_START must be the first hint in the batch, but found at index {}",
+                            idx
+                        ));
+                    }
                     // Reset global sequence and buffer at stream start
                     self.reset();
                     // Control hint only; skip processing
@@ -271,10 +319,19 @@ impl PrecompileHintsProcessor {
                     continue;
                 }
                 CTRL_END => {
-                    // Control hint only; wait for completion then skip processing
+                    // Control hint only; wait for completion then set flag
                     self.wait_for_completion()?;
+                    has_ctrl_end = true;
                     idx += length + 1;
-                    continue;
+
+                    // CTRL_END should be the last message - verify and break
+                    if idx < hints.len() {
+                        return Err(anyhow::anyhow!(
+                            "CTRL_END must be the last hint, but {} bytes remain",
+                            hints.len() - idx
+                        ));
+                    }
+                    break;
                 }
                 CTRL_CANCEL => {
                     // Cancel current stream: set error and notify
@@ -305,36 +362,15 @@ impl PrecompileHintsProcessor {
 
             // Handle HINTS_TYPE_RESULT synchronously - it doesn't need async processing
             if hint.hint_type == HINTS_TYPE_RESULT {
-                processed.extend_from_slice(&hint.data);
-
-                // Immediately mark this slot as complete and drain
-                let mut queue = self.state.queue.lock().unwrap();
-                let offset = seq_id - queue.next_drain_seq;
-                queue.buffer[offset] = Some(Ok(hint.data.clone()));
-
-                // Drain consecutive ready results from the front
-                while let Some(Some(res)) = queue.buffer.front() {
-                    match res {
-                        Ok(_data) => {
-                            queue.buffer.pop_front();
-                            queue.next_drain_seq += 1;
-                        }
-                        Err(_) => {
-                            self.state.error_flag.store(true, Ordering::Release);
-                            if let Some(Some(Err(e))) = queue.buffer.pop_front() {
-                                eprintln!("[seq={}] Error: {}", queue.next_drain_seq, e);
-                            }
-                            queue.next_drain_seq += 1;
-                            self.state.drain_signal.notify_all();
-                            break;
-                        }
-                    }
+                // Immediately mark this slot as complete
+                {
+                    let mut queue = self.state.queue.lock().unwrap();
+                    let offset = seq_id - queue.next_drain_seq;
+                    queue.buffer[offset] = Some(Ok(hint.data.clone()));
                 }
 
-                // Notify if buffer is now empty
-                if queue.buffer.is_empty() {
-                    self.state.drain_signal.notify_all();
-                }
+                // Notify drainer thread
+                self.state.drain_signal.notify_one();
             } else {
                 // Spawn processing task
                 let state = Arc::clone(&self.state);
@@ -372,45 +408,81 @@ impl PrecompileHintsProcessor {
 
                     queue.buffer[offset] = Some(result);
 
-                    // Drain consecutive ready results from the front
-                    while let Some(Some(res)) = queue.buffer.front() {
-                        match res {
-                            Ok(_data) => {
-                                // Print the result (will be replaced with send to another process)
-                                // println!("[seq={}] Result: {:?}", queue.next_drain_seq, data);
-                                queue.buffer.pop_front();
-                                queue.next_drain_seq += 1;
-                            }
-                            Err(_) => {
-                                // Error found - signal to stop and break
-                                state.error_flag.store(true, Ordering::Release);
-                                // Print error and stop draining
-                                if let Some(Some(Err(e))) = queue.buffer.pop_front() {
-                                    eprintln!("[seq={}] Error: {}", queue.next_drain_seq, e);
-                                }
-                                queue.next_drain_seq += 1;
-                                state.drain_signal.notify_all();
-                                break;
-                            }
-                        }
-                    }
+                    // Release lock before notifying
+                    drop(queue);
 
-                    // Notify if buffer is now empty
-                    if queue.buffer.is_empty() {
-                        state.drain_signal.notify_all();
-                    }
+                    // Notify drainer thread
+                    state.drain_signal.notify_one();
                 });
             }
 
             idx += length + 1;
         }
 
-        println!("Processed hints stats:");
+        debug!("Processed hints stats:");
         for (i, count) in self.stats.iter().enumerate() {
-            println!("Hint type {}: {}", i, count.load(Ordering::Relaxed));
+            debug!("Hint type {}: {}", i, count.load(Ordering::Relaxed));
         }
 
-        Ok(processed)
+        Ok(has_ctrl_end)
+    }
+
+    /// Drainer thread that waits for hints to complete and drains ready results from queue.
+    fn drainer_thread(state: Arc<HintProcessorState>, hints_sink: Arc<HS>) {
+        loop {
+            let mut queue = state.queue.lock().unwrap();
+
+            // Check for shutdown
+            if state.shutdown.load(Ordering::Acquire) {
+                break;
+            }
+
+            // Drain all consecutive ready results from the front
+            while let Some(Some(res)) = queue.buffer.front() {
+                match res {
+                    Ok(data) => {
+                        // Clone data before dropping lock
+                        let data_to_submit = data.clone();
+                        queue.buffer.pop_front();
+                        queue.next_drain_seq += 1;
+
+                        // Drop lock before submitting to avoid blocking workers
+                        drop(queue);
+
+                        // Submit to sink
+                        if let Err(e) = hints_sink.submit(data_to_submit) {
+                            eprintln!("Error submitting to sink: {}", e);
+                            state.error_flag.store(true, Ordering::Release);
+                            state.drain_signal.notify_all();
+                            return;
+                        }
+
+                        // Re-acquire lock for next iteration
+                        queue = state.queue.lock().unwrap();
+                    }
+                    Err(e) => {
+                        // Error found - signal to stop
+                        state.error_flag.store(true, Ordering::Release);
+                        eprintln!("[seq={}] Error: {}", queue.next_drain_seq, e);
+                        queue.buffer.pop_front();
+                        queue.next_drain_seq += 1;
+                        state.drain_signal.notify_all();
+                        return;
+                    }
+                }
+            }
+
+            // Notify waiters if buffer is now empty
+            if queue.buffer.is_empty() {
+                state.drain_signal.notify_all();
+            }
+
+            // Wait for notification that a hint completed
+            #[allow(unused_assignments)]
+            {
+                queue = state.drain_signal.wait(queue).unwrap();
+            }
+        }
     }
 
     /// Waits for all pending hints to be processed and drained.
@@ -516,15 +588,38 @@ impl PrecompileHintsProcessor {
     }
 }
 
-impl HintsProcessor for PrecompileHintsProcessor {
-    fn process_hints(&self, hints: &[u64]) -> Result<Vec<u64>> {
-        self.process_hints(hints)
+impl<HS: HintsSink + Send + Sync + 'static> Drop for PrecompileHintsProcessor<HS> {
+    fn drop(&mut self) {
+        // Signal drainer thread to shut down
+        self.state.shutdown.store(true, Ordering::Release);
+        self.state.drain_signal.notify_all();
+
+        // Join the drainer thread to ensure clean shutdown
+        // Safety: We only take the value once in drop
+        unsafe {
+            let handle = ManuallyDrop::take(&mut self.drainer_thread);
+            let _ = handle.join();
+        }
+    }
+}
+
+impl<HS: HintsSink + Send + Sync + 'static> HintsProcessor for PrecompileHintsProcessor<HS> {
+    fn process_hints(&self, hints: &[u64], first_batch: bool) -> Result<bool> {
+        self.process_hints(hints, first_batch)
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    struct NullHints;
+
+    impl HintsSink for NullHints {
+        fn submit(&self, _processed: Vec<u64>) -> Result<()> {
+            Ok(())
+        }
+    }
 
     fn make_header(hint_type: u32, length: u32) -> u64 {
         ((hint_type as u64) << 32) | (length as u64)
@@ -534,8 +629,8 @@ mod tests {
         make_header(ctrl, length)
     }
 
-    fn processor() -> PrecompileHintsProcessor {
-        PrecompileHintsProcessor::with_num_threads(2).unwrap()
+    fn processor() -> PrecompileHintsProcessor<NullHints> {
+        PrecompileHintsProcessor::with_num_threads(2, NullHints).unwrap()
     }
 
     // Positive tests
@@ -545,7 +640,7 @@ mod tests {
         let data = vec![make_header(HINTS_TYPE_RESULT, 2), 0x111, 0x222];
 
         // Dispatch should succeed and be non-blocking
-        assert!(p.process_hints(&data).is_ok());
+        assert!(p.process_hints(&data, false).is_ok());
         // Wait for completion should succeed
         assert!(p.wait_for_completion().is_ok());
 
@@ -566,7 +661,7 @@ mod tests {
             make_header(HINTS_TYPE_RESULT, 1),
             0x333,
         ];
-        assert!(p.process_hints(&data).is_ok());
+        assert!(p.process_hints(&data, false).is_ok());
         assert!(p.wait_for_completion().is_ok());
 
         // Verify all hints were processed (buffer empty, next_drain_seq advanced)
@@ -581,8 +676,8 @@ mod tests {
         let data1 = vec![make_header(HINTS_TYPE_RESULT, 1), 0xAAA];
         let data2 = vec![make_header(HINTS_TYPE_RESULT, 1), 0xBBB];
 
-        assert!(p.process_hints(&data1).is_ok());
-        assert!(p.process_hints(&data2).is_ok());
+        assert!(p.process_hints(&data1, false).is_ok());
+        assert!(p.process_hints(&data2, false).is_ok());
         assert!(p.wait_for_completion().is_ok());
 
         // Verify sequence continued across calls
@@ -595,7 +690,7 @@ mod tests {
     fn test_empty_input_ok() {
         let p = processor();
         let data: Vec<u64> = vec![];
-        assert!(p.process_hints(&data).is_ok());
+        assert!(p.process_hints(&data, false).is_ok());
         assert!(p.wait_for_completion().is_ok());
 
         // No hints processed
@@ -609,16 +704,10 @@ mod tests {
         let p = processor();
         let data = vec![make_header(999, 1), 0x1234];
 
-        // Dispatch enqueues work
-        assert!(p.process_hints(&data).is_ok());
-
-        // Error surfaces on wait
-        let result = p.wait_for_completion();
+        // Should return error immediately during validation
+        let result = p.process_hints(&data, false);
         assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("error"));
-
-        // Error flag should be set
-        assert!(p.state.error_flag.load(Ordering::Acquire));
+        assert!(result.unwrap_err().to_string().contains("Invalid hint type"));
     }
 
     #[test]
@@ -627,32 +716,29 @@ mod tests {
         // First valid, then invalid type
         let data = vec![make_header(HINTS_TYPE_RESULT, 1), 0x111, make_header(999, 0)];
 
-        let _ = p.process_hints(&data);
-        let result = p.wait_for_completion();
-
+        // Should error immediately when encountering invalid hint type
+        let result = p.process_hints(&data, false);
         assert!(result.is_err());
-        assert!(p.state.error_flag.load(Ordering::Acquire));
+        assert!(result.unwrap_err().to_string().contains("Invalid hint type"));
     }
 
     #[test]
     fn test_reset_clears_error() {
         let p = processor();
         let bad = vec![make_header(999, 0)];
-        let _ = p.process_hints(&bad);
+        let result = p.process_hints(&bad, false);
 
-        // Wait briefly for error to propagate
-        std::thread::sleep(std::time::Duration::from_millis(10));
+        // Should get synchronous error for invalid hint type
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("Invalid hint type"));
 
-        // Error should be set
-        assert!(p.state.error_flag.load(Ordering::Acquire));
-
-        // Reset should clear error
+        // Reset should clear any error state
         p.reset();
         assert!(!p.state.error_flag.load(Ordering::Acquire));
 
-        // Should be able to process new hints
+        // Should be able to process new hints after reset
         let good = vec![make_header(HINTS_TYPE_RESULT, 1), 0x42];
-        assert!(p.process_hints(&good).is_ok());
+        assert!(p.process_hints(&good, false).is_ok());
         assert!(p.wait_for_completion().is_ok());
 
         let queue = p.state.queue.lock().unwrap();
@@ -666,7 +752,7 @@ mod tests {
 
         // First batch increments sequence
         let batch1 = vec![make_header(HINTS_TYPE_RESULT, 1), 0x01];
-        p.process_hints(&batch1).unwrap();
+        p.process_hints(&batch1, false).unwrap();
         p.wait_for_completion().unwrap();
 
         // Sequence should be at 1
@@ -677,7 +763,7 @@ mod tests {
 
         // Send START control - should reset sequence
         let start = vec![make_ctrl_header(CTRL_START, 0)];
-        p.process_hints(&start).unwrap();
+        p.process_hints(&start, true).unwrap();
 
         // Sequence should be reset to 0
         {
@@ -688,10 +774,10 @@ mod tests {
 
         // Process new batch
         let batch2 = vec![make_header(HINTS_TYPE_RESULT, 1), 0x02];
-        p.process_hints(&batch2).unwrap();
+        p.process_hints(&batch2, false).unwrap();
 
         let end = vec![make_ctrl_header(CTRL_END, 0)];
-        p.process_hints(&end).unwrap();
+        p.process_hints(&end, false).unwrap();
 
         // Should have processed 1 hint (starting from 0 again)
         let queue = p.state.queue.lock().unwrap();
@@ -705,11 +791,11 @@ mod tests {
         // Dispatch hints
         let data =
             vec![make_header(HINTS_TYPE_RESULT, 1), 0x10, make_header(HINTS_TYPE_RESULT, 1), 0x20];
-        p.process_hints(&data).unwrap();
+        p.process_hints(&data, false).unwrap();
 
         // END should wait internally
         let end = vec![make_ctrl_header(CTRL_END, 0)];
-        p.process_hints(&end).unwrap();
+        p.process_hints(&end, false).unwrap();
 
         // Buffer should already be empty
         {
@@ -727,7 +813,7 @@ mod tests {
         let p = processor();
         let cancel = vec![make_ctrl_header(CTRL_CANCEL, 0)];
 
-        let result = p.process_hints(&cancel);
+        let result = p.process_hints(&cancel, false);
         assert!(result.is_err());
         assert!(result.unwrap_err().to_string().contains("cancelled"));
 
@@ -740,7 +826,7 @@ mod tests {
         let p = processor();
         let signal_err = vec![make_ctrl_header(CTRL_ERROR, 0)];
 
-        let result = p.process_hints(&signal_err);
+        let result = p.process_hints(&signal_err, false);
         assert!(result.is_err());
         assert!(result.unwrap_err().to_string().contains("error"));
 
@@ -753,7 +839,7 @@ mod tests {
     fn test_stress_throughput() {
         use std::time::Instant;
 
-        let p = PrecompileHintsProcessor::with_num_threads(32).unwrap();
+        let p = PrecompileHintsProcessor::with_num_threads(32, NullHints).unwrap();
 
         // Generate a large batch of hints
         const NUM_HINTS: usize = 100_000;
@@ -765,7 +851,7 @@ mod tests {
         }
 
         let start = Instant::now();
-        p.process_hints(&data).unwrap();
+        p.process_hints(&data, false).unwrap();
         p.wait_for_completion().unwrap();
         let duration = start.elapsed();
 
@@ -786,7 +872,7 @@ mod tests {
     fn test_stress_concurrent_batches() {
         use std::time::Instant;
 
-        let p = PrecompileHintsProcessor::with_num_threads(32).unwrap();
+        let p = PrecompileHintsProcessor::with_num_threads(32, NullHints).unwrap();
 
         const NUM_BATCHES: usize = 1_000;
         const HINTS_PER_BATCH: usize = 100;
@@ -800,7 +886,7 @@ mod tests {
                 data.push(make_header(HINTS_TYPE_RESULT, 1));
                 data.push((batch_id * HINTS_PER_BATCH + i) as u64);
             }
-            p.process_hints(&data).unwrap();
+            p.process_hints(&data, false).unwrap();
         }
 
         p.wait_for_completion().unwrap();
@@ -825,7 +911,7 @@ mod tests {
     fn test_stress_with_resets() {
         use std::time::Instant;
 
-        let p = PrecompileHintsProcessor::with_num_threads(32).unwrap();
+        let p = PrecompileHintsProcessor::with_num_threads(32, NullHints).unwrap();
 
         const ITERATIONS: usize = 100;
         const HINTS_PER_ITER: usize = 1_000;
@@ -835,7 +921,7 @@ mod tests {
         for _iter in 0..ITERATIONS {
             // Reset at start of each iteration
             let reset = vec![make_ctrl_header(CTRL_START, 0)];
-            p.process_hints(&reset).unwrap();
+            p.process_hints(&reset, true).unwrap();
 
             // Process batch
             let mut data = Vec::with_capacity(HINTS_PER_ITER * 2);
@@ -843,11 +929,11 @@ mod tests {
                 data.push(make_header(HINTS_TYPE_RESULT, 1));
                 data.push(i as u64);
             }
-            p.process_hints(&data).unwrap();
+            p.process_hints(&data, false).unwrap();
 
             // End stream
             let end = vec![make_ctrl_header(CTRL_END, 0)];
-            p.process_hints(&end).unwrap();
+            p.process_hints(&end, false).unwrap();
         }
 
         let duration = start.elapsed();
