@@ -1,3 +1,4 @@
+#![allow(clippy::too_many_arguments)]
 use num_format::{Locale, ToFormattedString};
 
 pub struct StatsReport {
@@ -167,7 +168,6 @@ impl StatsReport {
             cost as f64 / self.cost_divisor,
             calls.to_formatted_string(&Locale::en)
         );
-        return;
     }
 
     pub fn add_top_step_calls_perc(&mut self, label: &str, steps: u64, calls: usize) {
@@ -178,7 +178,6 @@ impl StatsReport {
             steps as f64 / self.step_divisor,
             calls.to_formatted_string(&Locale::en)
         );
-        return;
     }
 
     pub fn add_top_step_perc(&mut self, label: &str, cost: u64) {
@@ -287,7 +286,8 @@ impl StatsReport {
 
     pub fn title_step_cost_detail_cost(
         &mut self,
-        short_label: &str,
+        label: &str,
+        index_label: &str,
         count_label: &str,
         step_label: &str,
         cost_label: &str,
@@ -297,15 +297,16 @@ impl StatsReport {
         cost_mem_label: &str,
     ) {
         self.output += &format!(
-            "{}{short_label:<label_width$} {count_label:>10} {step_label:>15}       % {cost_label:>15}       % {cost_main_label:>15} {cost_ops_label:>15} {cost_precomp_label:>15} {cost_mem_label:>15}\n",
+            "{}{label:<label_width$} {index_label:>10} {count_label:>10} {step_label:>15}       % {cost_label:>15}       % {cost_main_label:>15} {cost_ops_label:>15} {cost_precomp_label:>15} {cost_mem_label:>15}\n",
             self.identation,
-            label_width = self.short_label_width,
+            label_width = self.label_width,
         );
     }
 
     pub fn add_step_cost_detail_cost(
         &mut self,
-        short_label: &str,
+        label: &str,
+        index: usize,
         count: u64,
         step: u64,
         cost: u64,
@@ -316,9 +317,10 @@ impl StatsReport {
         comment: &str,
     ) {
         self.output += &format!(
-            "{}{:<label_width$} {:>10} {:>15} {:6.2}% {:>15} {:6.2}% {:>15} {:>15} {:>15} {:>15}{comment}\n",
+            "{}{:<label_width$} {:>10} {:>10} {:>15} {:6.2}% {:>15} {:6.2}% {:>15} {:>15} {:>15} {:>15}{comment}\n",
             self.identation,
-            short_label,
+            label,
+            index.to_formatted_string(&Locale::en),
             count.to_formatted_string(&Locale::en),
             step.to_formatted_string(&Locale::en),
             step as f64 / self.step_divisor,
@@ -328,7 +330,7 @@ impl StatsReport {
             cost_ops.to_formatted_string(&Locale::en),
             cost_precomp.to_formatted_string(&Locale::en),
             cost_mem.to_formatted_string(&Locale::en),
-            label_width = self.short_label_width,
+            label_width = self.label_width,
         );
     }
 

@@ -23,13 +23,15 @@ use crate::{
     StatsCoverageReport, StatsReport, BASE_COST, MAIN_COST,
 };
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct CallStackEntry {
     pub pc: u64,
     pub ra: u64,
     pub caller_roi_index: Option<usize>,
     pub called_roi_index: Option<usize>,
     pub func_name: String,
+    pub return_reg: u8,
+    pub tail_calls: Vec<(usize, StatsCosts)>,
     costs: StatsCosts,
 }
 
@@ -58,6 +60,7 @@ pub struct Stats {
     rois_by_address: BTreeMap<u32, u32>,
     rois: Vec<RegionsOfInterest>,
     current_roi: Option<usize>,
+    previous_roi: Option<usize>,
     top_rois: usize,
     roi_callers: usize,
     top_rois_detail: bool,
@@ -70,9 +73,15 @@ pub struct Stats {
     previous_verbose: String,
     is_call: bool,
     is_return: bool,
-    cost_marks: HashMap<u16, StatsCostMark>,
+    call_return_reg: u8,
+    profile_marks: HashMap<u16, StatsCostMark>,
     individual_cost_marks: bool,
     main_name: String,
+    profile_tags: HashMap<u16, String>,
+    #[cfg(feature = "debug_stats_trace")]
+    debug_step_stack: Vec<u64>,
+    #[cfg(feature = "debug_stats_trace")]
+    previous_stack_depth: usize,
 }
 
 impl Default for Stats {
@@ -87,6 +96,7 @@ impl Default for Stats {
             rois: Vec::new(),
             rois_by_address: BTreeMap::new(),
             current_roi: None,
+            previous_roi: None,
             top_rois: 25,
             roi_callers: 10,
             ops_cost: 0,
@@ -101,9 +111,15 @@ impl Default for Stats {
             previous_verbose: String::default(),
             is_call: false,
             is_return: false,
-            cost_marks: HashMap::new(),
+            call_return_reg: 0,
+            profile_marks: HashMap::new(),
             individual_cost_marks: false,
             main_name: "main".to_string(),
+            profile_tags: HashMap::new(),
+            #[cfg(feature = "debug_stats_trace")]
+            debug_step_stack: Vec::new(),
+            #[cfg(feature = "debug_stats_trace")]
+            previous_stack_depth: 0,
         }
     }
 }
@@ -112,17 +128,11 @@ impl Stats {
     /// Called every time some data is read from memory, if statistics are enabled
     pub fn on_memory_read(&mut self, address: u64, width: u64) {
         self.costs.memory_read(address, width);
-        if let Some(roi_index) = self.current_roi {
-            self.rois[roi_index].memory_read(address, width);
-        }
     }
 
     /// Called every time some data is writen to memory, if statistics are enabled
     pub fn on_memory_write(&mut self, address: u64, width: u64, value: u64) {
         self.costs.memory_write(address, width, value);
-        if let Some(roi_index) = self.current_roi {
-            self.rois[roi_index].memory_write(address, width, value);
-        }
     }
 
     /// Called every time a register is read, if statistics are enabled
@@ -138,9 +148,9 @@ impl Stats {
     }
 
     /// Called at every step with the current number of executed steps, if statistics are enabled
-    pub fn on_steps(&mut self, _steps: u64) {
+    pub fn on_steps(&mut self, steps: u64) {
         // Store the number of executed steps
-        // assert_eq!(self.costs.steps, steps);
+        assert_eq!(self.costs.steps, steps + 1);
     }
 
     pub fn print_call_stack(&self) {
@@ -157,7 +167,7 @@ impl Stats {
             );
         }
     }
-    pub fn static_print_call_stack(call_stack: &Vec<CallStackEntry>, prefix: &str) {
+    pub fn static_print_call_stack(call_stack: &[CallStackEntry], prefix: &str) {
         for (i, entry) in call_stack.iter().rev().enumerate() {
             println!(
                 "{prefix}#{} PC:0x{:08X} RA:0x{:08X} ROI[{}]:{} STEPS:{}",
@@ -171,33 +181,51 @@ impl Stats {
         }
     }
     pub fn check_roi(&mut self, pc: u32, regs: &[u64]) {
+        self.previous_roi = self.current_roi;
+
         // First, handle RETURN even if we're not changing ROI
         let return_call = if self.is_return && !self.call_stack.is_empty() {
-            let return_call = self.call_stack.pop().unwrap();
-            // Update ROI stats
-            if let Some(roi_idx) = self.current_roi {
-                let roi = &mut self.rois[roi_idx];
-                roi.inc_step();
-            }
-            Some(return_call)
+            self.call_stack.pop()
         } else {
             None
         };
 
         let previous_roi_index = self.current_roi;
 
-        self.current_roi = if let Some((_, index)) = self.rois_by_address.range(..=pc).next_back() {
-            Some(*index as usize)
+        let update_roi = if let Some(previous_index) = self.current_roi {
+            let roi = &self.rois[previous_index];
+            pc < roi.from_pc || pc > roi.to_pc
         } else {
-            None
+            true
         };
+
+        if update_roi {
+            self.current_roi =
+                if let Some((_, index)) = self.rois_by_address.range(..=pc).next_back() {
+                    Some(*index as usize)
+                } else {
+                    None
+                };
+        }
+
+        if previous_roi_index != self.current_roi && !self.is_return && !self.is_call {
+            if let Some(roi_index) = self.current_roi {
+                // Tail call
+                if let Some(top) = self.call_stack.last_mut() {
+                    top.tail_calls.push((roi_index, self.costs.clone()));
+                    self.rois[roi_index].tail_jmp(previous_roi_index);
+                    if top.tail_calls.len() < 2 {
+                        self.rois[roi_index].calls += 1;
+                    }
+                }
+            }
+        }
 
         // Now handle ROI updates and CALL/JMP
         if let Some(roi_index) = self.current_roi {
             let roi = &mut self.rois[roi_index];
             if pc >= roi.from_pc && pc <= roi.to_pc && !self.is_call && !self.is_return {
                 assert!(return_call.is_none());
-                roi.inc_step();
                 return;
             }
         }
@@ -207,72 +235,51 @@ impl Stats {
             // let roi = &mut self.rois[*index as usize];
             // If return after call, need to add delta costs
             if let Some(return_call) = return_call {
-                #[cfg(feature = "debug_stats")]
-                println!(
-                    "#{} RETURN 0x{pc:08X} {} {}",
-                    self.call_stack.len(),
-                    roi_index,
-                    self.rois[roi_index].name
-                );
-
                 if return_call.caller_roi_index != Some(roi_index) {
                     panic!("{:?} {:?}", return_call, self.rois[roi_index]);
                 }
 
                 self.rois[roi_index].return_call(self.call_stack.len());
 
-                if return_call.called_roi_index != self.current_roi {
-                    let _steps = self.rois[roi_index].get_steps();
-                    assert!(_steps <= self.costs.steps);
-                    let _res =
-                        self.rois[roi_index].add_delta_costs(&return_call.costs, &self.costs);
-                    #[cfg(feature = "debug_stats")]
-                    if _res.is_none() {
-                        println!(
-                            "\x1B[1;31mIGNORE ADD_DELTA_COSTS #{} ROI[{}]:{} S:{}+0 GS:{}",
-                            self.rois[roi_index].get_callstack_rc(),
-                            roi_index,
-                            self.rois[roi_index].name,
-                            _steps,
-                            self.costs.steps,
-                        );
-                        Self::static_print_call_stack(&self.call_stack, "  > ");
-                        print!("\x1B[0m");
-                    } else {
-                        println!(
-                            "\x1B[1;32mACCEPT ADD_DELTA_COSTS #{} ROI[{}]:{}  S:{}+{}={} GS:{}",
-                            self.rois[roi_index].get_callstack_rc(),
-                            roi_index,
-                            self.rois[roi_index].name,
-                            _steps,
-                            res.unwrap(),
-                            self.rois[roi_index].get_steps(),
-                            self.costs.steps,
-                        );
-                        Self::static_print_call_stack(&self.call_stack, "  > ");
-                        print!("\x1B[0m");
+                // TODO: check tail call re-entry calls
+                // For all tail_call add costs from tail call to now
+                let mut processed = Vec::new();
+                for (roi_index, tail_call) in return_call.tail_calls.iter() {
+                    if processed.contains(roi_index) {
+                        continue;
                     }
-                    let roi_steps = self.rois[roi_index].get_steps();
-                    if roi_steps > self.costs.steps {
-                        self.print_call_stack();
-                        panic!(
-                            "roi.costs.steps({}) > self.costs.steps({}) ref.steps: {} on #{}",
-                            roi_steps,
-                            self.costs.steps,
-                            return_call.costs.steps,
-                            self.call_stack.len()
-                        );
+                    if Some(*roi_index) != self.current_roi {
+                        self.rois[*roi_index].add_delta_costs(tail_call, &self.costs);
                     }
+                    processed.push(*roi_index);
                 }
-                #[cfg(feature = "debug_stats")]
-                println!(
-                    "#{} STEPS {} + {steps_added} = {} STEPS:{}",
-                    self.call_stack.len(),
-                    self.rois[roi_index].get_steps() - steps_added,
-                    self.rois[roi_index].get_steps(),
-                    self.costs.steps
-                );
+
+                // At this point we need to update costs of caller inside called ROI
+                if let Some(called_roi_index) = return_call.called_roi_index {
+                    // update with cost taking as reference the cost when is "called"
+                    self.rois[called_roi_index].update_caller(
+                        roi_index,
+                        &return_call.costs,
+                        &self.costs,
+                    );
+                    self.rois[called_roi_index].add_delta_costs(&return_call.costs, &self.costs);
+                }
+                let _steps = self.rois[roi_index].get_steps();
+                assert!(_steps <= self.costs.steps);
+
+                let roi_steps = self.rois[roi_index].get_steps();
+                if roi_steps > self.costs.steps {
+                    self.print_call_stack();
+                    panic!(
+                        "roi.costs.steps({}) > self.costs.steps({}) ref.steps: {} on #{}",
+                        roi_steps,
+                        self.costs.steps,
+                        return_call.costs.steps,
+                        self.call_stack.len()
+                    );
+                }
             }
+
             if pc >= self.rois[roi_index].from_pc && pc <= self.rois[roi_index].to_pc {
                 if self.is_call {
                     assert!(!self.is_return);
@@ -286,25 +293,19 @@ impl Stats {
                         called_roi_index: self.current_roi,
                         costs: self.costs.clone(),
                         func_name: self.rois[roi_index].name.clone(),
+                        return_reg: self.call_return_reg,
+                        ..Default::default()
                     });
+                    self.call_return_reg = 0;
 
-                    #[cfg(feature = "debug_stats")]
-                    println!(
-                        "#{} CALL 0x{pc:08X} {} {} STEPS:{}",
-                        self.call_stack.len() - 1,
-                        roi_index,
-                        self.rois[roi_index].name,
-                        self.costs.steps
-                    );
-                    self.rois[roi_index].call(self.current_roi, self.call_stack.len());
+                    self.rois[roi_index].call(previous_roi_index, self.call_stack.len());
                 } else if !self.is_return {
                     // JMP: This is a tail call. Replace the top of the call stack if it exists
                     if let Some(top) = self.call_stack.last_mut() {
                         top.pc = pc as u64;
                         top.called_roi_index = Some(roi_index);
-                        // top.costs = self.costs.clone();
                     }
-                    self.rois[roi_index].inc_step();
+                    self.rois[roi_index].calls += 1;
                     self.rois[roi_index].update_call_depth(self.call_stack.len());
                 }
             }
@@ -313,13 +314,13 @@ impl Stats {
 
     fn on_start_mark(&mut self, id: u64) {
         assert!(id < u16::MAX as u64);
-        let mark = self.cost_marks.entry(id as u16).or_insert_with(StatsCostMark::new);
+        let mark = self.profile_marks.entry(id as u16).or_default();
         mark.start = Some(self.costs.clone());
     }
 
     fn on_end_mark(&mut self, id: u64) {
         assert!(id < u16::MAX as u64);
-        let mark = self.cost_marks.get_mut(&(id as u16)).unwrap_or_else(|| {
+        let mark = self.profile_marks.get_mut(&(id as u16)).unwrap_or_else(|| {
             panic!("Cost mark with id {} does not exist. Must call on_start_mark first.", id)
         });
 
@@ -343,12 +344,12 @@ impl Stats {
     }
     fn on_absolute_mark(&mut self, id: u64) {
         assert!(id < u16::MAX as u64);
-        let mark = self.cost_marks.entry(id as u16).or_insert_with(StatsCostMark::new);
+        let mark = self.profile_marks.entry(id as u16).or_default();
         mark.costs.push(self.costs.clone());
     }
     fn on_relative_mark(&mut self, id: u64) {
         assert!(id < u16::MAX as u64);
-        let mark = self.cost_marks.entry(id as u16).or_insert_with(StatsCostMark::new);
+        let mark = self.profile_marks.entry(id as u16).or_default();
 
         if let Some(start) = &mark.start {
             let mut delta_costs = StatsCosts::new();
@@ -362,23 +363,68 @@ impl Stats {
     }
     fn on_reset_relative_mark(&mut self, id: u64) {
         assert!(id < u16::MAX as u64);
-        let mark = self.cost_marks.entry(id as u16).or_insert_with(StatsCostMark::new);
+        let mark = self.profile_marks.entry(id as u16).or_default();
         mark.start = Some(self.costs.clone());
+    }
+    fn on_counter_mark(&mut self, id: u64) {
+        assert!(id < u16::MAX as u64);
+        let mark = self.profile_marks.entry(id as u16).or_default();
+        mark.count += 1;
+    }
+    fn on_value_mark(&mut self, id: u64, value: u64) {
+        assert!(id < u16::MAX as u64);
+        let mark = self.profile_marks.entry(id as u16).or_default();
+        if mark.min_value.unwrap_or(u64::MAX) >= value {
+            mark.min_value = Some(value);
+        }
+        if mark.max_value.unwrap_or(u64::MIN) <= value {
+            mark.max_value = Some(value);
+        }
+        mark.total_value += value as u128;
+        mark.count += 1;
+    }
+    fn on_argument_mark(&mut self, id: u64, index: u8, value: u64) {
+        assert!(id < u16::MAX as u64);
+        let mark = self.profile_marks.entry(id as u16).or_default();
+        if mark.arguments.len() <= index as usize {
+            mark.arguments.resize(index as usize + 1, 0);
+        }
+        mark.arguments[index as usize] = value;
     }
     /// Called every time an operation is executed, if statistics are enabled
     pub fn on_op(&mut self, instruction: &ZiskInst, a: u64, b: u64, pc: u64, regs: &[u64]) {
+        // println!("##PC## 0x{pc:08X}");
         self.costs.steps += 1;
         self.check_roi(pc as u32, regs);
+        #[cfg(feature = "debug_stats_trace")]
+        self.debug_stats_trace(pc);
         // If the operation is a usual operation, then increase the usual counter
 
         if instruction.op == 0 && instruction.a_src == SRC_REG && instruction.b_src == SRC_IMM {
-            match instruction.a_offset_imm0 {
-                1 => self.on_start_mark(instruction.b_offset_imm0),
-                2 => self.on_end_mark(instruction.b_offset_imm0),
-                3 => self.on_absolute_mark(instruction.b_offset_imm0),
-                4 => self.on_relative_mark(instruction.b_offset_imm0),
-                5 => self.on_reset_relative_mark(instruction.b_offset_imm0),
-                _ => (),
+            if instruction.b_offset_imm0 < 256 {
+                match instruction.a_offset_imm0 {
+                    1 => self.on_start_mark(instruction.b_offset_imm0),
+                    2 => self.on_end_mark(instruction.b_offset_imm0),
+                    3 => self.on_absolute_mark(instruction.b_offset_imm0),
+                    4 => self.on_relative_mark(instruction.b_offset_imm0),
+                    5 => self.on_reset_relative_mark(instruction.b_offset_imm0),
+                    6 => self.on_counter_mark(instruction.b_offset_imm0),
+                    _ => (),
+                }
+            } else {
+                let flags = (instruction.b_offset_imm0 >> 8) as u8;
+                match flags {
+                    1..2 => self.on_argument_mark(
+                        instruction.b_offset_imm0 & 0xFF,
+                        flags - 1,
+                        regs[instruction.a_offset_imm0 as usize],
+                    ),
+                    4 => self.on_value_mark(
+                        instruction.b_offset_imm0 & 0xFF,
+                        regs[instruction.a_offset_imm0 as usize],
+                    ),
+                    _ => (),
+                }
             }
         }
 
@@ -396,12 +442,6 @@ impl Stats {
         }
         // Otherwise, increase the counter corresponding to this opcode
         else {
-            if instruction.is_external_op {
-                if let Some(roi_index) = self.current_roi {
-                    let roi = &mut self.rois[roi_index];
-                    roi.add_op(instruction.op);
-                }
-            }
             self.costs.ops[instruction.op as usize] += 1;
         }
         // Increase the PC histogram entry for this PC
@@ -410,7 +450,9 @@ impl Stats {
         self.previous_verbose = instruction.verbose.clone();
         if instruction.set_pc {
             // CALL: set_pc=true, store_ra=true, store_offset=1 (stores PC+4 or PC+2 in ra)
-            self.is_call = instruction.store_ra && instruction.store_offset == 1;
+            // self.is_call = instruction.store_ra && instruction.store_offset == 1;
+            self.is_call = instruction.store_ra;
+            self.call_return_reg = if self.is_call { instruction.store_offset as u8 } else { 0 };
 
             // RETURN: set_pc=true, store_ra=false (no stores RA), b_src=SRC_REG, b_offset_imm0=1 (jumps to ra/x1)
             // Additionally, verify that the target PC matches the expected return address from the call stack
@@ -427,6 +469,10 @@ impl Stats {
                 } else {
                     self.is_return = false;
                 }
+            } else if let Some(top) = self.call_stack.last() {
+                self.is_return = !instruction.store_ra
+                    && instruction.b_src == SRC_REG
+                    && instruction.b_offset_imm0 == top.return_reg as u64;
             } else {
                 self.is_return = false;
             }
@@ -505,13 +551,13 @@ impl Stats {
 
         // If there is an ROI whose name contains main_func_name, remove all entries from the
         // beginning up to and including it.
-        if let Some(pos) = top_rois
-            .iter()
-            .position(|(index, _)| self.rois[*index].name.to_lowercase().contains("main"))
-        {
-            top_rois.drain(0..=pos);
+        if !self.main_name.is_empty() {
+            if let Some(pos) =
+                top_rois.iter().position(|(index, _)| self.rois[*index].name == self.main_name)
+            {
+                top_rois.drain(0..=pos);
+            }
         }
-
         top_rois.truncate(self.top_rois);
         top_rois
     }
@@ -596,9 +642,6 @@ impl Stats {
     }
     /// Returns a string containing a human-readable text showing all counters
     pub fn report(&self, rom: &ZiskRom) -> String {
-        #[cfg(feature = "debug_stats")]
-        println!("CALL_STACK:{}", self.call_stack.len());
-
         if self.legacy_stats {
             return self.legacy_report();
         }
@@ -648,12 +691,11 @@ impl Stats {
             let top_step_rois = self.get_top_rois(true);
             for (index, _) in top_step_rois.iter() {
                 let roi = &self.rois[*index];
-                // report.add_top_step_depth_perc(
-                //     &roi.name,
-                //     roi.get_steps(),
-                //     roi.get_call_stack_depth(),
-                // );
-                report.add_top_step_calls_perc(&roi.name, roi.get_steps(), roi.calls);
+                let steps = roi.get_steps();
+                if steps == 0 {
+                    continue;
+                }
+                report.add_top_step_calls_perc(&roi.name, steps, roi.calls);
             }
 
             report.title_autowidth("TOP COST FUNCTIONS (COST, % COST, CALLS, FUNCTION)");
@@ -661,18 +703,19 @@ impl Stats {
             // Create a vector with ROI indices and their steps for sorting
             let top_cost_rois = self.get_top_rois(false);
 
+            let mut final_top_cost_rois = Vec::new();
             for (index, _) in top_cost_rois.iter() {
                 let roi = &self.rois[*index];
-                // report.add_top_cost_depth_perc(
-                //     &roi.name,
-                //     roi.get_cost(),
-                //     roi.get_call_stack_depth(),
-                // );
-                report.add_top_cost_calls_perc(&roi.name, roi.get_cost(), roi.calls);
+                let cost = roi.get_cost();
+                if cost == 0 {
+                    continue;
+                }
+                final_top_cost_rois.push(*index);
+                report.add_top_cost_calls_perc(&roi.name, cost, roi.calls);
             }
 
             if self.top_rois_detail {
-                for (index, _) in top_cost_rois.iter() {
+                for index in final_top_cost_rois.iter() {
                     let roi = &self.rois[*index];
                     let mut roi_report = StatsReport::new();
                     roi_report.set_total_cost(roi.get_cost());
@@ -700,12 +743,13 @@ impl Stats {
                 }
             }
         }
-        if !self.cost_marks.is_empty() {
-            let mut keys = self.cost_marks.keys().cloned().collect::<Vec<u16>>();
+        if !self.profile_marks.is_empty() {
+            let mut keys = self.profile_marks.keys().cloned().collect::<Vec<u16>>();
             keys.sort_by_key(|k| *k);
             report.ln();
             report.title_step_cost_detail_cost(
-                "MARKS",
+                "MARK_ID",
+                "INDEX",
                 "COUNT",
                 "STEPS",
                 "TOTAL COST",
@@ -714,14 +758,38 @@ impl Stats {
                 "PRECOMPILE COST",
                 "MEMORY COST",
             );
-            report.add_separator_width(134);
+            report.add_separator_width(158);
             for id in keys {
-                let mark = &self.cost_marks[&id];
+                let mark = &self.profile_marks[&id];
+                let tag = if let Some(name) = self.profile_tags.get(&id) {
+                    name.as_str()
+                } else {
+                    &format!("{id}")
+                };
+                if mark.costs.is_empty() && mark.count > 0 {
+                    if mark.min_value.is_none() {
+                        report.add_step_cost_detail_cost(tag, 0, mark.count, 0, 0, 0, 0, 0, 0, "");
+                    } else {
+                        report.add_step_cost_detail_cost(
+                            tag,
+                            0,
+                            mark.count,
+                            mark.min_value.unwrap_or(0),
+                            mark.max_value.unwrap_or(0),
+                            0,
+                            0,
+                            0,
+                            0,
+                            "",
+                        );
+                    }
+                }
                 for (i, costs) in mark.costs.iter().enumerate() {
                     let costs = costs.summary();
                     let main_cost = costs.0 * MAIN_COST;
                     report.add_step_cost_detail_cost(
-                        &format!("{id:>4}.{i}"),
+                        tag,
+                        i,
                         mark.count,
                         costs.0,
                         main_cost + costs.1 + costs.2 + costs.3,
@@ -735,6 +803,9 @@ impl Stats {
             }
         }
         report.output
+    }
+    pub fn add_profile_tag(&mut self, id: u16, name: &str) {
+        self.profile_tags.insert(id, name.to_string());
     }
     pub fn add_roi(&mut self, from_pc: u32, to_pc: u32, name: &str) {
         let roi = RegionsOfInterest::new(self.rois.len(), from_pc, to_pc, name);
@@ -759,6 +830,39 @@ impl Stats {
     }
     pub fn set_main_name(&mut self, value: String) {
         self.main_name = value;
+    }
+    #[cfg(feature = "debug_stats_trace")]
+    pub fn debug_stats_trace(&mut self, pc: u64) {
+        if self.costs.steps == 1 || self.previous_roi != self.current_roi {
+            let func_name = if let Some(roi_index) = self.current_roi {
+                &self.rois[roi_index].name
+            } else {
+                &"".to_string()
+            };
+
+            let stack_depth = self.call_stack.len();
+            let mut down = false;
+            let mut jmp_type = 'J';
+            if stack_depth != self.previous_stack_depth {
+                for index in self.previous_stack_depth..stack_depth {
+                    if index >= self.debug_step_stack.len() {
+                        self.debug_step_stack.push(self.costs.steps);
+                    } else {
+                        self.debug_step_stack[index] = self.costs.steps;
+                    }
+                }
+                down = stack_depth < self.previous_stack_depth;
+                jmp_type = if down { 'R' } else { 'C' };
+            }
+
+            println!(
+                "#T: {:>10} {:>7} {jmp_type} {:>10} 0x{pc:08x} {func_name}",
+                self.costs.steps,
+                self.call_stack.len(),
+                if down { self.costs.steps - self.debug_step_stack[stack_depth - 1] } else { 0 }
+            );
+            self.previous_stack_depth = stack_depth;
+        }
     }
 }
 
