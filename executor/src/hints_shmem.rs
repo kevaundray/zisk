@@ -4,7 +4,7 @@
 //! using SharedMemoryWriter instances.
 
 use anyhow::Result;
-use asm_runner::SharedMemoryWriter;
+use asm_runner::{AsmMTHeader, AsmServices, AsmSharedMemory, SharedMemoryWriter};
 use std::sync::Mutex;
 use tracing::{debug, warn};
 use zisk_hints::HintsSink;
@@ -35,19 +35,51 @@ impl HintsShmem {
     /// # Returns
     /// A new `HintsShmem` instance with uninitialized writers.
     pub fn new(
-        shmem_control_names: Vec<String>,
-        shmem_names: Vec<String>,
+        base_port: Option<u16>,
+        local_rank: i32,
         unlock_mapped_memory: bool,
     ) -> Self {
+        // Generate shared memory names for hints pipeline.
+        let hints_shmem_names = AsmServices::SERVICES
+            .iter()
+            .map(|service| {
+                AsmSharedMemory::<AsmMTHeader>::shmem_precompile_name(
+                    if let Some(base_port) = base_port {
+                        AsmServices::port_for(service, base_port, local_rank)
+                    } else {
+                        AsmServices::default_port(service, local_rank)
+                    },
+                    *service,
+                    local_rank,
+                )
+            })
+            .collect::<Vec<_>>();
+
+        // Generate shared memory control names for hints pipeline.
+        let hints_shmem_control_names = AsmServices::SERVICES
+            .iter()
+            .map(|service| {
+                AsmSharedMemory::<AsmMTHeader>::shmem_control_name(
+                    if let Some(base_port) = base_port {
+                        AsmServices::port_for(service, base_port, local_rank)
+                    } else {
+                        AsmServices::default_port(service, local_rank)
+                    },
+                    *service,
+                    local_rank,
+                )
+            })
+            .collect::<Vec<_>>();
+
         assert_eq!(
-            shmem_control_names.len(),
-            shmem_names.len(),
+            hints_shmem_control_names.len(),
+            hints_shmem_names.len(),
             "Shared memory names and control names must have the same length"
         );
 
         // Map names to tuples
         let shmem_names: Vec<(String, String)> =
-            shmem_control_names.into_iter().zip(shmem_names.into_iter()).collect();
+            hints_shmem_control_names.into_iter().zip(hints_shmem_names.into_iter()).collect();
 
         Self { shmem_names, unlock_mapped_memory, shmem_writers: Mutex::new(Vec::new()) }
     }

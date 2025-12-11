@@ -197,41 +197,8 @@ impl<F: PrimeField64> ZiskExecutor<F> {
             (None, None)
         };
 
-        // Generate shared memory names for hints pipeline.
-        let hints_shmem_names = AsmServices::SERVICES
-            .iter()
-            .map(|service| {
-                AsmSharedMemory::<AsmMTHeader>::shmem_precompile_name(
-                    if let Some(base_port) = base_port {
-                        AsmServices::port_for(service, base_port, local_rank)
-                    } else {
-                        AsmServices::default_port(service, local_rank)
-                    },
-                    *service,
-                    local_rank,
-                )
-            })
-            .collect::<Vec<_>>();
-
-        // Generate shared memory control names for hints pipeline.
-        let hints_shmem_control_names = AsmServices::SERVICES
-            .iter()
-            .map(|service| {
-                AsmSharedMemory::<AsmMTHeader>::shmem_control_name(
-                    if let Some(base_port) = base_port {
-                        AsmServices::port_for(service, base_port, local_rank)
-                    } else {
-                        AsmServices::default_port(service, local_rank)
-                    },
-                    *service,
-                    local_rank,
-                )
-            })
-            .collect::<Vec<_>>();
-
         // Create hints pipeline with null hints stream initially.
-        let hints_shmem =
-            HintsShmem::new(hints_shmem_control_names, hints_shmem_names, unlock_mapped_memory);
+        let hints_shmem = HintsShmem::new(base_port, local_rank, unlock_mapped_memory);
 
         let hints_processor = PrecompileHintsProcessor::new(hints_shmem)
             .expect("Failed to create PrecompileHintsProcessor");
