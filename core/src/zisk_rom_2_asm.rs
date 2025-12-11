@@ -8026,7 +8026,7 @@ impl ZiskRom2Asm {
             Self::wait_for_prec_avail(ctx, code, unusual_code);
         }
 
-        // Load precompile address into aux
+        // Load precompile address into REG_AUX
         *code += &format!(
             "\tmov {}, {} {}\n",
             REG_AUX,
@@ -8037,21 +8037,45 @@ impl ZiskRom2Asm {
         // Load the destination fcall address into REG_ADDRESS
         *code += &format!("\tmov {REG_ADDRESS}, {reg_address}\n");
 
+        // Calculate the address of the first precompile u64 value = address + read % buffer_size
+        *code += &format!(
+            "\tmov {}, {} {}\n",
+            REG_ADDRESS,
+            ctx.mem_precompile_read_address,
+            ctx.comment_str("address = precompile_read")
+        );
+        *code += &format!(
+            "\tand {}, 0x{:x} {}\n",
+            REG_ADDRESS,
+            PRECOMPILE_BUFFER_SIZE_U64_MASK,
+            ctx.comment_str("address %= buffer size")
+        );
+        *code += &format!(
+            "\tadd {}, {} {}\n",
+            REG_ADDRESS,
+            REG_AUX,
+            ctx.comment_str("address += precompile_results_address")
+        );
+
         // Copy the result size (first u64 value) and store it in register B
         *code += &format!(
             "\tmov {}, [{}] {}\n",
             REG_B,
-            REG_AUX,
+            REG_ADDRESS,
             ctx.comment(format!("b = precompile_results[0]"))
         );
         *code += &format!(
             "\tmov [{} + {}*8], {} {}\n",
-            REG_ADDRESS,
+            reg_address,
             FCALL_RESULT_SIZE,
             REG_B,
             ctx.comment(format!("fcall[result_size] = b"))
         );
-        *code += &format!("\tadd {}, 1*8 {}\n", REG_AUX, ctx.comment_str("aux += 1*8"));
+        *code += &format!(
+            "\tinc {} {}\n",
+            ctx.mem_precompile_read_address,
+            ctx.comment_str("precompile_read++")
+        );
 
         // Copy data consuming REG_B u64's starting at REG_A=0, increasing REG_A until REG_A == REG_B
 
@@ -8065,17 +8089,37 @@ impl ZiskRom2Asm {
         *code += &format!("\tcmp {}, {} {}\n", REG_A, REG_B, ctx.comment_str("a =? b"));
         *code += &format!("\tje pc_{:x}_fcall_copy_params_loop_end\n", ctx.pc);
 
+        // Calculate the address of the next precompile u64 value = address + read % buffer_size
+        *code += &format!(
+            "\tmov {}, {} {}\n",
+            REG_ADDRESS,
+            ctx.mem_precompile_read_address,
+            ctx.comment_str("address = precompile_read")
+        );
+        *code += &format!("\tadd {}, {} {}\n", REG_ADDRESS, REG_A, ctx.comment_str("address += a"));
+        *code += &format!(
+            "\tand {}, 0x{:x} {}\n",
+            REG_ADDRESS,
+            PRECOMPILE_BUFFER_SIZE_U64_MASK,
+            ctx.comment_str("address %= buffer size")
+        );
+        *code += &format!(
+            "\tadd {}, {} {}\n",
+            REG_ADDRESS,
+            REG_AUX,
+            ctx.comment_str("address += precompile_results_address")
+        );
+
         // Copy value from precompile_results to fcall[result_data + REG_A]
         *code += &format!(
-            "\tmov {}, [{} + {}*8] {}\n",
+            "\tmov {}, [{}] {}\n",
             REG_VALUE,
-            REG_AUX,
-            REG_A,
+            REG_ADDRESS,
             ctx.comment(format!("value = precompile_results[]"))
         );
         *code += &format!(
             "\tmov [{} + {}*8 + {}*8], {} {}\n",
-            REG_ADDRESS,
+            reg_address,
             REG_A,
             FCALL_RESULT,
             REG_VALUE,
@@ -8083,7 +8127,7 @@ impl ZiskRom2Asm {
         );
 
         // Increment REG_A
-        *code += &format!("\tinc {} {}\n", REG_A, ctx.comment_str("a += 1"));
+        *code += &format!("\tinc {} {}\n", REG_A, ctx.comment_str("a++"));
 
         // Jump to loop start
         *code += &format!("\tjmp pc_{:x}_fcall_copy_params_loop_start\n", ctx.pc);
@@ -8091,21 +8135,19 @@ impl ZiskRom2Asm {
         // Loop end
         *code += &format!("pc_{:x}_fcall_copy_params_loop_end:\n", ctx.pc);
 
-        // Update precompile_results_address += (1 + result_size)*8
-        *code += &format!("\tshl {}, 3 {}\n", REG_A, ctx.comment_str("a *= 8"));
-        *code += &format!("\tadd {}, {} {}\n", REG_AUX, REG_A, ctx.comment_str("aux += size*8"));
+        // Update precompile_read += result_size
         *code += &format!(
-            "\tmov {}, {} {}\n",
-            ctx.mem_precompile_results_address,
-            REG_AUX,
-            ctx.comment_str("precompile_results_address = aux")
+            "\tadd {}, {} {}\n",
+            ctx.mem_precompile_read_address,
+            REG_A,
+            ctx.comment_str("precompile_read += fcall_result_size")
         );
     }
 
     fn wait_for_prec_avail(ctx: &mut ZiskAsmContext, code: &mut String, unusual_code: &mut String) {
         *code += &ctx.full_line_comment("Wait for precompile results available".to_string());
 
-        // if *precompile_written_address == *precompile_read_address -> call wait_for_prec_avail
+        // if precompile_written == precompile_read then call wait_for_prec_avail
         *code += &format!(
             "\tmov {}, {} {}\n",
             REG_AUX,
