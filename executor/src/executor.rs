@@ -20,7 +20,7 @@
 //! maintaining clarity and modularity in the computation process.
 
 use asm_runner::{
-    write_input, AsmMTHeader, AsmRunnerMO, AsmRunnerMT, AsmRunnerRH, AsmServices, AsmSharedMemory,
+    write_input, AsmRunnerMO, AsmRunnerMT, AsmRunnerRH, AsmServices, AsmSharedMemory,
     MinimalTraces, PreloadedMO, PreloadedMT, PreloadedRH, SharedMemoryWriter, Task, TaskFactory,
 };
 use fields::PrimeField64;
@@ -322,7 +322,7 @@ impl<F: PrimeField64> ZiskExecutor<F> {
 
             // Write inputs to shared memory
             let shmem_input_name =
-                AsmSharedMemory::<AsmMTHeader>::shmem_input_name(port, *service, self.local_rank);
+                AsmSharedMemory::shmem_input_name(port, *service, self.local_rank);
 
             let mut input_writer = self.shmem_input_writer[idx].lock().unwrap();
             if input_writer.is_none() {

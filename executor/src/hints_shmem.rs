@@ -4,9 +4,7 @@
 //! using SharedMemoryWriter instances.
 
 use anyhow::Result;
-use asm_runner::{
-    AsmMTHeader, AsmService, AsmServices, AsmSharedMemory, SharedMemoryReader, SharedMemoryWriter,
-};
+use asm_runner::{AsmService, AsmServices, AsmSharedMemory, SharedMemoryReader, SharedMemoryWriter};
 use named_sem::NamedSemaphore;
 use std::sync::Mutex;
 use tracing::debug;
@@ -24,21 +22,11 @@ struct ServiceResourceNames {
 impl ServiceResourceNames {
     fn new(service: &AsmService, port: u16, local_rank: i32) -> Self {
         Self {
-            control_writer: AsmSharedMemory::<AsmMTHeader>::shmem_control_writer_name(
-                port, *service, local_rank,
-            ),
-            control_reader: AsmSharedMemory::<AsmMTHeader>::shmem_control_reader_name(
-                port, *service, local_rank,
-            ),
-            data_name: AsmSharedMemory::<AsmMTHeader>::shmem_precompile_name(
-                port, *service, local_rank,
-            ),
-            sem_available_name: AsmSharedMemory::<AsmMTHeader>::semaphore_available_name(
-                port, *service, local_rank,
-            ),
-            sem_read_name: AsmSharedMemory::<AsmMTHeader>::semaphore_read_name(
-                port, *service, local_rank,
-            ),
+            control_writer: AsmSharedMemory::shmem_control_writer_name(port, *service, local_rank),
+            control_reader: AsmSharedMemory::shmem_control_reader_name(port, *service, local_rank),
+            data_name: AsmSharedMemory::shmem_precompile_name(port, *service, local_rank),
+            sem_available_name: AsmSharedMemory::sem_available_name(port, *service, local_rank),
+            sem_read_name: AsmSharedMemory::sem_read_name(port, *service, local_rank),
         }
     }
 }
