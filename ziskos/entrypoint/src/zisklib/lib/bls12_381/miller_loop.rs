@@ -196,7 +196,10 @@ fn line_eval_twist_bls12_381(
     let coeff1 = mul_fp2_bls12_381(mu, &neg_fp2_bls12_381(y));
     let coeff2 = mul_fp2_bls12_381(lambda, x);
 
-    [coeff1, coeff2].concat().try_into().unwrap()
+    let mut result = [0u64; 24];
+    result[0..12].copy_from_slice(&coeff1);
+    result[12..24].copy_from_slice(&coeff2);
+    result
 }
 
 /// Addition of two non-zero points `q1,q2` in G2 with hinted line coefficients (𝜆,𝜇)
@@ -221,7 +224,10 @@ fn add_twist_with_hints_bls12_381(
     y3 = add_fp2_bls12_381(mu, &y3);
     y3 = neg_fp2_bls12_381(&y3);
 
-    [x3, y3].concat().try_into().unwrap()
+    let mut result = [0u64; 24];
+    result[0..12].copy_from_slice(&x3);
+    result[12..24].copy_from_slice(&y3);
+    result
 }
 
 /// Doubling of a non-zero point `q` in G2 with hinted line coefficients (𝜆,𝜇)
@@ -238,5 +244,8 @@ fn dbl_twist_with_hints_bls12_381(q: &[u64; 24], lambda: &[u64; 12], mu: &[u64; 
     y3 = add_fp2_bls12_381(mu, &y3);
     y3 = neg_fp2_bls12_381(&y3);
 
-    [x3, y3].concat().try_into().unwrap()
+    let mut result = [0u64; 24];
+    result[0..12].copy_from_slice(&x3);
+    result[12..24].copy_from_slice(&y3);
+    result
 }

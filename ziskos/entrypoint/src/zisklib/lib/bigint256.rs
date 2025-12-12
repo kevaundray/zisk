@@ -20,6 +20,9 @@ pub fn wmul256(a: &[u64; 4], b: &[u64; 4]) -> [u64; 4] {
 }
 
 pub fn divrem256(a: &[u64; 4], b: &[u64; 4]) -> ([u64; 4], [u64; 4]) {
+    // Check for division by zero
+    assert!(!eq(b, &[0u64; 4]), "Division by zero");
+
     // Hint the result of the division
     let (quotient, remainder) = fcall_bigint256_div(a, b);
 
@@ -78,9 +81,10 @@ pub fn exp_power_of_two_self(x: &mut [u64; 4], module: &[u64; 4], power_log: usi
 }
 
 pub fn wpow256(a: &[u64; 4], exp: &[u64; 4]) -> [u64; 4] {
-    // If a = 0, return 0^0 = 0
+    // 0^0 = 1 by convention
+    // 0^n = 0 for n > 0
     if eq(a, &[0u64; 4]) {
-        return [0u64; 4];
+        return if eq(exp, &[0u64; 4]) { [1, 0, 0, 0] } else { [0u64; 4] };
     }
 
     // Direct cases: exp = 0,1,2
@@ -295,13 +299,19 @@ pub unsafe extern "C" fn omul256_c(a: *const u64, b: *const u64, result: *mut u6
 ///
 /// # Safety
 /// - `a` must point to a valid `[u64; 4]` (32 bytes).
-/// - `b` must point to a valid `[u64; 4]` (32 bytes).
+/// - `b` must point to a valid `[u64; 4]` (32 bytes), and must be non-zero.
 /// - `q` must point to a valid `[u64; 4]` (32 bytes), used as quotient output.
 /// - `r` must point to a valid `[u64; 4]` (32 bytes), used as remainder output.
+///
+/// # Panics
+/// Panics if `b` is zero.
 #[no_mangle]
 pub unsafe extern "C" fn divrem256_c(a: *const u64, b: *const u64, q: *mut u64, r: *mut u64) {
     let a_ref = &*(a as *const [u64; 4]);
     let b_ref = &*(b as *const [u64; 4]);
+
+    // Check for division by zero
+    assert!(!eq(b_ref, &[0u64; 4]), "Division by zero");
 
     // Hint the result of the division
     let (quotient, remainder) = fcall_bigint256_div(a_ref, b_ref);
@@ -312,8 +322,8 @@ pub unsafe extern "C" fn divrem256_c(a: *const u64, b: *const u64, q: *mut u64, 
     let mut params =
         SyscallArith256Params { a: b_ref, b: &quotient, c: &remainder, dl: &mut dl, dh: &mut dh };
     syscall_arith256(&mut params);
-    assert!(eq(&dl, a_ref));
-    assert!(lt(&remainder, b_ref));
+    assert!(eq(&dl, a_ref), "Dividend does not equal divisor * quotient + remainder");
+    assert!(lt(&remainder, b_ref), "Remainder is not less than divisor");
 
     core::ptr::copy_nonoverlapping(quotient.as_ptr(), q, 4);
     core::ptr::copy_nonoverlapping(remainder.as_ptr(), r, 4);

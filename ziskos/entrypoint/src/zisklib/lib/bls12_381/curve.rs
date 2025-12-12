@@ -69,7 +69,11 @@ pub fn add_bls12_381(p1: &[u64; 12], p2: &[u64; 12]) -> [u64; 12] {
     let p2 = SyscallPoint384 { x: x2, y: y2 };
     let mut params = SyscallBls12_381CurveAddParams { p1: &mut p1, p2: &p2 };
     syscall_bls12_381_curve_add(&mut params);
-    [p1.x, p1.y].concat().try_into().unwrap()
+
+    let mut result = [0u64; 12];
+    result[0..6].copy_from_slice(&p1.x);
+    result[6..12].copy_from_slice(&p1.y);
+    result
 }
 
 /// Negation of a non-zero point `p` on the BLS12-381 curve
@@ -78,14 +82,22 @@ pub fn neg_bls12_381(p: &[u64; 12]) -> [u64; 12] {
     let y: [u64; 6] = p[6..12].try_into().unwrap();
 
     let y_neg = neg_fp_bls12_381(&y);
-    [x, y_neg].concat().try_into().unwrap()
+
+    let mut result = [0u64; 12];
+    result[0..6].copy_from_slice(&x);
+    result[6..12].copy_from_slice(&y_neg);
+    result
 }
 
 /// Doubling of a non-zero point `p` on the BLS12-381 curve
 pub fn dbl_bls12_381(p: &[u64; 12]) -> [u64; 12] {
     let mut p = SyscallPoint384 { x: p[0..6].try_into().unwrap(), y: p[6..12].try_into().unwrap() };
     syscall_bls12_381_curve_dbl(&mut p);
-    [p.x, p.y].concat().try_into().unwrap()
+
+    let mut result = [0u64; 12];
+    result[0..6].copy_from_slice(&p.x);
+    result[6..12].copy_from_slice(&p.y);
+    result
 }
 
 /// Subtraction of two non-zero points `p1` and `p2` on the BLS12-381 curve
@@ -96,7 +108,11 @@ pub fn sub_bls12_381(p1: &[u64; 12], p2: &[u64; 12]) -> [u64; 12] {
     // P1 - P2 = P1 + (-P2)
     let y2_neg = neg_fp_bls12_381(&y2);
 
-    add_bls12_381(p1, &[x2, y2_neg].concat().try_into().unwrap())
+    let mut p2_neg = [0u64; 12];
+    p2_neg[0..6].copy_from_slice(&x2);
+    p2_neg[6..12].copy_from_slice(&y2_neg);
+
+    add_bls12_381(p1, &p2_neg)
 }
 
 /// Multiplies a non-zero point `p` on the BLS12-381 curve by a scalar `k` on the BLS12-381 scalar field
@@ -174,7 +190,10 @@ pub fn scalar_mul_bls12_381(p: &[u64; 12], k: &[u64; 6]) -> [u64; 12] {
     assert_eq!(k_rec, *k);
 
     // Convert the result back to a single array
-    [q.x, q.y].concat().try_into().unwrap()
+    let mut result = [0u64; 12];
+    result[0..6].copy_from_slice(&q.x);
+    result[6..12].copy_from_slice(&q.y);
+    result
 }
 
 /// Scalar multiplication of a non-zero point `p` by a binary scalar `k`
@@ -191,7 +210,11 @@ pub fn scalar_mul_bin_bls12_381(p: &[u64; 12], k: &[u8]) -> [u64; 12] {
             syscall_bls12_381_curve_add(&mut params);
         }
     }
-    [r.x, r.y].concat().try_into().unwrap()
+
+    let mut result = [0u64; 12];
+    result[0..6].copy_from_slice(&r.x);
+    result[6..12].copy_from_slice(&r.y);
+    result
 }
 
 /// Scalar multiplication of a non-zero point by (x²-1)/3
@@ -213,10 +236,14 @@ pub fn scalar_mul_by_x2div3_bls12_381(p: &[u64; 12]) -> [u64; 12] {
 ///                  (x,y) |-> (ɣ·x,y)
 pub fn sigma_endomorphism_bls12_381(p: &[u64; 12]) -> [u64; 12] {
     let mut x: [u64; 6] = p[0..6].try_into().unwrap();
+    let y: [u64; 6] = p[6..12].try_into().unwrap();
 
     x = mul_fp_bls12_381(&x, &GAMMA);
 
-    [x, p[6..12].try_into().unwrap()].concat().try_into().unwrap()
+    let mut result = [0u64; 12];
+    result[0..6].copy_from_slice(&x);
+    result[6..12].copy_from_slice(&y);
+    result
 }
 
 // ========== Pointer-based API ==========

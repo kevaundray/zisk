@@ -78,7 +78,10 @@ pub fn add_twist_bls12_381(p1: &[u64; 24], p2: &[u64; 24]) -> [u64; 24] {
     y3 = mul_fp2_bls12_381(&lambda, &y3);
     y3 = sub_fp2_bls12_381(&y3, &y1);
 
-    [x3, y3].concat().try_into().unwrap()
+    let mut result = [0u64; 24];
+    result[0..12].copy_from_slice(&x3);
+    result[12..24].copy_from_slice(&y3);
+    result
 }
 
 /// Doubling of a non-zero point
@@ -101,7 +104,10 @@ pub fn dbl_twist_bls12_381(p: &[u64; 24]) -> [u64; 24] {
     y3 = mul_fp2_bls12_381(&lambda, &y3);
     y3 = sub_fp2_bls12_381(&y3, &y);
 
-    [x3, y3].concat().try_into().unwrap()
+    let mut result = [0u64; 24];
+    result[0..12].copy_from_slice(&x3);
+    result[12..24].copy_from_slice(&y3);
+    result
 }
 
 /// Negation of a point
@@ -111,7 +117,11 @@ pub fn neg_twist_bls12_381(p: &[u64; 24]) -> [u64; 24] {
 
     // Compute the negation
     let y_neg = neg_fp2_bls12_381(&y);
-    [x, y_neg].concat().try_into().unwrap()
+
+    let mut result = [0u64; 24];
+    result[0..12].copy_from_slice(&x);
+    result[12..24].copy_from_slice(&y_neg);
+    result
 }
 
 /// Multiplies a non-zero point `p` on the BLS12-381 curve by a scalar `k` on the BLS12-381 scalar field
@@ -230,5 +240,8 @@ pub fn utf_endomorphism_twist_bls12_381(p: &[u64; 24]) -> [u64; 24] {
     x = mul_fp2_bls12_381(&x, &EXT_U);
     y = mul_fp2_bls12_381(&y, &EXT_U);
 
-    [x, y].concat().try_into().unwrap()
+    let mut result = [0u64; 24];
+    result[0..12].copy_from_slice(&x);
+    result[12..24].copy_from_slice(&y);
+    result
 }
