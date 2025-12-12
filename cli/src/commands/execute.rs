@@ -42,7 +42,7 @@ pub struct ZiskExecute {
 
     /// Input path
     #[clap(short = 'i', long)]
-    pub input: Option<PathBuf>,
+    pub input: Option<String>,
 
     /// Precompiles Hints path
     #[clap(short = 'h', long)]
@@ -83,14 +83,15 @@ impl ZiskExecute {
         print_banner();
 
         if self.input.is_some() {
-            print_banner_field("Input", &self.input.as_ref().unwrap().to_string_lossy());
+            print_banner_field("Input", &self.input.as_ref().unwrap());
         }
 
         if self.precompile_hints_path.is_some() {
             print_banner_field("Prec. Hints", &self.precompile_hints_path.as_ref().unwrap());
         }
 
-        let stdin = self.create_stdin()?;
+        let stdin = ZiskStdin::from_str(self.input.as_ref().as_deref())?;
+
         let hints_stream = StreamSource::from_str(self.precompile_hints_path.as_deref())?;
 
         let emulator = if cfg!(target_os = "macos") { true } else { self.emulator };
@@ -103,18 +104,6 @@ impl ZiskExecute {
         );
 
         Ok(())
-    }
-
-    fn create_stdin(&mut self) -> Result<ZiskStdin> {
-        let stdin = if let Some(input) = &self.input {
-            if !input.exists() {
-                return Err(anyhow::anyhow!("Input file not found at {:?}", input.display()));
-            }
-            ZiskStdin::from_file(input)?
-        } else {
-            ZiskStdin::null()
-        };
-        Ok(stdin)
     }
 
     pub fn run_emu(&mut self, stdin: ZiskStdin) -> Result<ZiskExecuteResult> {
