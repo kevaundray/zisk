@@ -1,7 +1,7 @@
 use anyhow::Result;
 use clap::Parser;
 use std::path::PathBuf;
-use tracing::info;
+use tracing::{info, warn};
 use zisk_build::ZISK_VERSION_MESSAGE;
 use zisk_sdk::{ProverClient, ZiskExecuteResult};
 
@@ -82,24 +82,32 @@ impl ZiskExecute {
 
         print_banner();
 
-        if self.input.is_some() {
-            print_banner_field("Input", &self.input.as_ref().unwrap());
+        if let Some(input) = &self.input {
+            print_banner_field("Input", input);
         }
 
-        if self.precompile_hints_path.is_some() {
-            print_banner_field("Prec. Hints", &self.precompile_hints_path.as_ref().unwrap());
+        if let Some(hints) = &self.precompile_hints_path {
+            print_banner_field("Prec. Hints", hints);
         }
 
         let stdin = ZiskStdin::from_str(self.input.as_ref().as_deref())?;
 
         let hints_stream = StreamSource::from_str(self.precompile_hints_path.as_deref())?;
 
-        let emulator = if cfg!(target_os = "macos") { true } else { self.emulator };
+        let emulator = if cfg!(target_os = "macos") {
+            if !self.emulator {
+                warn!("Emulator mode is forced on macOS due to lack of ASM support.");
+            }
+            true
+        } else {
+            self.emulator
+        };
+
         let result =
             if emulator { self.run_emu(stdin)? } else { self.run_asm(stdin, Some(hints_stream))? };
 
         info!(
-            "Execution completed in {:.2?}, executed steps: {}",
+            "Execution completed in {:.2?}, steps: {}",
             result.duration, result.execution.executed_steps
         );
 
