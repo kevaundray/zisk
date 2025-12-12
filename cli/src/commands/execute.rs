@@ -129,7 +129,7 @@ impl ZiskExecute {
     pub fn run_asm(
         &mut self,
         stdin: ZiskStdin,
-        stream: Option<StreamSource>,
+        hints_stream: Option<StreamSource>,
     ) -> Result<ZiskExecuteResult> {
         let prover = ProverClient::builder()
             .asm()
@@ -145,6 +145,6 @@ impl ZiskExecute {
             .print_command_info()
             .build()?;
 
-        prover.execute(stdin, stream)
+        prover.execute(stdin, hints_stream)
     }
 }
