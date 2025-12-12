@@ -105,13 +105,14 @@ impl ProverEngine for EmuProver {
     fn stats(
         &self,
         stdin: ZiskStdin,
+        hints_stream: Option<StreamSource>,
         debug_info: Option<Option<String>>,
         mpi_node: Option<u32>,
     ) -> Result<(i32, i32, Option<ExecutorStats>)> {
         let debug_info =
             create_debug_info(debug_info, self.core_prover.backend.proving_key.clone())?;
 
-        self.core_prover.backend.stats(stdin, debug_info, mpi_node)
+        self.core_prover.backend.stats(stdin, hints_stream, debug_info, mpi_node)
     }
 
     fn verify_constraints_debug(

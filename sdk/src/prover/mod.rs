@@ -61,6 +61,7 @@ pub trait ProverEngine {
     fn stats(
         &self,
         stdin: ZiskStdin,
+        hints_stream: Option<StreamSource>,
         debug_info: Option<Option<String>>,
         mpi_node: Option<u32>,
     ) -> Result<(i32, i32, Option<ExecutorStats>)>;
@@ -148,10 +149,11 @@ impl<C: ZiskBackend> ZiskProver<C> {
     pub fn stats(
         &self,
         stdin: ZiskStdin,
+        hints_stream: Option<StreamSource>,
         debug_info: Option<Option<String>>,
         mpi_node: Option<u32>,
     ) -> Result<(i32, i32, Option<ExecutorStats>)> {
-        self.prover.stats(stdin, debug_info, mpi_node)
+        self.prover.stats(stdin, hints_stream, debug_info, mpi_node)
     }
 
     /// Verify the constraints with the given standard input and debug information.

@@ -62,10 +62,16 @@ impl ProverBackend {
     pub(crate) fn stats(
         &self,
         stdin: ZiskStdin,
+        hints_stream: Option<StreamSource>,
         debug_info: DebugInfo,
         _mpi_node: Option<u32>,
     ) -> Result<(i32, i32, Option<ExecutorStats>)> {
         self.witness_lib.set_stdin(stdin);
+        if let Some(stream) = hints_stream {
+            self.witness_lib
+                .set_hints_stream(stream)
+                .map_err(|e| anyhow::anyhow!("Error setting hints stream: {}", e))?;
+        }
 
         let world_rank = self.proofman.get_world_rank();
         let local_rank = self.proofman.get_local_rank();
