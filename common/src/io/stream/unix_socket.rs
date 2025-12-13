@@ -721,9 +721,4 @@ mod tests {
         reader.close().unwrap();
         writer_thread.join().unwrap();
     }
-
-    // Note: Empty messages cannot be reliably distinguished from connection close
-    // with SOCK_SEQPACKET, so this test is commented out
-    // #[test]
-    // fn test_empty_message() { ... }
 }
