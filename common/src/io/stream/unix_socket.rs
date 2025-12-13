@@ -661,6 +661,67 @@ mod tests {
         writer_thread.join().unwrap();
     }
 
+    #[test]
+    fn test_stress_many_messages() {
+        let socket_path = "/tmp/test_unix_socket_stress.sock";
+        let _ = std::fs::remove_file(socket_path);
+
+        let socket_path_clone = socket_path.to_string();
+
+        const NUM_MESSAGES: usize = 1000;
+
+        // Spawn writer (server) thread
+        let writer_thread = thread::spawn(move || {
+            let mut writer = UnixSocketStreamWriter::new(&socket_path_clone).unwrap();
+
+            // Wait for client to connect with first message
+            loop {
+                if let Err(e) = writer.write(b"START") {
+                    if let Some(UnixSocketError::NoClientConnected) =
+                        e.downcast_ref::<UnixSocketError>()
+                    {
+                        thread::sleep(Duration::from_millis(10));
+                        continue;
+                    }
+                    panic!("Unexpected error: {}", e);
+                }
+                break;
+            }
+
+            // Send many messages rapidly
+            for i in 0..NUM_MESSAGES {
+                let msg = format!("Message {}", i);
+                writer.write(msg.as_bytes()).unwrap();
+            }
+
+            writer.write(b"END").unwrap();
+            writer.close().unwrap();
+        });
+
+        thread::sleep(Duration::from_millis(100));
+
+        // Reader receives all messages
+        let mut reader = UnixSocketStreamReader::new(socket_path).unwrap();
+
+        // Read START marker
+        let start = reader.next().unwrap().unwrap();
+        assert_eq!(start, b"START");
+
+        // Read all messages and verify order
+        for i in 0..NUM_MESSAGES {
+            let expected = format!("Message {}", i);
+            let msg = reader.next().unwrap().unwrap();
+            assert_eq!(msg, expected.as_bytes(), "Message {} mismatch", i);
+        }
+
+        // Read END marker
+        let end = reader.next().unwrap().unwrap();
+        assert_eq!(end, b"END");
+
+        reader.close().unwrap();
+        writer_thread.join().unwrap();
+    }
+
     // Note: Empty messages cannot be reliably distinguished from connection close
     // with SOCK_SEQPACKET, so this test is commented out
     // #[test]
