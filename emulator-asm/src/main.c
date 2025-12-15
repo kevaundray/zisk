@@ -22,6 +22,7 @@
 #include <arpa/inet.h>
 #include <netinet/tcp.h>
 #include <sys/file.h>
+//#include <bits/local_lim.h>
 
 // Assembly-provided functions
 void emulator_start(void);
@@ -340,6 +341,8 @@ int shmem_control_fd = -1;
 uint64_t * shmem_control_address = NULL;
 volatile uint64_t * precompile_written_address = NULL;
 volatile uint64_t * precompile_read_address = NULL;
+// uint64_t * precompile_written_address = NULL;
+// uint64_t * precompile_read_address = NULL;
 
 int main(int argc, char *argv[])
 {
@@ -1751,8 +1754,8 @@ void client_setup (void)
             fflush(stderr);
             exit(-1);
         }
+        shmem_precompile_address = pPrecompile;
         precompile_results_address = (uint64_t *)pPrecompile;
-        shmem_precompile_address = precompile_results_address;
 
         if (verbose) printf("mmap(precompile) mapped %lu B and returned address %p in %lu us\n", MAX_PRECOMPILE_SIZE, precompile_results_address, duration);
 
@@ -1865,12 +1868,28 @@ void client_write_precompile_results (void)
         exit(-1);
     }
 
+    // Copy input data into input memory
+    size_t precompile_read = fread(precompile_results_address, 1, precompile_data_size, precompile_fp);
+    if (precompile_read != precompile_data_size)
+    {
+        printf("ERROR: Precompile read (%lu) != expected read size (%lu)\n", precompile_read, precompile_data_size);
+        fflush(stdout);
+        fflush(stderr);
+        exit(-1);
+    }
+    //printf("SEM_VALUE_MAX = %u\n", SEM_VALUE_MAX);
+
+    //*precompile_written_address = precompile_read >> 3; // in u64s
+    sleep(1);
+    //sem_post(sem_prec_avail);
+
     // Copy in chunks of 25*8 bytes (Keccak-f state size)
     uint64_t precompile_read_so_far = 0;
     uint64_t data[25];
     while (precompile_read_so_far < (uint64_t)precompile_data_size)
     {        
         // Wait for server to read precompile results
+        printf("Waiting for sem_prec_read()\n");
         result = sem_wait(sem_prec_read);
         if (result == -1)
         {
@@ -1881,28 +1900,33 @@ void client_write_precompile_results (void)
         }
 
         // Number of bytes to read from file and write to shared memory in every loop
-        uint64_t bytes_to_read = sizeof(data);
+        // uint64_t bytes_to_read = sizeof(data);
 
-        // Copy input data into input memory
-        size_t precompile_read = fread(data, 1, bytes_to_read, precompile_fp);
-        if (precompile_read != bytes_to_read)
-        {
-            printf("ERROR: Input read (%lu) != expected read size (%lu)\n", precompile_read, bytes_to_read);
-            fflush(stdout);
-            fflush(stderr);
-            exit(-1);
-        }
+        // // Copy input data into input memory
+        // size_t precompile_read = fread(data, 1, bytes_to_read, precompile_fp);
+        // if (precompile_read != bytes_to_read)
+        // {
+        //     printf("ERROR: Input read (%lu) != expected read size (%lu)\n", precompile_read, bytes_to_read);
+        //     fflush(stdout);
+        //     fflush(stderr);
+        //     exit(-1);
+        // }
 
-        // Copy data to shared memory
-        for (int i=0; i<25; i++)
-        {
-            memcpy(&precompile_results_address[(precompile_read_so_far >> 3) % (MAX_PRECOMPILE_SIZE >> 3)], &data[i], 8);
-            precompile_read_so_far += 8;
-        }
+        // // Copy data to shared memory
+        // for (int i=0; i<25; i++)
+        // {
+        //     memcpy(&precompile_results_address[(precompile_read_so_far >> 3) % (MAX_PRECOMPILE_SIZE >> 3)], &data[i], 8);
+        //     precompile_read_so_far += 8;
+        // }
+
+        precompile_read_so_far += 25*8;
+
         // Notify server that precompile results are available
         *precompile_written_address = precompile_read_so_far >> 3; // in u64s
-        __sync_synchronize(); // memory barrier
+        //__sync_synchronize(); // memory barrier
         //usleep(100000);
+
+        printf("Posting sem_prec_avail() precompile_written=%lu precompile_read=%lu\n", *precompile_written_address, *precompile_read_address);
         sem_post(sem_prec_avail);
     }
 
@@ -1918,6 +1942,7 @@ void client_write_precompile_results (void)
 
 void client_run (void)
 {
+    printf("client_run(): Starting client...\n");
     assert(client);
     assert(!server);
 
@@ -3057,7 +3082,7 @@ void server_setup (void)
             fflush(stderr);
             exit(-1);
         }
-        shmem_precompile_address = (void *)pPrecompile;
+        shmem_precompile_address = pPrecompile;
         precompile_results_address = (uint64_t *)pPrecompile;
         if (verbose) printf("mmap(precompile) mapped %lu B and returned address %p in %lu us\n", MAX_PRECOMPILE_SIZE, precompile_results_address, duration);
 
@@ -3124,7 +3149,7 @@ void server_setup (void)
             fflush(stderr);
             exit(-1);
         }
-        if (verbose) printf("sem_open(%s) succeeded\n", sem_prec_avail_name);
+        if (verbose) printf("sem_open(%s) succeeded sem_prec_avail=%p\n", sem_prec_avail_name, sem_prec_avail);
 
         // Create the semaphore for precompile results read signal
         assert(strlen(sem_prec_read_name) > 0);
@@ -3139,7 +3164,7 @@ void server_setup (void)
             fflush(stderr);
             exit(-1);
         }
-        if (verbose) printf("sem_open(%s) succeeded\n", sem_prec_read_name);
+        if (verbose) printf("sem_open(%s) succeeded sem_prec_read=%p\n", sem_prec_read_name, sem_prec_read);
     }
 
     /*******/
@@ -4556,30 +4581,30 @@ void file_lock(void)
 
 int _wait_for_prec_avail (void)
 {
-    int sem_prec_avail_value = 0;
-    if (sem_getvalue(sem_prec_avail, &sem_prec_avail_value) != 0)
-    {
-        printf("ERROR: wait_for_prec_avail() failed calling sem_getvalue(%s) errno=%d=%s\n", sem_prec_avail_name, errno, strerror(errno));
-        fflush(stdout);
-        fflush(stderr);
-        exit(-1);
-    }
-    printf("_wait_for_prec_avail() sem_prec_avail_value=%d precompile_written_address=%lu precompile_read_address=%lu\n", sem_prec_avail_value, *precompile_written_address, *precompile_read_address);
+    // int sem_prec_avail_value = 0;
+    // if (sem_getvalue(sem_prec_avail, &sem_prec_avail_value) != 0)
+    // {
+    //     printf("ERROR: wait_for_prec_avail() failed calling sem_getvalue(%s) errno=%d=%s\n", sem_prec_avail_name, errno, strerror(errno));
+    //     fflush(stdout);
+    //     fflush(stderr);
+    //     exit(-1);
+    // }
+    // printf("_wait_for_prec_avail() sem_prec_avail_value=%d precompile_written_address=%lu precompile_read_address=%lu\n", sem_prec_avail_value, *precompile_written_address, *precompile_read_address);
 
     // Sync precompile shared memory
     //__sync_synchronize();
-    if (msync(((void *)shmem_control_address) + CONTROL_SIZE/2, CONTROL_SIZE/2, MS_SYNC) != 0) {
-        printf("ERROR: 1 msync failed for shmem_control_address errno=%d=%s\n", errno, strerror(errno));
-        fflush(stdout);
-        fflush(stderr);
-        exit(-1);
-    }
+    // if (msync(((void *)shmem_control_address) + CONTROL_SIZE/2, CONTROL_SIZE/2, MS_SYNC) != 0) {
+    //     printf("ERROR: 1 msync failed for shmem_control_address errno=%d=%s\n", errno, strerror(errno));
+    //     fflush(stdout);
+    //     fflush(stderr);
+    //     exit(-1);
+    // }
 
     // Tell the writer that we have read the precompile results
     sem_post(sem_prec_read);
 
     // Make sure the semaphore is reset before checking the condition
-    while (sem_trywait(sem_prec_avail) == 0) {};
+    //while (sem_trywait(sem_prec_avail) == 0) {printf("Purging sem_prec_avail\n");};
 
     // Sync precompile shared memory
     //__sync_synchronize();
@@ -4602,14 +4627,20 @@ int _wait_for_prec_avail (void)
         //     exit(-1);
         // }
         return 0;
+        //return;
     }
 
     // Wait again, but blocking this time
-    sem_getvalue(sem_prec_avail, &sem_prec_avail_value);
-    printf("_wait_for_prec_avail() calling sem_wait sem_prec_avail_value=%d precompile_written_address=%lu precompile_read_address=%lu\n", sem_prec_avail_value, *precompile_written_address, *precompile_read_address);
+    //sem_getvalue(sem_prec_avail, &sem_prec_avail_value);
+    {
+        printf("_wait_for_prec_avail() calling sem_wait\n");
+        uint64_t written = *precompile_written_address;
+        uint64_t read = *precompile_read_address;
+        printf("_wait_for_prec_avail() calling sem_wait precompile_written_address=%lu precompile_read_address=%lu\n", written, read);
+    }
     int result = sem_wait(sem_prec_avail);
-    sem_getvalue(sem_prec_avail, &sem_prec_avail_value);
-    printf("_wait_for_prec_avail() called sem_wait sem_prec_avail_value=%d precompile_written_address=%lu precompile_read_address=%lu\n", sem_prec_avail_value, *precompile_written_address, *precompile_read_address);
+    // //sem_getvalue(sem_prec_avail, &sem_prec_avail_value);
+    // printf("_wait_for_prec_avail() called sem_wait precompile_written_address=%lu precompile_read_address=%lu\n", *precompile_written_address, *precompile_read_address);
     if (result == -1)
     {
         printf("ERROR: wait_for_prec_avail() failed calling sem_wait(%s) errno=%d=%s\n", sem_prec_avail_name, errno, strerror(errno));
@@ -4617,6 +4648,12 @@ int _wait_for_prec_avail (void)
         fflush(stderr);
         exit(-1);
     }
+
+    // while (*precompile_written_address == *precompile_read_address)
+    // {
+    //     usleep(10000);
+    // }
+    printf("_wait_for_prec_avail() called sem_wait precompile_written_address=%lu precompile_read_address=%lu\n", *precompile_written_address, *precompile_read_address);
 
     // Sync precompile shared memory
     __sync_synchronize();
@@ -4627,14 +4664,30 @@ int _wait_for_prec_avail (void)
     //     exit(-1);
     // }
 
-    if (*precompile_written_address == *precompile_read_address)
+    uint64_t written = *precompile_written_address;
+    uint64_t read = *precompile_read_address;
     {
-        printf("ERROR: wait_for_prec_avail() found written=%lu == read=%lu\n", *precompile_written_address, *precompile_read_address);
-        return -1;
+        if (written == read)
+        {
+            printf("ERROR: wait_for_prec_avail() found written=%lu == read=%lu\n", written, read);
+            //fflush(stdout);
+            //fflush(stderr);
+            //exit(-1);
+            return -1;
+        }
     }
 
-    uint64_t read_index = *precompile_read_address;
-    printf("_wait_for_prec_avail() proceeding to read data[0]=%lx data[7]=%lx\n", precompile_results_address[read_index], precompile_results_address[read_index + 7]);
+    {
+        // printf("_wait_for_prec_avail() proceeding to read\n");
+        // for (uint64_t i=0; i<25; i++)
+        // {
+        //     uint64_t data = precompile_results_address[read + i];
+        //     printf("%lx \n", data);
+        // }
+        //printf("\n");
+        //printf("_wait_for_prec_avail() proceeding to read %lx %lx\n", precompile_results_address[read_index], precompile_results_address[read_index + 7]);
+        //fflush(stdout);
+    }
 
     // Sync precompile shared memory
     //__sync_synchronize();

@@ -3421,6 +3421,10 @@ impl ZiskRom2Asm {
 
         *code += "\n";
 
+        *code += "execute_pop_internal_regs_and_end:\n";
+        Self::pop_internal_registers(&mut ctx, code, false);
+        *code += "\n";
+
         *code += "execute_end:\n";
 
         // Update step memory variable with the content of the step register, to make it accessible
@@ -5117,7 +5121,13 @@ impl ZiskRom2Asm {
 
                     // Get result from precompile results data
                     if ctx.precompile_results_keccak() {
-                        Self::precompile_results_array(ctx, code, unusual_code, "rdi", 25);
+                        Self::precompile_results_array(
+                            ctx,
+                            code,
+                            unusual_code,
+                            &ctx.b.string_value.clone(),
+                            25,
+                        );
                     } else {
                         // Call the keccak function
                         Self::push_internal_registers(ctx, code, false);
@@ -7888,7 +7898,7 @@ impl ZiskRom2Asm {
     /**********************/
 
     // Copies size u64 elements from precompile_results_address to the address in reg_address,
-    // and increments precompile_results_address by size*8
+    // and increments precompile_read by size*8
     fn precompile_results_array(
         ctx: &mut ZiskAsmContext,
         code: &mut String,
@@ -8173,10 +8183,8 @@ impl ZiskRom2Asm {
         Self::push_internal_registers(ctx, unusual_code, false);
         *unusual_code += "\tcall _wait_for_prec_avail\n";
         *unusual_code += "\tcmp rax, 0\n";
-        *unusual_code += "\tjne execute_end\n";
-
+        *unusual_code += "\tjne execute_pop_internal_regs_and_end\n";
         Self::pop_internal_registers(ctx, unusual_code, false);
-
         *unusual_code += &format!("\tjmp pc_{:x}_wait_for_prec_avail_done\n", ctx.pc,);
 
         // TODO:
