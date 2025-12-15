@@ -1,6 +1,6 @@
-require "std_constants.pil";
-require "std_lookup.pil";
-require "opids.pil";
+require "std_constants.pil"
+require "std_lookup.pil"
+require "opids.pil"
 
 // The maximum value that any expression during keccakf computation can get
 // Obtained from `keccakf_expr_generator.rs`
