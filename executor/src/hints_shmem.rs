@@ -188,7 +188,6 @@ impl HintsSink for HintsShmem {
             // Flow control based on buffer occupancy
             if available_space < data_size {
                 // Not enough space - signal reader and wait for consumption
-                // resource.sem_available.post()?;
                 resource.sem_read.wait()?;
             }
 
