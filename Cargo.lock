@@ -196,7 +196,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "62945a2f7e6de02a31fe400aa489f0e0f5b2502e69f95f853adb82a96c7a6b60"
 dependencies = [
  "quote",
- "syn",
+ "syn 2.0.111",
 ]
 
 [[package]]
@@ -209,7 +209,7 @@ dependencies = [
  "num-traits",
  "proc-macro2",
  "quote",
- "syn",
+ "syn 2.0.111",
 ]
 
 [[package]]
@@ -259,7 +259,7 @@ checksum = "213888f660fddcca0d257e88e54ac05bca01885f258ccdf695bafd77031bb69d"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn",
+ "syn 2.0.111",
 ]
 
 [[package]]
@@ -327,7 +327,7 @@ checksum = "c7c24de15d275a1ecfd47a380fb4d5ec9bfe0933f309ed5e705b775596a3574d"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn",
+ "syn 2.0.111",
 ]
 
 [[package]]
@@ -338,7 +338,7 @@ checksum = "9035ad2d096bed7955a320ee7e2230574d28fd3c3a0f186cbea1ff3c7eed5dbb"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn",
+ "syn 2.0.111",
 ]
 
 [[package]]
@@ -466,7 +466,7 @@ dependencies = [
  "regex",
  "rustc-hash 1.1.0",
  "shlex",
- "syn",
+ "syn 2.0.111",
 ]
 
 [[package]]
@@ -526,7 +526,7 @@ dependencies = [
  "proc-macro-crate",
  "proc-macro2",
  "quote",
- "syn",
+ "syn 2.0.111",
 ]
 
 [[package]]
@@ -756,7 +756,7 @@ dependencies = [
  "heck",
  "proc-macro2",
  "quote",
- "syn",
+ "syn 2.0.111",
 ]
 
 [[package]]
@@ -809,7 +809,7 @@ dependencies = [
  "encode_unicode",
  "libc",
  "once_cell",
- "unicode-width",
+ "unicode-width 0.2.2",
  "windows-sys 0.59.0",
 ]
 
@@ -1039,8 +1039,8 @@ dependencies = [
 
 [[package]]
 name = "curves"
-version = "0.14.0"
-source = "git+https://github.com/0xPolygonHermez/pil2-proofman.git?tag=v0.14.0#91437fce47835235886ee119e31ef34c03565a21"
+version = "0.15.0"
+source = "git+https://github.com/0xPolygonHermez/pil2-proofman.git?branch=feature%2Fverify-mt-optimization#ba6c7400a932ca4e090199f9a9c1ab1cd73702c8"
 dependencies = [
  "fields",
  "num-bigint",
@@ -1145,7 +1145,7 @@ checksum = "97369cbbc041bc366949bc74d34658d6cda5621039731c6310521892a3a20ae0"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn",
+ "syn 2.0.111",
 ]
 
 [[package]]
@@ -1180,7 +1180,7 @@ dependencies = [
  "enum-ordinalize",
  "proc-macro2",
  "quote",
- "syn",
+ "syn 2.0.111",
 ]
 
 [[package]]
@@ -1246,7 +1246,7 @@ checksum = "8ca9601fb2d62598ee17836250842873a413586e5d7ed88b356e38ddbb0ec631"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn",
+ "syn 2.0.111",
 ]
 
 [[package]]
@@ -1298,7 +1298,7 @@ checksum = "44f23cf4b44bfce11a86ace86f8a73ffdec849c9fd00a386a53d278bd9e81fb3"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn",
+ "syn 2.0.111",
 ]
 
 [[package]]
@@ -1382,8 +1382,8 @@ dependencies = [
 
 [[package]]
 name = "fields"
-version = "0.14.0"
-source = "git+https://github.com/0xPolygonHermez/pil2-proofman.git?tag=v0.14.0#91437fce47835235886ee119e31ef34c03565a21"
+version = "0.15.0"
+source = "git+https://github.com/0xPolygonHermez/pil2-proofman.git?branch=feature%2Fverify-mt-optimization#ba6c7400a932ca4e090199f9a9c1ab1cd73702c8"
 dependencies = [
  "num-bigint",
  "paste",
@@ -1501,7 +1501,7 @@ checksum = "162ee34ebcb7c64a8abebc059ce0fee27c2262618d7b60ed8faf72fef13c3650"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn",
+ "syn 2.0.111",
 ]
 
 [[package]]
@@ -1974,7 +1974,7 @@ dependencies = [
  "console",
  "number_prefix",
  "portable-atomic",
- "unicode-width",
+ "unicode-width 0.2.2",
  "web-time",
 ]
 
@@ -2092,7 +2092,7 @@ checksum = "980af8b43c3ad5d8d349ace167ec8170839f753a42d233ba19e08afe1850fa69"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn",
+ "syn 2.0.111",
 ]
 
 [[package]]
@@ -2590,6 +2590,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "papergrid"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "608b6444acf7f5ea39e8bd06dd6037e34a4b5ddfb29ae840edad49ea798e9e79"
+dependencies = [
+ "unicode-width 0.1.14",
+]
+
+[[package]]
 name = "parking_lot"
 version = "0.12.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2666,7 +2675,7 @@ dependencies = [
  "pest_meta",
  "proc-macro2",
  "quote",
- "syn",
+ "syn 2.0.111",
 ]
 
 [[package]]
@@ -2691,8 +2700,8 @@ dependencies = [
 
 [[package]]
 name = "pil-std-lib"
-version = "0.14.0"
-source = "git+https://github.com/0xPolygonHermez/pil2-proofman.git?tag=v0.14.0#91437fce47835235886ee119e31ef34c03565a21"
+version = "0.15.0"
+source = "git+https://github.com/0xPolygonHermez/pil2-proofman.git?branch=feature%2Fverify-mt-optimization#ba6c7400a932ca4e090199f9a9c1ab1cd73702c8"
 dependencies = [
  "colored",
  "fields",
@@ -2723,7 +2732,7 @@ checksum = "6e918e4ff8c4549eb882f14b3a4bc8c8bc93de829416eacf579f1207a8fbf861"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn",
+ "syn 2.0.111",
 ]
 
 [[package]]
@@ -3018,7 +3027,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "479ca8adacdd7ce8f1fb39ce9ecccbfe93a3f1344b3d0d97f20bc0196208f62b"
 dependencies = [
  "proc-macro2",
- "syn",
+ "syn 2.0.111",
 ]
 
 [[package]]
@@ -3041,8 +3050,8 @@ dependencies = [
 
 [[package]]
 name = "proofman"
-version = "0.14.0"
-source = "git+https://github.com/0xPolygonHermez/pil2-proofman.git?tag=v0.14.0#91437fce47835235886ee119e31ef34c03565a21"
+version = "0.15.0"
+source = "git+https://github.com/0xPolygonHermez/pil2-proofman.git?branch=feature%2Fverify-mt-optimization#ba6c7400a932ca4e090199f9a9c1ab1cd73702c8"
 dependencies = [
  "blake3",
  "borsh",
@@ -3071,14 +3080,13 @@ dependencies = [
  "tokio",
  "tokio-util",
  "tracing",
- "transcript",
  "witness",
 ]
 
 [[package]]
 name = "proofman-common"
-version = "0.14.0"
-source = "git+https://github.com/0xPolygonHermez/pil2-proofman.git?tag=v0.14.0#91437fce47835235886ee119e31ef34c03565a21"
+version = "0.15.0"
+source = "git+https://github.com/0xPolygonHermez/pil2-proofman.git?branch=feature%2Fverify-mt-optimization#ba6c7400a932ca4e090199f9a9c1ab1cd73702c8"
 dependencies = [
  "borsh",
  "colored",
@@ -3087,6 +3095,7 @@ dependencies = [
  "csv",
  "env",
  "fields",
+ "indexmap",
  "lazy_static",
  "libloading",
  "mpi",
@@ -3098,17 +3107,17 @@ dependencies = [
  "serde",
  "serde_json",
  "sysinfo 0.35.2",
+ "tabled",
  "thiserror 2.0.17",
  "tracing",
  "tracing-subscriber",
- "transcript",
  "yansi",
 ]
 
 [[package]]
 name = "proofman-hints"
-version = "0.14.0"
-source = "git+https://github.com/0xPolygonHermez/pil2-proofman.git?tag=v0.14.0#91437fce47835235886ee119e31ef34c03565a21"
+version = "0.15.0"
+source = "git+https://github.com/0xPolygonHermez/pil2-proofman.git?branch=feature%2Fverify-mt-optimization#ba6c7400a932ca4e090199f9a9c1ab1cd73702c8"
 dependencies = [
  "fields",
  "proofman-common",
@@ -3119,19 +3128,19 @@ dependencies = [
 
 [[package]]
 name = "proofman-macros"
-version = "0.14.0"
-source = "git+https://github.com/0xPolygonHermez/pil2-proofman.git?tag=v0.14.0#91437fce47835235886ee119e31ef34c03565a21"
+version = "0.15.0"
+source = "git+https://github.com/0xPolygonHermez/pil2-proofman.git?branch=feature%2Fverify-mt-optimization#ba6c7400a932ca4e090199f9a9c1ab1cd73702c8"
 dependencies = [
  "proc-macro2",
  "quote",
  "rayon",
- "syn",
+ "syn 2.0.111",
 ]
 
 [[package]]
 name = "proofman-starks-lib-c"
-version = "0.14.0"
-source = "git+https://github.com/0xPolygonHermez/pil2-proofman.git?tag=v0.14.0#91437fce47835235886ee119e31ef34c03565a21"
+version = "0.15.0"
+source = "git+https://github.com/0xPolygonHermez/pil2-proofman.git?branch=feature%2Fverify-mt-optimization#ba6c7400a932ca4e090199f9a9c1ab1cd73702c8"
 dependencies = [
  "crossbeam-channel",
  "tracing",
@@ -3139,8 +3148,8 @@ dependencies = [
 
 [[package]]
 name = "proofman-util"
-version = "0.14.0"
-source = "git+https://github.com/0xPolygonHermez/pil2-proofman.git?tag=v0.14.0#91437fce47835235886ee119e31ef34c03565a21"
+version = "0.15.0"
+source = "git+https://github.com/0xPolygonHermez/pil2-proofman.git?branch=feature%2Fverify-mt-optimization#ba6c7400a932ca4e090199f9a9c1ab1cd73702c8"
 dependencies = [
  "colored",
  "fields",
@@ -3150,11 +3159,12 @@ dependencies = [
 
 [[package]]
 name = "proofman-verifier"
-version = "0.14.0"
-source = "git+https://github.com/0xPolygonHermez/pil2-proofman.git?tag=v0.14.0#91437fce47835235886ee119e31ef34c03565a21"
+version = "0.15.0"
+source = "git+https://github.com/0xPolygonHermez/pil2-proofman.git?branch=feature%2Fverify-mt-optimization#ba6c7400a932ca4e090199f9a9c1ab1cd73702c8"
 dependencies = [
  "bytemuck",
  "fields",
+ "rayon",
  "tracing",
  "zstd",
 ]
@@ -3187,7 +3197,7 @@ dependencies = [
  "pulldown-cmark",
  "pulldown-cmark-to-cmark",
  "regex",
- "syn",
+ "syn 2.0.111",
  "tempfile",
 ]
 
@@ -3201,7 +3211,7 @@ dependencies = [
  "itertools 0.14.0",
  "proc-macro2",
  "quote",
- "syn",
+ "syn 2.0.111",
 ]
 
 [[package]]
@@ -3748,7 +3758,7 @@ checksum = "d540f220d3187173da220f885ab66608367b6574e925011a9353e4badda91d79"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn",
+ "syn 2.0.111",
 ]
 
 [[package]]
@@ -4121,6 +4131,17 @@ dependencies = [
 
 [[package]]
 name = "syn"
+version = "1.0.109"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "72b64191b275b66ffe2469e8af2c1cfe3bafa67b529ead792a6d0160888b4237"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "unicode-ident",
+]
+
+[[package]]
+name = "syn"
 version = "2.0.111"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "390cc9a294ab71bdb1aa2e99d13be9c753cd2d7bd6560c77118597410c4d2e87"
@@ -4147,7 +4168,7 @@ checksum = "728a70f3dbaf5bab7f0c4b1ac8d7ae5ea60a4b5549c8a5914361c99147a709d2"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn",
+ "syn 2.0.111",
 ]
 
 [[package]]
@@ -4176,6 +4197,27 @@ dependencies = [
  "objc2-core-foundation",
  "objc2-io-kit",
  "windows",
+]
+
+[[package]]
+name = "tabled"
+version = "0.7.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2407502760ccfd538f2fb1f843dd87b6daf1a17848d57bc5a25617e408ef4c7a"
+dependencies = [
+ "papergrid",
+ "tabled_derive",
+]
+
+[[package]]
+name = "tabled_derive"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "278ea3921cee8c5a69e0542998a089f7a14fa43c9c4e4f9951295da89bd0c943"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 1.0.109",
 ]
 
 [[package]]
@@ -4223,7 +4265,7 @@ checksum = "4fee6c4efc90059e10f81e6d42c60a18f76588c3d74cb83a0b242a2b6c7504c1"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn",
+ "syn 2.0.111",
 ]
 
 [[package]]
@@ -4234,7 +4276,7 @@ checksum = "3ff15c8ecd7de3849db632e14d18d2571fa09dfc5ed93479bc4485c7a517c913"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn",
+ "syn 2.0.111",
 ]
 
 [[package]]
@@ -4348,7 +4390,7 @@ checksum = "af407857209536a95c8e56f8231ef2c2e2aff839b22e07a1ffcbc617e9db9fa5"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn",
+ "syn 2.0.111",
 ]
 
 [[package]]
@@ -4515,7 +4557,7 @@ dependencies = [
  "prettyplease",
  "proc-macro2",
  "quote",
- "syn",
+ "syn 2.0.111",
 ]
 
 [[package]]
@@ -4540,7 +4582,7 @@ dependencies = [
  "prost-build",
  "prost-types",
  "quote",
- "syn",
+ "syn 2.0.111",
  "tempfile",
  "tonic-build",
 ]
@@ -4638,7 +4680,7 @@ checksum = "7490cfa5ec963746568740651ac6781f701c9c5ea257c58e057f3ba8cf69e8da"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn",
+ "syn 2.0.111",
 ]
 
 [[package]]
@@ -4694,14 +4736,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "transcript"
-version = "0.14.0"
-source = "git+https://github.com/0xPolygonHermez/pil2-proofman.git?tag=v0.14.0#91437fce47835235886ee119e31ef34c03565a21"
-dependencies = [
- "proofman-starks-lib-c",
-]
-
-[[package]]
 name = "try-lock"
 version = "0.2.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4748,6 +4782,12 @@ name = "unicode-segmentation"
 version = "1.12.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f6ccf251212114b54433ec949fd6a7841275f9ada20dddd2f29e9ceea4501493"
+
+[[package]]
+name = "unicode-width"
+version = "0.1.14"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7dd6e30e90baa6f72411720665d41d89b9a3d039dc45b8faea1ddd07f617f6af"
 
 [[package]]
 name = "unicode-width"
@@ -4954,7 +4994,7 @@ dependencies = [
  "bumpalo",
  "proc-macro2",
  "quote",
- "syn",
+ "syn 2.0.111",
  "wasm-bindgen-shared",
 ]
 
@@ -5107,7 +5147,7 @@ checksum = "053e2e040ab57b9dc951b72c264860db7eb3b0200ba345b4e4c3b14f67855ddf"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn",
+ "syn 2.0.111",
 ]
 
 [[package]]
@@ -5118,7 +5158,7 @@ checksum = "3f316c4a2570ba26bbec722032c4099d8c8bc095efccdc15688708623367e358"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn",
+ "syn 2.0.111",
 ]
 
 [[package]]
@@ -5370,8 +5410,8 @@ checksum = "f17a85883d4e6d00e8a97c586de764dabcc06133f7f1d55dce5cdc070ad7fe59"
 
 [[package]]
 name = "witness"
-version = "0.14.0"
-source = "git+https://github.com/0xPolygonHermez/pil2-proofman.git?tag=v0.14.0#91437fce47835235886ee119e31ef34c03565a21"
+version = "0.15.0"
+source = "git+https://github.com/0xPolygonHermez/pil2-proofman.git?branch=feature%2Fverify-mt-optimization#ba6c7400a932ca4e090199f9a9c1ab1cd73702c8"
 dependencies = [
  "colored",
  "fields",
@@ -5424,7 +5464,7 @@ checksum = "b659052874eb698efe5b9e8cf382204678a0086ebf46982b79d6ca3182927e5d"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn",
+ "syn 2.0.111",
  "synstructure",
 ]
 
@@ -5445,7 +5485,7 @@ checksum = "d8a8d209fdf45cf5138cbb5a506f6b52522a25afccc534d1475dad8e31105c6a"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn",
+ "syn 2.0.111",
 ]
 
 [[package]]
@@ -5465,7 +5505,7 @@ checksum = "d71e5d6e06ab090c67b5e44993ec16b72dcbaabc526db883a360057678b48502"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn",
+ "syn 2.0.111",
  "synstructure",
 ]
 
@@ -5486,7 +5526,7 @@ checksum = "ce36e65b0d2999d2aafac989fb249189a141aee1f53c612c1f37d72631959f69"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn",
+ "syn 2.0.111",
 ]
 
 [[package]]
@@ -5519,7 +5559,7 @@ checksum = "eadce39539ca5cb3985590102671f2567e659fca9666581ad3411d59207951f3"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn",
+ "syn 2.0.111",
 ]
 
 [[package]]
