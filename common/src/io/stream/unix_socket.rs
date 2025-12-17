@@ -246,10 +246,7 @@ impl UnixSocketStreamWriter {
         // Remove socket file if it exists and is stale
         if self.path.exists() {
             // Try to detect if socket is stale by attempting connection
-            let is_stale = match std::os::unix::net::UnixStream::connect(&self.path) {
-                Err(_) => true, // Connection failed = stale socket
-                Ok(_) => false, // Connection succeeded = socket still in use!
-            };
+            let is_stale = std::os::unix::net::UnixStream::connect(&self.path).is_err();
 
             if is_stale {
                 std::fs::remove_file(&self.path).context("Failed to remove stale socket file")?;
