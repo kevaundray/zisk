@@ -302,8 +302,7 @@ impl ZiskAsmContext {
         false
     }
     pub fn call_wait_for_prec_avail(&self) -> bool {
-        //self.precompile_results()
-        true
+        self.precompile_results()
     }
 }
 
@@ -5140,13 +5139,7 @@ impl ZiskRom2Asm {
 
                     // Get result from precompile results data
                     if ctx.precompile_results_keccak() {
-                        Self::precompile_results_array(
-                            ctx,
-                            code,
-                            unusual_code,
-                            &ctx.b.string_value.clone(),
-                            25,
-                        );
+                        Self::precompile_results_array(ctx, code, unusual_code, "rdi", 25);
                     } else {
                         // Call the keccak function
                         Self::push_internal_registers(ctx, code, false);
@@ -8731,25 +8724,25 @@ impl ZiskRom2Asm {
         *code += "\tpush rax\n";
         *code += "\tpush rcx\n";
         *code += "\tpush rdx\n";
-        //*code += "\tpush rdi\n";
+        *code += "\tpush rdi\n";
         // *code += "\tpush rsi\n";
         // *code += "\tpush rsp\n";
         *code += "\tpush r8\n";
         *code += "\tpush r9\n";
         *code += "\tpush r10\n";
         *code += "\tpush r11\n";
-        Self::push_xmm_regs(ctx, code, !extra_8);
+        Self::push_xmm_regs(ctx, code, extra_8);
     }
 
     fn pop_internal_registers(ctx: &mut ZiskAsmContext, code: &mut String, extra_8: bool) {
-        Self::pop_xmm_regs(ctx, code, !extra_8);
+        Self::pop_xmm_regs(ctx, code, extra_8);
         *code += "\tpop r11\n";
         *code += "\tpop r10\n";
         *code += "\tpop r9\n";
         *code += "\tpop r8\n";
         // *code += "\tpop rsp\n";
         // *code += "\tpop rsi\n";
-        //*code += "\tpop rdi\n";
+        *code += "\tpop rdi\n";
         *code += "\tpop rdx\n";
         *code += "\tpop rcx\n";
         *code += "\tpop rax\n";
