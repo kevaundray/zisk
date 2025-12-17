@@ -270,7 +270,7 @@ impl Stats {
                     }
                     println!("\n");
                     Self::static_print_call_stack(&self.call_stack, "");
-                    // panic!("{:?} {:?}", return_call, self.rois[roi_index]);
+                    panic!("CALL STACK EMU: STACK MISMATCH DETECTED on 0x{pc:08x}");
                 }
 
                 self.rois[roi_index].return_call(self.call_stack.len());
@@ -595,9 +595,9 @@ impl Stats {
         // If there is an ROI whose name contains main_func_name, remove all entries from the
         // beginning up to and including it.
         if !self.main_name.is_empty() {
-            if let Some(pos) =
-                top_rois.iter().position(|(index, _)| self.rois[*index].name == self.main_name)
-            {
+            if let Some(pos) = top_rois.iter().position(|(index, _)| {
+                self.rois[*index].name == self.main_name && self.rois[*index].get_steps() > 0
+            }) {
                 top_rois.drain(0..=pos);
             }
         }
