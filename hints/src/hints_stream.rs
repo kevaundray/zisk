@@ -83,19 +83,12 @@ impl<HP: HintsProcessor + Send + Sync + 'static> HintsStream<HP> {
         hints_processor: Arc<HP>,
         rx: Receiver<ThreadCommand>,
     ) {
-        loop {
-            match rx.recv() {
-                Ok(ThreadCommand::Process) => {
-                    if let Err(e) = Self::process_stream(&mut stream, &hints_processor) {
-                        tracing::error!("Error processing hints in background thread: {:?}", e);
-                    }
-                }
-                Ok(ThreadCommand::Shutdown) | Err(_) => {
-                    // Channel closed or shutdown requested
-                    break;
-                }
+        while let Ok(ThreadCommand::Process) = rx.recv() {
+            if let Err(e) = Self::process_stream(&mut stream, &hints_processor) {
+                tracing::error!("Error processing hints in background thread: {:?}", e);
             }
         }
+        // Loop exits when Shutdown is received or channel is closed
     }
 
     /// Process all hints from the stream.

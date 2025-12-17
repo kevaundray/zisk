@@ -96,9 +96,9 @@ impl ZiskVerifyConstraints {
             print_banner_field("Prec. Hints", hints);
         }
 
-        let stdin = ZiskStdin::from_str(self.input.as_ref().as_deref())?;
+        let stdin = ZiskStdin::from_uri(self.input.as_ref().as_deref())?;
 
-        let hints_stream = StreamSource::from_str(self.precompile_hints_path.as_deref())?;
+        let hints_stream = StreamSource::from_uri(self.precompile_hints_path.as_deref())?;
 
         let emulator = if cfg!(target_os = "macos") {
             if !self.emulator {

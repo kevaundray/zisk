@@ -113,16 +113,16 @@ impl ZiskStdin {
     /// - None -> null stream
     /// - "scheme://path" -> parsed based on scheme
     /// - No scheme -> treated as file path
-    pub fn from_str<S: Into<String>>(hints_uri: Option<S>) -> Result<ZiskStdin> {
-        if hints_uri.is_none() {
+    pub fn from_uri<S: Into<String>>(stdin_uri: Option<S>) -> Result<ZiskStdin> {
+        if stdin_uri.is_none() {
             return Ok(ZiskStdin::null());
         }
 
-        let uri_str = hints_uri.unwrap().into();
+        let uri = stdin_uri.unwrap().into();
 
         // Check if URI contains "://" separator
-        if let Some(pos) = uri_str.find("://") {
-            let (scheme, path) = uri_str.split_at(pos);
+        if let Some(pos) = uri.find("://") {
+            let (scheme, path) = uri.split_at(pos);
             let path = &path[3..]; // Skip "://"
 
             match scheme {
@@ -132,7 +132,7 @@ impl ZiskStdin {
             }
         } else {
             // No "://" found - fallback as a file path
-            ZiskStdin::from_file(uri_str.as_str())
+            ZiskStdin::from_file(uri.as_str())
         }
     }
 }

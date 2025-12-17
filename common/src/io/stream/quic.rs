@@ -176,9 +176,7 @@ impl QuicStreamWriter {
         let cert = rcgen::generate_simple_self_signed(vec!["localhost".into()])
             .context("Failed to generate certificate")?;
 
-        let key = rustls::pki_types::PrivateKeyDer::Pkcs8(
-            cert.signing_key.serialize_der().try_into().unwrap(),
-        );
+        let key = rustls::pki_types::PrivateKeyDer::Pkcs8(cert.signing_key.serialize_der().into());
         let cert_der = rustls::pki_types::CertificateDer::from(cert.cert);
 
         let mut server_config = ServerConfig::with_single_cert(vec![cert_der], key)

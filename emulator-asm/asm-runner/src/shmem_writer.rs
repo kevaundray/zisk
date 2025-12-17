@@ -91,7 +91,7 @@ impl SharedMemoryWriter {
     /// * `Ok(())` - If data was successfully written
     /// * `Err` - If data size exceeds shared memory capacity or msync fails
     pub fn write_input<T>(&self, data: &[T]) -> Result<()> {
-        let byte_size = data.len() * std::mem::size_of::<T>();
+        let byte_size = std::mem::size_of_val(data);
 
         if byte_size > self.size {
             return Err(io::Error::new(
@@ -125,7 +125,8 @@ impl SharedMemoryWriter {
     /// # Arguments
     /// * `data` - A slice of data to write to shared memory
     pub fn write_ring_buffer<T>(&mut self, data: &[T]) {
-        let byte_size = data.len() * std::mem::size_of::<T>();
+        let byte_size = std::mem::size_of_val(data);
+
         let data_ptr = data.as_ptr() as *const u8;
 
         unsafe {
