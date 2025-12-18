@@ -5,7 +5,6 @@ use anyhow::Result;
 use std::sync::mpsc::{Receiver, Sender};
 use std::sync::Arc;
 use std::thread::{self, JoinHandle};
-use tracing::debug;
 use zisk_common::io::{StreamRead, StreamSource};
 
 enum ThreadCommand {
@@ -105,7 +104,6 @@ impl<HP: HintsProcessor + Send + Sync + 'static> HintsStream<HP> {
 
             // Break if CTRL_END was encountered
             if has_ctrl_end {
-                debug!("CTRL_END encountered, stopping hint processing");
                 break;
             }
         }

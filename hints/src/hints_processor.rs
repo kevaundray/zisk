@@ -419,9 +419,11 @@ impl<HS: HintsSink + Send + Sync + 'static> PrecompileHintsProcessor<HS> {
             idx += length + 1;
         }
 
-        debug!("Processed hints stats:");
-        for (i, count) in self.stats.iter().enumerate() {
-            debug!("Hint type {}: {}", i, count.load(Ordering::Relaxed));
+        if has_ctrl_end {
+            debug!("Processed hints stats:");
+            for (i, count) in self.stats.iter().enumerate() {
+                debug!("Hint type {}: {}", i, count.load(Ordering::Relaxed));
+            }
         }
 
         Ok(has_ctrl_end)
