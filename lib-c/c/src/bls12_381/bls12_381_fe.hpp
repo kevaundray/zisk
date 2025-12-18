@@ -178,7 +178,7 @@ int inline BLS12_381ComplexSqrtFe (const RawBLS12_381_384::Element &x1, const Ra
 
     // Step 1: a1 ← a^((p-3)/4)
     RawBLS12_381_384::Element a1_x, a1_y;
-    BLS12_381ComplexExpFe(x1, x2, ScalarP_MINUS_3_DIV_4, a1_x, a1_y);
+    BLS12_381ComplexExpFe(x1, y1, ScalarP_MINUS_3_DIV_4, a1_x, a1_y);
 
     // Step 2: α ← a1 * a1 * a
     RawBLS12_381_384::Element a1_a_x, a1_a_y;
