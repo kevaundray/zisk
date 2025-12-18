@@ -53,7 +53,7 @@ brew reinstall jq curl libomp protobuf openssl nasm pkgconf open-mpi libffi nloh
     ```
 
 2. During the installation, you will be prompted to select a setup option. You can choose from the following:
-Install proving key (no constant tree files)
+
     1. **Install proving key (default)** – Required for generating and verifying proofs.
     2. **Install proving key (no constant tree files)** – Install proving key but without constant tree files generation.
     3. **Install verify key** – Needed only if you want to verify proofs.
