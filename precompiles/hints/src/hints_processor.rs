@@ -11,19 +11,19 @@
 //! - **Data** (`[u64; length]`): The hint payload, where `length` is specified in the header
 //!
 //! ```text
-//! ┌────────────────────────────────────────────────────────────────┐
-//! │                         Header (u64)                           │
-//! ├────────────────────────────────┬───────────────────────────────┤
-//! │      Hint Code (32 bits)       │       Length (32 bits)        │
-//! ├────────────────────────────────┴───────────────────────────────┤
-//! │                      Data[0] (u64)                             │
-//! ├────────────────────────────────────────────────────────────────┤
-//! │                      Data[1] (u64)                             │
-//! ├────────────────────────────────────────────────────────────────┤
-//! │                         ...                                    │
-//! ├────────────────────────────────────────────────────────────────┤
-//! │                      Data[length-1] (u64)                      │
-//! └────────────────────────────────────────────────────────────────┘
+//! ┌─────────────────────────────────────────────────────────────┐
+//! │                         Header (u64)                        │
+//! ├·····························································┤
+//! │      Hint Code (32 bits)           Length (32 bits).        │
+//! ├─────────────────────────────────────────────────────────────┤
+//! │                        Data[0] (u64)                        │
+//! ├─────────────────────────────────────────────────────────────┤
+//! │                        Data[1] (u64)                        │
+//! ├─────────────────────────────────────────────────────────────┤
+//! │                             ...                             │
+//! ├─────────────────────────────────────────────────────────────┤
+//! │                     Data[length-1] (u64)                    │
+//! └─────────────────────────────────────────────────────────────┘
 //!
 //! - Hint Code — Control code or Data Hint Type
 //! - Length — Number of following u64 data words
@@ -52,11 +52,10 @@ use std::mem::ManuallyDrop;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::{Arc, Condvar, Mutex};
 use tracing::debug;
+use zisk_common::io::{StreamProcessor, StreamSink};
 use ziskos::syscalls::SyscallPoint256;
 
-use crate::{secp256k1_ecdsa_verify, HintsProcessor, HintsSink};
-
-// TODO! COnvert Control Code to an enum and HINT TYPE to an enum as well
+use crate::secp256k1_ecdsa_verify;
 
 /// Control code: Reset processor state and global sequence.
 const CTRL_START: u32 = 0x00;
@@ -185,7 +184,7 @@ impl HintProcessorState {
 /// This struct provides methods to parse and process a stream of concatenated
 /// hints, using a dedicated Rayon thread pool for parallel processing while
 /// preserving the original order of results.
-pub struct PrecompileHintsProcessor<HS: HintsSink + Send + Sync + 'static> {
+pub struct PrecompileHintsProcessor<HS: StreamSink + Send + Sync + 'static> {
     /// The thread pool used for parallel hint processing.
     pool: ThreadPool,
 
@@ -203,7 +202,7 @@ pub struct PrecompileHintsProcessor<HS: HintsSink + Send + Sync + 'static> {
     drainer_thread: ManuallyDrop<std::thread::JoinHandle<()>>,
 }
 
-impl<HS: HintsSink + Send + Sync + 'static> PrecompileHintsProcessor<HS> {
+impl<HS: StreamSink + Send + Sync + 'static> PrecompileHintsProcessor<HS> {
     const DEFAULT_NUM_THREADS: usize = 32;
 
     /// Creates a new processor with the default number of threads.
@@ -421,9 +420,11 @@ impl<HS: HintsSink + Send + Sync + 'static> PrecompileHintsProcessor<HS> {
             idx += length + 1;
         }
 
-        debug!("Processed hints stats:");
-        for (i, count) in self.stats.iter().enumerate() {
-            debug!("Hint type {}: {}", i, count.load(Ordering::Relaxed));
+        if has_ctrl_end {
+            debug!("Processed hints stats:");
+            for (i, count) in self.stats.iter().enumerate() {
+                debug!("Hint type {}: {}", i, count.load(Ordering::Relaxed));
+            }
         }
 
         Ok(has_ctrl_end)
@@ -590,7 +591,7 @@ impl<HS: HintsSink + Send + Sync + 'static> PrecompileHintsProcessor<HS> {
     }
 }
 
-impl<HS: HintsSink + Send + Sync + 'static> Drop for PrecompileHintsProcessor<HS> {
+impl<HS: StreamSink + Send + Sync + 'static> Drop for PrecompileHintsProcessor<HS> {
     fn drop(&mut self) {
         // Signal drainer thread to shut down
         self.state.shutdown.store(true, Ordering::Release);
@@ -605,9 +606,9 @@ impl<HS: HintsSink + Send + Sync + 'static> Drop for PrecompileHintsProcessor<HS
     }
 }
 
-impl<HS: HintsSink + Send + Sync + 'static> HintsProcessor for PrecompileHintsProcessor<HS> {
-    fn process_hints(&self, hints: &[u64], first_batch: bool) -> Result<bool> {
-        self.process_hints(hints, first_batch)
+impl<HS: StreamSink + Send + Sync + 'static> StreamProcessor for PrecompileHintsProcessor<HS> {
+    fn process(&self, data: &[u64], first_batch: bool) -> Result<bool> {
+        self.process_hints(data, first_batch)
     }
 }
 
@@ -617,7 +618,7 @@ mod tests {
 
     struct NullHints;
 
-    impl HintsSink for NullHints {
+    impl StreamSink for NullHints {
         fn submit(&self, _processed: Vec<u64>) -> Result<()> {
             Ok(())
         }

@@ -372,13 +372,13 @@ impl<X> ProverClientBuilder<EmuB, X> {
         }
 
         println!("{: >12} {}", "Witness Lib".bright_green().bold(), witness_lib.display());
-        println!("{: >12} {}", "Elf".bright_green().bold(), elf.display());
+        println!("{: >12} {}", "ELF".bright_green().bold(), elf.display());
         println!(
             "{: >12} {}",
             "Emulator".bright_green().bold(),
             "Running in emulator mode".bright_yellow()
         );
-        println!("{: >12} {}", "Proving key".bright_green().bold(), proving_key.display());
+        println!("{: >12} {}", "Proving Key".bright_green().bold(), proving_key.display());
 
         if let Some(output_dir) = output_dir {
             println!("{: >12} {}", "Output Dir".bright_green().bold(), output_dir.display());
@@ -508,8 +508,8 @@ impl<X> ProverClientBuilder<AsmB, X> {
         }
 
         println!("{: >12} {}", "Witness Lib".bright_green().bold(), witness_lib.display());
-        println!("{: >12} {}", "Elf".bright_green().bold(), elf.display());
-        println!("{: >12} {}", "Proving key".bright_green().bold(), proving_key.display());
+        println!("{: >12} {}", "ELF".bright_green().bold(), elf.display());
+        println!("{: >12} {}", "Proving Key".bright_green().bold(), proving_key.display());
 
         if let Some(output_dir) = output_dir {
             println!("{: >12} {}", "Output Dir".bright_green().bold(), output_dir.display());

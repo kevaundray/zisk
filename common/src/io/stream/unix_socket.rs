@@ -323,47 +323,66 @@ impl UnixSocketStreamWriter {
 impl StreamWrite for UnixSocketStreamWriter {
     /// Open/initialize the stream for writing
     ///
-    /// Creates a listening socket and spawns a background thread to accept connections.
-    /// Returns immediately without blocking.
+    /// Creates a listening socket and waits for a client to connect (blocking).
     fn open(&mut self) -> Result<()> {
+        // If we already have a connected socket, we're done
+        if self.socket.is_some() {
+            return Ok(());
+        }
+
         // Create listener if not exists
         if self.listener_fd.is_none() {
             self.create_listener()?;
         }
 
-        // Spawn accept thread if not already running
-        if self.accept_thread.is_none() {
-            let listener_fd = self.listener_fd.unwrap();
-            let (tx, rx) = mpsc::channel();
-            self.socket_receiver = Some(rx);
+        // If we don't have a socket yet, either spawn accept thread or wait for it
+        if self.socket.is_none() {
+            // Spawn accept thread if not already running
+            if self.accept_thread.is_none() {
+                let listener_fd = self.listener_fd.unwrap();
+                let (tx, rx) = mpsc::channel();
+                self.socket_receiver = Some(rx);
 
-            let handle = thread::spawn(move || {
-                // Retry accept on EINTR
-                let conn_fd = loop {
-                    let fd = unsafe {
-                        libc::accept(listener_fd, std::ptr::null_mut(), std::ptr::null_mut())
+                let handle = thread::spawn(move || {
+                    // Retry accept on EINTR
+                    let conn_fd = loop {
+                        let fd = unsafe {
+                            libc::accept(listener_fd, std::ptr::null_mut(), std::ptr::null_mut())
+                        };
+
+                        if fd < 0 {
+                            let err = std::io::Error::last_os_error();
+                            if err.kind() == std::io::ErrorKind::Interrupted {
+                                continue; // Retry on EINTR
+                            }
+                            eprintln!("Accept failed: {}", err);
+                            return;
+                        }
+
+                        break fd;
                     };
 
-                    if fd < 0 {
-                        let err = std::io::Error::last_os_error();
-                        if err.kind() == std::io::ErrorKind::Interrupted {
-                            continue; // Retry on EINTR
-                        }
-                        eprintln!("Accept failed: {}", err);
-                        return;
+                    // Convert to UnixStream
+                    let stream = unsafe { UnixStream::from_raw_fd(conn_fd) };
+
+                    // Send socket through channel
+                    let _ = tx.send(stream);
+                });
+
+                self.accept_thread = Some(handle);
+            }
+
+            // Block waiting for the client connection
+            if let Some(rx) = &self.socket_receiver {
+                match rx.recv() {
+                    Ok(stream) => {
+                        self.socket = Some(stream);
                     }
-
-                    break fd;
-                };
-
-                // Convert to UnixStream
-                let stream = unsafe { UnixStream::from_raw_fd(conn_fd) };
-
-                // Send socket through channel
-                let _ = tx.send(stream);
-            });
-
-            self.accept_thread = Some(handle);
+                    Err(e) => {
+                        return Err(anyhow::anyhow!("Failed to receive client connection: {}", e));
+                    }
+                }
+            }
         }
 
         Ok(())
