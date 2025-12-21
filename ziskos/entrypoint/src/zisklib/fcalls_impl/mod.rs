@@ -1,5 +1,8 @@
-mod bigint256_div;
+mod big_int256_div;
+mod big_int_div;
+mod bin_decomp;
 mod bls12_381_fp2_inv;
+mod bls12_381_fp2_sqrt;
 mod bls12_381_fp_inv;
 mod bls12_381_fp_sqrt;
 mod bls12_381_twist;

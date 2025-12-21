@@ -12,7 +12,9 @@ use super::{
     },
 };
 
-/// Computes the Miller loop for the BLS12-381 curve
+/// Computes the Miller loop of a non-zero point `p` in G1 and a non-zero point `q` in G2
+///
+/// Note: It is not optimized for the case where either `p` or `q` is the point at infinity.
 pub fn miller_loop_bls12_381(p: &[u64; 12], q: &[u64; 24]) -> [u64; 72] {
     // Before the loop starts, compute xp' = (-xp/yp)·1/(1+u) and yp' = (1/yp)·1/(1+u)
     let mut xp: [u64; 6] = p[0..6].try_into().unwrap();
@@ -44,7 +46,7 @@ pub fn miller_loop_bls12_381(p: &[u64; 12], q: &[u64; 24]) -> [u64; 72] {
         f = sparse_mul_fp12_bls12_381(&f, &l);
 
         // Double r
-        r = line_dbl_twist_bls12_381(&r, &lambda, &mu);
+        r = dbl_twist_with_hints_bls12_381(&r, &lambda, &mu);
 
         if bit == 1 {
             // Hint the coefficients (𝜆,𝜇) of the line l_{twist(r),twist(q)}
@@ -58,7 +60,74 @@ pub fn miller_loop_bls12_381(p: &[u64; 12], q: &[u64; 24]) -> [u64; 72] {
             f = sparse_mul_fp12_bls12_381(&f, &l);
 
             // Add r and q
-            r = line_add_twist_bls12_381(&r, q, &lambda, &mu);
+            r = add_twist_with_hints_bls12_381(&r, q, &lambda, &mu);
+        }
+    }
+
+    // Finally, compute f̅
+    conjugate_fp12_bls12_381(&f)
+}
+
+/// Computes the Miller loop for the BN254 curve for a batch of non-zero points `p_i` in G1 and non-zero points `q_i` in G2
+pub fn miller_loop_batch_bls12_381(g1_points: &[[u64; 12]], g2_points: &[[u64; 24]]) -> [u64; 72] {
+    // Before the loop starts, compute xp' = (-xp/yp)·1/(1+u) and yp' = (1/yp)·1/(1+u)
+    let n = g1_points.len();
+    let mut xp_primes: Vec<[u64; 12]> = Vec::with_capacity(n);
+    let mut yp_primes: Vec<[u64; 12]> = Vec::with_capacity(n);
+    for p in g1_points.iter() {
+        let mut xp: [u64; 6] = p[0..6].try_into().unwrap();
+        let mut yp: [u64; 6] = p[6..12].try_into().unwrap();
+        yp = inv_fp_bls12_381(&yp);
+        xp = neg_fp_bls12_381(&xp);
+        xp = mul_fp_bls12_381(&xp, &yp);
+
+        let xp_prime: [u64; 12] = scalar_mul_fp2_bls12_381(&EXT_U_INV, &xp);
+        let yp_prime: [u64; 12] = scalar_mul_fp2_bls12_381(&EXT_U_INV, &yp);
+        xp_primes.push(xp_prime);
+        yp_primes.push(yp_prime);
+    }
+
+    // Initialize the Miller loop with r_i = q_i and f = 1
+    let mut r: Vec<[u64; 24]> = g2_points.iter().map(|q| q[0..24].try_into().unwrap()).collect();
+    let mut f = [0u64; 72];
+    f[0] = 1;
+    for &bit in X_ABS_BIN_BE.iter().skip(1) {
+        // Compute f = f² · line_{twist(r),twist(r)}(p)
+        f = square_fp12_bls12_381(&f);
+
+        for i in 0..n {
+            let r = &mut r[i];
+
+            // Hint the coefficients (𝜆,𝜇) of the line l_{twist(r),twist(r)}
+            let (lambda, mu) = fcall_bls12_381_dbl_line_coeffs(r);
+
+            // Check that the line is correct
+            assert!(is_tangent_twist_bls12_381(r, &lambda, &mu));
+
+            let xp_prime = &xp_primes[i];
+            let yp_prime = &yp_primes[i];
+            let l = line_eval_twist_bls12_381(&lambda, &mu, xp_prime, yp_prime);
+            f = sparse_mul_fp12_bls12_381(&f, &l);
+
+            // Double r
+            *r = dbl_twist_with_hints_bls12_381(r, &lambda, &mu);
+
+            if bit == 1 {
+                let q = &g2_points[i];
+
+                // Hint the coefficients (𝜆,𝜇) of the line l_{twist(r),twist(q')}
+                let (lambda, mu) = fcall_bls12_381_add_line_coeffs(r, q);
+
+                // Check that the line is correct
+                assert!(is_line_twist_bls12_381(r, q, &lambda, &mu));
+
+                // Compute f = f · line_{twist(r),twist(q')}
+                let l = line_eval_twist_bls12_381(&lambda, &mu, xp_prime, yp_prime);
+                f = sparse_mul_fp12_bls12_381(&f, &l);
+
+                // Add r and q
+                *r = add_twist_with_hints_bls12_381(r, q, &lambda, &mu);
+            }
         }
     }
 
@@ -76,7 +145,7 @@ pub fn miller_loop_bls12_381(p: &[u64; 12], q: &[u64; 24]) -> [u64; 72] {
 // In fact, one can use the coefficients of the line to compute the
 // evaluation of the line at p and compute the addition q1 + q2
 
-/// Checks if the line defined by (𝜆,𝜇) passes through q1 and q2
+/// Checks if the line defined by (𝜆,𝜇) passes through non-zero points `q1,q2` in G2
 #[inline]
 fn is_line_twist_bls12_381(
     q1: &[u64; 24],
@@ -87,7 +156,7 @@ fn is_line_twist_bls12_381(
     line_check_twist_bls12_381(q1, lambda, mu) && line_check_twist_bls12_381(q2, lambda, mu)
 }
 
-/// Checks if the line defined by (𝜆,𝜇) is tangent to the curve at q
+/// Checks if the line defined by (𝜆,𝜇) is tangent to the curve at non-zero point `q` in G2
 #[inline]
 fn is_tangent_twist_bls12_381(q: &[u64; 24], lambda: &[u64; 12], mu: &[u64; 12]) -> bool {
     // Check the line passes through q
@@ -106,7 +175,7 @@ fn is_tangent_twist_bls12_381(q: &[u64; 24], lambda: &[u64; 12], mu: &[u64; 12])
     curve_check && tangent_check
 }
 
-/// Check if the line defined by (𝜆,𝜇) passes through the point q
+/// Check if the line defined by (𝜆,𝜇) passes through non-zero point `q` in G2
 #[inline]
 fn line_check_twist_bls12_381(q: &[u64; 24], lambda: &[u64; 12], mu: &[u64; 12]) -> bool {
     let x: &[u64; 12] = q[0..12].try_into().unwrap();
@@ -129,11 +198,16 @@ fn line_eval_twist_bls12_381(
     let coeff1 = mul_fp2_bls12_381(mu, &neg_fp2_bls12_381(y));
     let coeff2 = mul_fp2_bls12_381(lambda, x);
 
-    [coeff1, coeff2].concat().try_into().unwrap()
+    let mut result = [0u64; 24];
+    result[0..12].copy_from_slice(&coeff1);
+    result[12..24].copy_from_slice(&coeff2);
+    result
 }
 
+/// Addition of two non-zero points `q1,q2` in G2 with hinted line coefficients (𝜆,𝜇)
+/// Assumes q1 != q2,-q2
 #[inline]
-fn line_add_twist_bls12_381(
+fn add_twist_with_hints_bls12_381(
     q1: &[u64; 24],
     q2: &[u64; 24],
     lambda: &[u64; 12],
@@ -152,11 +226,15 @@ fn line_add_twist_bls12_381(
     y3 = add_fp2_bls12_381(mu, &y3);
     y3 = neg_fp2_bls12_381(&y3);
 
-    [x3, y3].concat().try_into().unwrap()
+    let mut result = [0u64; 24];
+    result[0..12].copy_from_slice(&x3);
+    result[12..24].copy_from_slice(&y3);
+    result
 }
 
+/// Doubling of a non-zero point `q` in G2 with hinted line coefficients (𝜆,𝜇)
 #[inline]
-fn line_dbl_twist_bls12_381(q: &[u64; 24], lambda: &[u64; 12], mu: &[u64; 12]) -> [u64; 24] {
+fn dbl_twist_with_hints_bls12_381(q: &[u64; 24], lambda: &[u64; 12], mu: &[u64; 12]) -> [u64; 24] {
     let x: &[u64; 12] = q[0..12].try_into().unwrap();
 
     // Compute x3 = λ² - 2x
@@ -168,5 +246,23 @@ fn line_dbl_twist_bls12_381(q: &[u64; 24], lambda: &[u64; 12], mu: &[u64; 12]) -
     y3 = add_fp2_bls12_381(mu, &y3);
     y3 = neg_fp2_bls12_381(&y3);
 
-    [x3, y3].concat().try_into().unwrap()
+    let mut result = [0u64; 24];
+    result[0..12].copy_from_slice(&x3);
+    result[12..24].copy_from_slice(&y3);
+    result
+}
+
+/// # Safety
+/// - `ret` must point to a valid `[u64; 72]` for the Fp12 output.
+/// - `q` must point to a valid `[u64; 24]` for the G2 affine point.
+/// - `p` must point to a valid `[u64; 12]` for the G1 affine point.
+#[no_mangle]
+pub unsafe extern "C" fn miller_loop_bls12_381_c(ret: *mut u64, q: *const u64, p: *const u64) {
+    let p_arr: &[u64; 12] = &*(p as *const [u64; 12]);
+    let q_arr: &[u64; 24] = &*(q as *const [u64; 24]);
+
+    let result = miller_loop_bls12_381(p_arr, q_arr);
+
+    let ret_arr: &mut [u64; 72] = &mut *(ret as *mut [u64; 72]);
+    *ret_arr = result;
 }

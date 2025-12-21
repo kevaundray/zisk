@@ -6,10 +6,10 @@ use crate::{
         syscall_bls12_381_complex_sub, SyscallBls12_381ComplexAddParams,
         SyscallBls12_381ComplexMulParams, SyscallBls12_381ComplexSubParams, SyscallComplex384,
     },
-    zisklib::{eq, fcall_bls12_381_fp2_inv},
+    zisklib::{eq, fcall_bls12_381_fp2_inv, fcall_bls12_381_fp2_sqrt},
 };
 
-use super::constants::P_MINUS_ONE;
+use super::constants::{NQR_FP2, P_MINUS_ONE};
 
 /// Helper to convert from array representation to syscall representation
 #[inline]
@@ -103,6 +103,29 @@ pub fn square_fp2_bls12_381(a: &[u64; 12]) -> [u64; 12] {
     from_syscall_complex(&f1)
 }
 
+/// Square root in Fp2
+#[inline]
+pub fn sqrt_fp2_bls12_381(x: &[u64; 12]) -> ([u64; 12], bool) {
+    // Hint the sqrt
+    let hint = fcall_bls12_381_fp2_sqrt(x);
+    let is_qr = hint[0] == 1;
+    let sqrt = hint[1..13].try_into().unwrap();
+
+    // Compute sqrt * sqrt
+    let mul = mul_fp2_bls12_381(&sqrt, &sqrt);
+
+    if is_qr {
+        // Check that sqrt * sqrt == x
+        assert!(eq(&mul, x));
+        (sqrt, true)
+    } else {
+        // Check that sqrt * sqrt == x * NQR
+        let nqr = mul_fp2_bls12_381(x, &NQR_FP2);
+        assert!(eq(&mul, &nqr));
+        (sqrt, false)
+    }
+}
+
 /// Inversion in Fp2: returns a⁻¹
 #[inline]
 pub fn inv_fp2_bls12_381(a: &[u64; 12]) -> [u64; 12] {
@@ -138,95 +161,104 @@ pub fn conjugate_fp2_bls12_381(a: &[u64; 12]) -> [u64; 12] {
 // ========== Pointer-based API ==========
 
 /// # Safety
-///
-/// Addition in Fp2
-#[inline]
-pub unsafe fn add_fp2_bls12_381_ptr(a: *mut u64, b: *const u64) {
-    let a_in = core::slice::from_raw_parts(a as *const u64, 12);
-    let b_in = core::slice::from_raw_parts(b, 12);
+/// - `a` must point to a valid `[u64; 12]` (96 bytes), used as both input and output.
+/// - `b` must point to a valid `[u64; 12]` (96 bytes).
+#[no_mangle]
+pub unsafe extern "C" fn add_fp2_bls12_381_c(a: *mut u64, b: *const u64) {
+    let mut f1 =
+        SyscallComplex384 { x: *(a as *const [u64; 6]), y: *(a.add(6) as *const [u64; 6]) };
+    let f2 = SyscallComplex384 { x: *(b as *const [u64; 6]), y: *(b.add(6) as *const [u64; 6]) };
 
-    let result = add_fp2_bls12_381(a_in.try_into().unwrap(), b_in.try_into().unwrap());
+    let mut params = SyscallBls12_381ComplexAddParams { f1: &mut f1, f2: &f2 };
+    syscall_bls12_381_complex_add(&mut params);
 
-    let out = core::slice::from_raw_parts_mut(a, 12);
-    out.copy_from_slice(&result);
+    *(a as *mut [u64; 6]) = f1.x;
+    *(a.add(6) as *mut [u64; 6]) = f1.y;
 }
 
 /// # Safety
-///
-/// Doubling in Fp2
-#[inline]
-pub unsafe fn dbl_fp2_bls12_381_ptr(a: *mut u64) {
-    let a_in = core::slice::from_raw_parts(a as *const u64, 12);
+/// - `a` must point to a valid `[u64; 12]` (96 bytes), used as both input and output.
+#[no_mangle]
+pub unsafe extern "C" fn dbl_fp2_bls12_381_c(a: *mut u64) {
+    let mut f1 =
+        SyscallComplex384 { x: *(a as *const [u64; 6]), y: *(a.add(6) as *const [u64; 6]) };
+    let f2 = SyscallComplex384 { x: f1.x, y: f1.y };
 
-    let result = dbl_fp2_bls12_381(a_in.try_into().unwrap());
+    let mut params = SyscallBls12_381ComplexAddParams { f1: &mut f1, f2: &f2 };
+    syscall_bls12_381_complex_add(&mut params);
 
-    let out = core::slice::from_raw_parts_mut(a, 12);
-    out.copy_from_slice(&result);
+    *(a as *mut [u64; 6]) = f1.x;
+    *(a.add(6) as *mut [u64; 6]) = f1.y;
 }
 
 /// # Safety
-///
-/// Negation in Fp2
-#[inline]
-pub unsafe fn neg_fp2_bls12_381_ptr(a: *mut u64) {
-    let a_in = core::slice::from_raw_parts(a as *const u64, 12);
+/// - `a` must point to a valid `[u64; 12]` (96 bytes), used as both input and output.
+#[no_mangle]
+pub unsafe extern "C" fn neg_fp2_bls12_381_c(a: *mut u64) {
+    let mut f1 =
+        SyscallComplex384 { x: *(a as *const [u64; 6]), y: *(a.add(6) as *const [u64; 6]) };
+    let f2 = SyscallComplex384 { x: P_MINUS_ONE, y: [0, 0, 0, 0, 0, 0] };
 
-    let result = neg_fp2_bls12_381(a_in.try_into().unwrap());
+    let mut params = SyscallBls12_381ComplexMulParams { f1: &mut f1, f2: &f2 };
+    syscall_bls12_381_complex_mul(&mut params);
 
-    let out = core::slice::from_raw_parts_mut(a, 12);
-    out.copy_from_slice(&result);
+    *(a as *mut [u64; 6]) = f1.x;
+    *(a.add(6) as *mut [u64; 6]) = f1.y;
 }
 
 /// # Safety
-///
-/// Subtraction in Fp2
-#[inline]
-pub unsafe fn sub_fp2_bls12_381_ptr(a: *mut u64, b: *const u64) {
-    let a_in = core::slice::from_raw_parts(a as *const u64, 12);
-    let b_in = core::slice::from_raw_parts(b, 12);
+/// - `a` must point to a valid `[u64; 12]` (96 bytes), used as both input and output.
+/// - `b` must point to a valid `[u64; 12]` (96 bytes).
+#[no_mangle]
+pub unsafe extern "C" fn sub_fp2_bls12_381_c(a: *mut u64, b: *const u64) {
+    let mut f1 =
+        SyscallComplex384 { x: *(a as *const [u64; 6]), y: *(a.add(6) as *const [u64; 6]) };
+    let f2 = SyscallComplex384 { x: *(b as *const [u64; 6]), y: *(b.add(6) as *const [u64; 6]) };
 
-    let result = sub_fp2_bls12_381(a_in.try_into().unwrap(), b_in.try_into().unwrap());
+    let mut params = SyscallBls12_381ComplexSubParams { f1: &mut f1, f2: &f2 };
+    syscall_bls12_381_complex_sub(&mut params);
 
-    let out = core::slice::from_raw_parts_mut(a, 12);
-    out.copy_from_slice(&result);
+    *(a as *mut [u64; 6]) = f1.x;
+    *(a.add(6) as *mut [u64; 6]) = f1.y;
 }
 
 /// # Safety
-///
-/// Multiplication in Fp2
-#[inline]
-pub unsafe fn mul_fp2_bls12_381_ptr(a: *mut u64, b: *const u64) {
-    let a_in = core::slice::from_raw_parts(a as *const u64, 12);
-    let b_in = core::slice::from_raw_parts(b, 12);
+/// - `a` must point to a valid `[u64; 12]` (96 bytes), used as both input and output.
+/// - `b` must point to a valid `[u64; 12]` (96 bytes).
+#[no_mangle]
+pub unsafe extern "C" fn mul_fp2_bls12_381_c(a: *mut u64, b: *const u64) {
+    let mut f1 =
+        SyscallComplex384 { x: *(a as *const [u64; 6]), y: *(a.add(6) as *const [u64; 6]) };
+    let f2 = SyscallComplex384 { x: *(b as *const [u64; 6]), y: *(b.add(6) as *const [u64; 6]) };
 
-    let result = mul_fp2_bls12_381(a_in.try_into().unwrap(), b_in.try_into().unwrap());
+    let mut params = SyscallBls12_381ComplexMulParams { f1: &mut f1, f2: &f2 };
+    syscall_bls12_381_complex_mul(&mut params);
 
-    let out = core::slice::from_raw_parts_mut(a, 12);
-    out.copy_from_slice(&result);
+    *(a as *mut [u64; 6]) = f1.x;
+    *(a.add(6) as *mut [u64; 6]) = f1.y;
 }
 
 /// # Safety
-///
-/// Squaring in Fp2
-#[inline]
-pub unsafe fn square_fp2_bls12_381_ptr(a: *mut u64) {
-    let a_in = core::slice::from_raw_parts(a as *const u64, 12);
+/// - `a` must point to a valid `[u64; 12]` (96 bytes), used as both input and output.
+#[no_mangle]
+pub unsafe extern "C" fn square_fp2_bls12_381_c(a: *mut u64) {
+    let mut f1 =
+        SyscallComplex384 { x: *(a as *const [u64; 6]), y: *(a.add(6) as *const [u64; 6]) };
+    let f2 = SyscallComplex384 { x: f1.x, y: f1.y };
 
-    let result = square_fp2_bls12_381(a_in.try_into().unwrap());
+    let mut params = SyscallBls12_381ComplexMulParams { f1: &mut f1, f2: &f2 };
+    syscall_bls12_381_complex_mul(&mut params);
 
-    let out = core::slice::from_raw_parts_mut(a, 12);
-    out.copy_from_slice(&result);
+    *(a as *mut [u64; 6]) = f1.x;
+    *(a.add(6) as *mut [u64; 6]) = f1.y;
 }
 
 /// # Safety
-///
-/// Inversion of a non-zero element in Fp2
-#[inline]
-pub unsafe fn inv_fp2_bls12_381_ptr(a: *mut u64) {
-    let a_in = core::slice::from_raw_parts(a as *const u64, 12).try_into().unwrap();
-
-    let result = inv_fp2_bls12_381(&a_in);
-
-    let out = core::slice::from_raw_parts_mut(a, 12);
-    out.copy_from_slice(&result);
+/// - `a` must point to a valid `[u64; 12]` (96 bytes), used as both input and output.
+/// - Element must be non-zero.
+#[no_mangle]
+pub unsafe extern "C" fn inv_fp2_bls12_381_c(a: *mut u64) {
+    let a_ref = &*(a as *const [u64; 12]);
+    let result = inv_fp2_bls12_381(a_ref);
+    *(a as *mut [u64; 12]) = result;
 }

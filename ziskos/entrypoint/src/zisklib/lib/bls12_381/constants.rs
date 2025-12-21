@@ -12,6 +12,20 @@ pub const E_B: [u64; 6] = [0x4, 0, 0, 0, 0, 0];
 /// B parameter of the twist E': y² = x³ + 4·(1+u)
 pub const ETWISTED_B: [u64; 12] = [0x4, 0x0, 0x0, 0x0, 0x0, 0x0, 0x4, 0x0, 0x0, 0x0, 0x0, 0x0];
 
+/// Identity element in G1
+pub const IDENTITY_G1: [u64; 12] = {
+    let mut tmp = [0u64; 12];
+    tmp[6] = 1;
+    tmp
+};
+
+/// Identity element in G2
+pub const IDENTITY_G2: [u64; 24] = {
+    let mut tmp = [0u64; 24];
+    tmp[12] = 1;
+    tmp
+};
+
 /// Base field size
 pub const P: [u64; 6] = [
     0xB9FEFFFFFFFFAAAB,
@@ -33,7 +47,10 @@ pub const R: [u64; 4] =
 pub const R_MINUS_ONE: [u64; 4] = [R[0] - 1, R[1], R[2], R[3]];
 
 /// A known non-quadratic residue in Fp
-pub const NQR: [u64; 6] = [2, 0, 0, 0, 0, 0];
+pub const NQR_FP: [u64; 6] = [2, 0, 0, 0, 0, 0];
+
+/// A known non-quadratic residue in Fp2
+pub const NQR_FP2: [u64; 12] = [1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0];
 
 /// This is the the order-3 element of for the σ endomorphism
 pub const GAMMA: [u64; 6] = [
