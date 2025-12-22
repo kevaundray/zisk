@@ -8,10 +8,8 @@ use crate::zisklib::{
 };
 
 use super::{
-    big_int256_div::*, big_int_div::*, bin_decomp::*, bls12_381_fp2_inv::*, bls12_381_fp2_sqrt::*,
-    bls12_381_fp_inv::*, bls12_381_fp_sqrt::*, bls12_381_twist::*, bn254_fp::*, bn254_fp2::*,
-    bn254_twist::*, msb_pos_256::*, msb_pos_384::*, secp256k1_fn_inv::*, secp256k1_fp_inv::*,
-    secp256k1_fp_sqrt::*,
+    big_int256_div::*, big_int_div::*, bin_decomp::*, bls12_381::*, bn254::*, msb_pos_256::*,
+    msb_pos_384::*, secp256k1::*,
 };
 
 pub fn fcall_proxy(id: u64, params: &[u64], results: &mut [u64]) -> i64 {
