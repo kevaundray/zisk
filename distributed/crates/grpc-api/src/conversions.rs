@@ -9,12 +9,13 @@
 //! model. All conversions implement the `From` and/or `Into` traits for idiomatic Rust usage.
 
 use crate::{
-    contribution_params::InputSource, coordinator_message::Payload, execute_task_request,
-    execute_task_response, job_status_response, jobs_list_response, launch_proof_response,
-    system_status_response, workers_list_response, AggParams, Challenges,
+    contribution_params::{HintsSource, InputSource},
+    coordinator_message::Payload,
+    execute_task_request, execute_task_response, job_status_response, jobs_list_response,
+    launch_proof_response, system_status_response, workers_list_response, AggParams, Challenges,
     ComputeCapacity as GrpcComputeCapacity, ContributionParams, CoordinatorMessage,
-    ExecuteTaskRequest, ExecuteTaskResponse, Heartbeat, HeartbeatAck, InputMode, InputUris,
-    JobCancelled, JobStatus, JobStatusResponse, JobsList, JobsListResponse, LaunchProofRequest,
+    ExecuteTaskRequest, ExecuteTaskResponse, Heartbeat, HeartbeatAck, InputMode, JobCancelled,
+    JobStatus, JobStatusResponse, JobsList, JobsListResponse, LaunchProofRequest,
     LaunchProofResponse, Metrics, Proof, ProofList, ProveParams, Shutdown, StatusInfoResponse,
     SystemStatus, SystemStatusResponse, TaskType, WorkerError, WorkerInfo, WorkerReconnectRequest,
     WorkerRegisterRequest, WorkerRegisterResponse, WorkersList, WorkersListResponse,
@@ -153,14 +154,16 @@ impl From<SystemStatusDto> for SystemStatusResponse {
 
 impl From<LaunchProofRequestDto> for LaunchProofRequest {
     fn from(dto: LaunchProofRequestDto) -> Self {
-        let (inputs_mode, inputs_uri, hints_uri) = match dto.inputs_mode {
-            InputModeDto::InputModeNone => (InputMode::None, None, None),
-            InputModeDto::InputModePath(inputs, hints) => {
-                (InputMode::Path, Some(inputs), Some(hints))
-            }
-            InputModeDto::InputModeData(inputs, hints) => {
-                (InputMode::Data, Some(inputs), Some(hints))
-            }
+        let (inputs_mode, inputs_uri) = match dto.inputs_mode {
+            InputModeDto::InputModeNone => (InputMode::None, None),
+            InputModeDto::InputModeUri(inputs_uri) => (InputMode::Uri, Some(inputs_uri)),
+            InputModeDto::InputModeData(inputs_uri) => (InputMode::Data, Some(inputs_uri)),
+        };
+
+        let (hints_mode, hints_uri) = match dto.hints_mode {
+            InputModeDto::InputModeNone => (InputMode::None, None),
+            InputModeDto::InputModeUri(hints_uri) => (InputMode::Uri, Some(hints_uri)),
+            InputModeDto::InputModeData(hints_uri) => (InputMode::Data, Some(hints_uri)),
         };
 
         LaunchProofRequest {
@@ -168,6 +171,7 @@ impl From<LaunchProofRequestDto> for LaunchProofRequest {
             compute_capacity: dto.compute_capacity,
             inputs_mode: inputs_mode.into(),
             inputs_uri,
+            hints_mode: hints_mode.into(),
             hints_uri,
             simulated_node: dto.simulated_node,
         }
@@ -185,23 +189,32 @@ impl TryFrom<LaunchProofRequest> for LaunchProofRequestDto {
             compute_capacity: req.compute_capacity,
             inputs_mode: match InputMode::try_from(req.inputs_mode).unwrap_or(InputMode::None) {
                 InputMode::None => InputModeDto::InputModeNone,
-                InputMode::Path => {
+                InputMode::Uri => {
                     let inputs_uri = req.inputs_uri.ok_or_else(|| {
                         anyhow::anyhow!("Input mode is Path but inputs_uri is missing")
                     })?;
-                    let hints_uri = req.hints_uri.ok_or_else(|| {
-                        anyhow::anyhow!("Input mode is Path but hints_uri is missing")
-                    })?;
-                    InputModeDto::InputModePath(inputs_uri, hints_uri)
+                    InputModeDto::InputModeUri(inputs_uri)
                 }
                 InputMode::Data => {
                     let inputs_uri = req.inputs_uri.ok_or_else(|| {
                         anyhow::anyhow!("Input mode is Data but inputs_uri is missing")
                     })?;
+                    InputModeDto::InputModeData(inputs_uri)
+                }
+            },
+            hints_mode: match InputMode::try_from(req.hints_mode).unwrap_or(InputMode::None) {
+                InputMode::None => InputModeDto::InputModeNone,
+                InputMode::Uri => {
                     let hints_uri = req.hints_uri.ok_or_else(|| {
-                        anyhow::anyhow!("Input mode is Data but hints_uri is missing")
+                        anyhow::anyhow!("Hints mode is Path but hints_uri is missing")
                     })?;
-                    InputModeDto::InputModeData(inputs_uri, hints_uri)
+                    InputModeDto::InputModeUri(hints_uri)
+                }
+                InputMode::Data => {
+                    let hints_uri = req.hints_uri.ok_or_else(|| {
+                        anyhow::anyhow!("Hints mode is Data but hints_uri is missing")
+                    })?;
+                    InputModeDto::InputModeData(hints_uri)
                 }
             },
             simulated_node: req.simulated_node,
@@ -327,16 +340,21 @@ impl From<ExecuteTaskRequestDto> for ExecuteTaskRequest {
 impl From<ContributionParamsDto> for ContributionParams {
     fn from(dto: ContributionParamsDto) -> Self {
         let input_source = match dto.input_source {
-            InputSourceDto::InputPath(inputs_path, hints_uri) => {
-                Some(InputSource::InputPath(InputUris { inputs_path, hints_path: hints_uri }))
-            }
+            InputSourceDto::InputPath(inputs_path) => Some(InputSource::InputPath(inputs_path)),
             InputSourceDto::InputData(data) => Some(InputSource::InputData(data)),
+            InputSourceDto::InputNull => None,
+        };
+
+        let hints_source = match dto.hints_source {
+            InputSourceDto::InputPath(hints_path) => Some(HintsSource::HintsPath(hints_path)),
+            InputSourceDto::InputData(data) => Some(HintsSource::HintsData(data)),
             InputSourceDto::InputNull => None,
         };
 
         ContributionParams {
             data_id: dto.data_id.as_string(),
             input_source,
+            hints_source,
             rank_id: dto.rank_id,
             total_workers: dto.total_workers,
             worker_allocation: dto.worker_allocation,

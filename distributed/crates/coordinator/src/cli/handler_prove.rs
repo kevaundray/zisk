@@ -33,7 +33,17 @@ pub async fn handle(
         if direct_inputs {
             InputMode::Data
         } else {
-            InputMode::Path
+            InputMode::Uri
+        }
+    } else {
+        InputMode::None
+    };
+
+    let hints_mode = if hints_uri.is_some() {
+        if direct_inputs {
+            InputMode::Data
+        } else {
+            InputMode::Uri
         }
     } else {
         InputMode::None
@@ -53,6 +63,7 @@ pub async fn handle(
         compute_capacity,
         inputs_mode: inputs_mode.into(),
         inputs_uri,
+        hints_mode: hints_mode.into(),
         hints_uri,
         simulated_node,
     };

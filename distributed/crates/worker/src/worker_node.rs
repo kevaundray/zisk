@@ -12,7 +12,7 @@ use zisk_distributed_common::{
     AggProofData, AggregationParams, DataCtx, InputSourceDto, WorkerState,
 };
 use zisk_distributed_common::{DataId, JobId};
-use zisk_distributed_grpc_api::contribution_params::InputSource;
+use zisk_distributed_grpc_api::contribution_params::{HintsSource, InputSource};
 use zisk_distributed_grpc_api::execute_task_response::ResultData;
 use zisk_distributed_grpc_api::*;
 use zisk_sdk::{Asm, Emu, ZiskBackend};
@@ -516,24 +516,15 @@ impl<T: ZiskBackend + 'static> WorkerNodeGrpc<T> {
 
         let job_id = JobId::from(request.job_id);
         let input_source = match params.input_source {
-            Some(InputSource::InputPath(ref input_uris)) => {
+            Some(InputSource::InputPath(ref inputs_uris)) => {
                 // Validate and get the full path
                 let inputs_uri = Self::validate_subdir(
                     &self.worker_config.worker.inputs_folder,
-                    &PathBuf::from(&input_uris.inputs_path),
+                    &PathBuf::from(&inputs_uris),
                 )
                 .await?;
 
-                let hints_uri = Self::validate_subdir(
-                    &self.worker_config.worker.inputs_folder,
-                    &PathBuf::from(&input_uris.hints_path),
-                )
-                .await?;
-
-                InputSourceDto::InputPath(
-                    inputs_uri.to_string_lossy().to_string(),
-                    hints_uri.to_string_lossy().to_string(),
-                )
+                InputSourceDto::InputPath(inputs_uri.to_string_lossy().to_string())
             }
             Some(InputSource::InputData(data)) => InputSourceDto::InputData(data),
             None => {
@@ -541,7 +532,25 @@ impl<T: ZiskBackend + 'static> WorkerNodeGrpc<T> {
             }
         };
 
-        let data_ctx = DataCtx { data_id: DataId::from(params.data_id), input_source };
+        let hints_source = match params.hints_source {
+            Some(HintsSource::HintsPath(ref hints_uris)) => {
+                // Validate and get the full path
+                let hints_uri = Self::validate_subdir(
+                    &self.worker_config.worker.inputs_folder,
+                    &PathBuf::from(&hints_uris),
+                )
+                .await?;
+
+                InputSourceDto::InputPath(hints_uri.to_string_lossy().to_string())
+            }
+            Some(HintsSource::HintsData(data)) => InputSourceDto::InputData(data),
+            None => {
+                return Err(anyhow!("Hints source missing in ContributionParams"));
+            }
+        };
+
+        let data_ctx =
+            DataCtx { data_id: DataId::from(params.data_id), input_source, hints_source };
 
         let job = self.worker.new_job(
             job_id,

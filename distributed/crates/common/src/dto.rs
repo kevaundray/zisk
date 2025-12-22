@@ -72,21 +72,21 @@ pub enum InputModeDto {
     InputModeNone = 0,
     // Input will be provided as a path. First String is the inputs path,
     // second String is the precompiles hints path
-    InputModePath(String, String) = 1,
+    InputModeUri(String) = 1,
     // Input will be provided as a path. First String is the inputs path URI,
     // second String is the precompiles hints URI
-    InputModeData(String, String) = 2,
+    InputModeData(String) = 2,
 }
 
 impl Display for InputModeDto {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             InputModeDto::InputModeNone => write!(f, "None"),
-            InputModeDto::InputModePath(inputs, hints) => {
-                write!(f, "Path(inputs: {}, hints: {})", inputs, hints)
+            InputModeDto::InputModeUri(inputs) => {
+                write!(f, "Path({})", inputs)
             }
-            InputModeDto::InputModeData(inputs, hints) => {
-                write!(f, "Data(inputs: {}, hints: {})", inputs, hints)
+            InputModeDto::InputModeData(inputs) => {
+                write!(f, "Data( {})", inputs)
             }
         }
     }
@@ -96,6 +96,7 @@ pub struct LaunchProofRequestDto {
     pub data_id: DataId,
     pub compute_capacity: u32,
     pub inputs_mode: InputModeDto,
+    pub hints_mode: InputModeDto,
     pub simulated_node: Option<u32>,
 }
 
@@ -161,6 +162,7 @@ pub enum ExecuteTaskRequestTypeDto {
 pub struct ContributionParamsDto {
     pub data_id: DataId,
     pub input_source: InputSourceDto,
+    pub hints_source: InputSourceDto,
     pub rank_id: u32,
     pub total_workers: u32,
     pub worker_allocation: Vec<u32>,
@@ -169,7 +171,7 @@ pub struct ContributionParamsDto {
 
 #[derive(Debug, Clone, BorshSerialize, BorshDeserialize)]
 pub enum InputSourceDto {
-    InputPath(String, String), // (inputs_path, hints_path)
+    InputPath(String),
     InputData(Vec<u8>),
     InputNull,
 }

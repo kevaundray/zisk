@@ -335,6 +335,7 @@ impl Coordinator {
                 request.data_id.clone(),
                 required_compute_capacity,
                 request.inputs_mode,
+                request.hints_mode,
                 request.simulated_node,
             )
             .await?;
@@ -528,6 +529,7 @@ impl Coordinator {
         data_id: DataId,
         required_compute_capacity: ComputeCapacity,
         inputs_mode: InputModeDto,
+        hints_mode: InputModeDto,
         simulated_node: Option<u32>,
     ) -> CoordinatorResult<Job> {
         let execution_mode = if let Some(node) = simulated_node {
@@ -548,6 +550,7 @@ impl Coordinator {
         Ok(Job::new(
             data_id,
             inputs_mode,
+            hints_mode,
             required_compute_capacity,
             selected_workers,
             partitions,
@@ -605,10 +608,10 @@ impl Coordinator {
         active_workers: &[WorkerId],
     ) -> CoordinatorResult<()> {
         let input_source = match job.inputs_mode {
-            InputModeDto::InputModePath(ref inputs_uri, ref hints_uri) => {
-                InputSourceDto::InputPath(inputs_uri.clone(), hints_uri.clone())
+            InputModeDto::InputModeUri(ref inputs_uri) => {
+                InputSourceDto::InputPath(inputs_uri.clone())
             }
-            InputModeDto::InputModeData(ref inputs_uri, ref _hints_uri) => {
+            InputModeDto::InputModeData(ref inputs_uri) => {
                 let inputs = tokio::fs::read(inputs_uri).await.map_err(|e| {
                     CoordinatorError::Internal(format!(
                         "Failed to read input data for job {}: {}",
@@ -616,6 +619,22 @@ impl Coordinator {
                     ))
                 })?;
                 InputSourceDto::InputData(inputs)
+            }
+            InputModeDto::InputModeNone => InputSourceDto::InputNull,
+        };
+
+        let hints_source = match &job.hints_mode {
+            InputModeDto::InputModeUri(ref hints_uri) => {
+                InputSourceDto::InputPath(hints_uri.clone())
+            }
+            InputModeDto::InputModeData(ref hints_uri) => {
+                let hints = tokio::fs::read(hints_uri).await.map_err(|e| {
+                    CoordinatorError::Internal(format!(
+                        "Failed to read hints data for job {}: {}",
+                        job.job_id, e
+                    ))
+                })?;
+                InputSourceDto::InputData(hints)
             }
             InputModeDto::InputModeNone => InputSourceDto::InputNull,
         };
@@ -630,6 +649,7 @@ impl Coordinator {
             let job_id = job.job_id.clone();
             let data_id = job.data_id.clone();
             let input_source = input_source.clone();
+            let hints_source = hints_source.clone();
             let worker_allocation = job.partitions[rank_id].clone();
             let job_compute_capacity = job.compute_capacity;
             let workers_pool = &self.workers_pool;
@@ -641,6 +661,7 @@ impl Coordinator {
                     params: ExecuteTaskRequestTypeDto::ContributionParams(ContributionParamsDto {
                         data_id,
                         input_source,
+                        hints_source,
                         rank_id: rank_id as u32,
                         total_workers,
                         worker_allocation,

@@ -497,6 +497,7 @@ impl<T: ZiskBackend + 'static> Worker<T> {
                 prover.as_ref(),
                 phase_inputs,
                 job.data_ctx.input_source.clone(),
+                job.data_ctx.hints_source.clone(),
                 options,
             )
             .await;
@@ -528,17 +529,16 @@ impl<T: ZiskBackend + 'static> Worker<T> {
         prover: &ZiskProver<T>,
         phase_inputs: ProvePhaseInputs,
         input_source: InputSourceDto,
+        hints_source: InputSourceDto,
         options: ProofOptions,
     ) -> Result<Vec<ContributionsInfo>> {
         let phase = proofman::ProvePhase::Contributions;
 
         match input_source {
-            InputSourceDto::InputPath(inputs_uri, hints_uri) => {
+            InputSourceDto::InputPath(inputs_uri) => {
                 let stdin = ZiskStdin::from_file(inputs_uri)?;
-                let hints_stream = StreamSource::from_uri(hints_uri.into())?;
 
                 prover.set_stdin(stdin);
-                prover.set_hints_stream(hints_stream)?;
             }
             InputSourceDto::InputData(input_data) => {
                 let stdin = ZiskStdin::from_vec(input_data);
@@ -547,6 +547,20 @@ impl<T: ZiskBackend + 'static> Worker<T> {
             InputSourceDto::InputNull => {
                 let stdin = ZiskStdin::null();
                 prover.set_stdin(stdin);
+            }
+        }
+
+        match hints_source {
+            InputSourceDto::InputPath(hints_uri) => {
+                let hints_stream = StreamSource::from_uri(hints_uri.into())?;
+                prover.set_hints_stream(hints_stream)?;
+            }
+            InputSourceDto::InputData(hints_data) => {
+                let hints_stream = StreamSource::from_vec(hints_data);
+                prover.set_hints_stream(hints_stream)?;
+            }
+            InputSourceDto::InputNull => {
+                // No hints to set
             }
         }
 
@@ -754,10 +768,11 @@ impl<T: ZiskBackend + 'static> Worker<T> {
 
         match phase {
             JobPhase::Contributions => {
-                let (job_id, phase_inputs, options, input_source_dto): (
+                let (job_id, phase_inputs, options, input_source_dto, hints_source_dto): (
                     JobId,
                     ProvePhaseInputs,
                     ProofOptions,
+                    InputSourceDto,
                     InputSourceDto,
                 ) = borsh::from_slice(&bytes[1..]).unwrap();
 
@@ -766,6 +781,7 @@ impl<T: ZiskBackend + 'static> Worker<T> {
                     self.prover.as_ref(),
                     phase_inputs,
                     input_source_dto,
+                    hints_source_dto,
                     options,
                 )
                 .await;

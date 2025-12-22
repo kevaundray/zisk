@@ -1,4 +1,4 @@
-use crate::io::{QuicStreamReader, UnixSocketStreamReader};
+use crate::io::{MemoryStreamReader, QuicStreamReader, UnixSocketStreamReader};
 
 use super::{FileStreamReader, NullStreamReader};
 
@@ -25,6 +25,7 @@ pub enum StreamSource {
     Null(NullStreamReader),
     UnixSocket(UnixSocketStreamReader),
     Quic(QuicStreamReader),
+    Memory(MemoryStreamReader),
 }
 
 impl StreamSource {
@@ -36,6 +37,11 @@ impl StreamSource {
     /// Create a file-based stdin
     pub fn from_file<P: AsRef<std::path::Path>>(path: P) -> Result<Self> {
         Ok(StreamSource::File(FileStreamReader::new(path)?))
+    }
+
+    /// Create a memory-based stdin
+    pub fn from_vec(data: Vec<u8>) -> Self {
+        StreamSource::Memory(MemoryStreamReader::new(data))
     }
 
     /// Create a Unix socket-based stdin
@@ -93,6 +99,7 @@ impl StreamRead for StreamSource {
             StreamSource::Null(null_stream) => null_stream.open(),
             StreamSource::UnixSocket(unix_stream) => unix_stream.open(),
             StreamSource::Quic(quic_stream) => quic_stream.open(),
+            StreamSource::Memory(memory_stream) => memory_stream.open(),
         }
     }
 
@@ -103,6 +110,7 @@ impl StreamRead for StreamSource {
             StreamSource::Null(null_stream) => null_stream.next(),
             StreamSource::UnixSocket(unix_stream) => unix_stream.next(),
             StreamSource::Quic(quic_stream) => quic_stream.next(),
+            StreamSource::Memory(memory_stream) => memory_stream.next(),
         }
     }
 
@@ -113,6 +121,7 @@ impl StreamRead for StreamSource {
             StreamSource::Null(null_stream) => null_stream.close(),
             StreamSource::UnixSocket(unix_stream) => unix_stream.close(),
             StreamSource::Quic(quic_stream) => quic_stream.close(),
+            StreamSource::Memory(memory_stream) => memory_stream.close(),
         }
     }
 
@@ -123,6 +132,7 @@ impl StreamRead for StreamSource {
             StreamSource::Null(null_stream) => null_stream.is_active(),
             StreamSource::UnixSocket(unix_stream) => unix_stream.is_active(),
             StreamSource::Quic(quic_stream) => quic_stream.is_active(),
+            StreamSource::Memory(memory_stream) => memory_stream.is_active(),
         }
     }
 }

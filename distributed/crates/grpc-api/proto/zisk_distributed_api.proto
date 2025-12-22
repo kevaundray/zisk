@@ -57,13 +57,14 @@ message LaunchProofRequest {
   uint32 compute_capacity = 2;
   InputMode inputs_mode = 3;
   optional string inputs_uri = 4;
-  optional string hints_uri = 5;
-  optional uint32 simulated_node = 6; // If set, indicates this is a simulated worker
+  InputMode hints_mode = 5;
+  optional string hints_uri = 6;
+  optional uint32 simulated_node = 7; // If set, indicates this is a simulated worker
 }
 
 enum InputMode {
   INPUT_MODE_NONE = 0;  // No input provided
-  INPUT_MODE_PATH = 1;  // Input will be provided as a path
+  INPUT_MODE_URI = 1;   // Input will be provided as an URI
   INPUT_MODE_DATA = 2;  // Input data will be sent directly
 }
 
@@ -232,18 +233,17 @@ enum TaskType {
 message ContributionParams {
   string data_id = 1;
   oneof input_source {
-    InputUris input_path = 2;
+    string input_path = 2;
     bytes input_data = 3;
   }
-  uint32 rank_id = 4;
-  uint32 total_workers = 5;
-  repeated uint32 worker_allocation = 6;
-  uint32 job_compute_units = 7;
-}
-
-message InputUris {
-  string inputs_path = 1;
-  string hints_path = 2;
+  oneof hints_source {
+    string hints_path = 4;
+    bytes hints_data = 5;
+  }
+  uint32 rank_id = 6;
+  uint32 total_workers = 7;
+  repeated uint32 worker_allocation = 8;
+  uint32 job_compute_units = 9;
 }
 
 message ProveParams {
