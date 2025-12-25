@@ -4,8 +4,6 @@
 //! These DTOs serve as the canonical data structures for business logic, separate from external
 //! representations like gRPC protobuf types or serialization formats.
 
-use std::fmt::Display;
-
 use crate::{ComputeCapacity, DataId, JobId, JobPhase, JobState, WorkerId, WorkerState};
 use borsh::{BorshDeserialize, BorshSerialize};
 use chrono::{DateTime, Utc};
@@ -75,20 +73,6 @@ pub enum InputsModeDto {
     InputsData(String),
 }
 
-impl Display for InputsModeDto {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            InputsModeDto::InputsNone => write!(f, "None"),
-            InputsModeDto::InputsUri(inputs) => {
-                write!(f, "Path({})", inputs)
-            }
-            InputsModeDto::InputsData(inputs) => {
-                write!(f, "Data({})", inputs)
-            }
-        }
-    }
-}
-
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum HintsModeDto {
     /// No hints are provided.
@@ -97,20 +81,6 @@ pub enum HintsModeDto {
     HintsUri(String),
     /// Hints will be streamed from the given URI endpoint.
     HintsStream(String),
-}
-
-impl Display for HintsModeDto {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            HintsModeDto::HintsNone => write!(f, "None"),
-            HintsModeDto::HintsUri(inputs) => {
-                write!(f, "Path({})", inputs)
-            }
-            HintsModeDto::HintsStream(inputs) => {
-                write!(f, "Stream({})", inputs)
-            }
-        }
-    }
 }
 
 pub struct LaunchProofRequestDto {
