@@ -1,4 +1,4 @@
-use anyhow::{anyhow, Result};
+use anyhow::Result;
 use cargo_zisk::commands::{get_proving_key, get_witness_computation_lib};
 use proofman::{AggProofs, ContributionsInfo};
 use rom_setup::{
@@ -10,7 +10,9 @@ use std::sync::Arc;
 use tokio::sync::{mpsc, Mutex};
 use tokio::task::JoinHandle;
 use zisk_common::io::{StreamSource, ZiskStdin};
-use zisk_distributed_common::{AggregationParams, DataCtx, InputSourceDto, JobPhase, WorkerState};
+use zisk_distributed_common::{
+    AggregationParams, DataCtx, HintsSourceDto, InputSourceDto, JobPhase, WorkerState,
+};
 use zisk_distributed_common::{ComputeCapacity, JobId, WorkerId};
 use zisk_sdk::{Asm, Emu, ProverClient, ZiskBackend, ZiskProver};
 
@@ -529,7 +531,7 @@ impl<T: ZiskBackend + 'static> Worker<T> {
         prover: &ZiskProver<T>,
         phase_inputs: ProvePhaseInputs,
         input_source: InputSourceDto,
-        hints_source: InputSourceDto,
+        hints_source: HintsSourceDto,
         options: ProofOptions,
     ) -> Result<Vec<ContributionsInfo>> {
         let phase = proofman::ProvePhase::Contributions;
@@ -544,9 +546,6 @@ impl<T: ZiskBackend + 'static> Worker<T> {
                 let stdin = ZiskStdin::from_vec(input_data);
                 prover.set_stdin(stdin);
             }
-            InputSourceDto::InputStream(_) => {
-                return Err(anyhow!("Input source is in streaming mode but stream not completed"));
-            }
             InputSourceDto::InputNull => {
                 let stdin = ZiskStdin::null();
                 prover.set_stdin(stdin);
@@ -554,19 +553,15 @@ impl<T: ZiskBackend + 'static> Worker<T> {
         }
 
         match hints_source {
-            InputSourceDto::InputPath(hints_uri) => {
+            HintsSourceDto::HintsPath(hints_uri) => {
                 let hints_stream = StreamSource::from_uri(hints_uri.into())?;
                 prover.set_hints_stream(hints_stream)?;
             }
-            InputSourceDto::InputData(hints_data) => {
-                let hints_stream = StreamSource::from_vec(hints_data);
-                prover.set_hints_stream(hints_stream)?;
-            }
-            InputSourceDto::InputStream(hints_uri) => {
+            HintsSourceDto::HintsStream(hints_uri) => {
                 let hints_stream = StreamSource::from_uri(hints_uri.into())?;
                 prover.set_hints_stream(hints_stream)?;
             }
-            InputSourceDto::InputNull => {
+            HintsSourceDto::HintsNull => {
                 // No hints to set
             }
         }
@@ -780,7 +775,7 @@ impl<T: ZiskBackend + 'static> Worker<T> {
                     ProvePhaseInputs,
                     ProofOptions,
                     InputSourceDto,
-                    InputSourceDto,
+                    HintsSourceDto,
                 ) = borsh::from_slice(&bytes[1..]).unwrap();
 
                 let result = Self::execute_contribution_task(

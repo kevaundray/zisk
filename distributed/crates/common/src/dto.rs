@@ -70,14 +70,10 @@ pub struct SystemStatusDto {
 pub enum InputModeDto {
     // No input provided
     InputModeNone = 0,
-    // Input will be provided as a path. First String is the inputs path,
-    // second String is the precompiles hints path
+    // Input will be provided as a path.
     InputModeUri(String) = 1,
-    // Input will be provided as a path. First String is the inputs path URI,
-    // second String is the precompiles hints URI
+    // Input will be embedded directly as data.
     InputModeData(String) = 2,
-    // Input will be streamed via StreamStart/Data/End messages. String contains the file path to stream.
-    InputModeStream(String) = 3,
 }
 
 impl Display for InputModeDto {
@@ -90,7 +86,30 @@ impl Display for InputModeDto {
             InputModeDto::InputModeData(inputs) => {
                 write!(f, "Data({})", inputs)
             }
-            InputModeDto::InputModeStream(inputs) => {
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[repr(i32)]
+pub enum HintsModeDto {
+    // No input provided
+    InputModeNone = 0,
+    // Input will be provided as a path. First String is the inputs path,
+    // second String is the precompiles hints path
+    InputModeUri(String) = 1,
+    // Input will be streamed via StreamStart/Data/End messages. String contains the file path to stream.
+    InputModeStream(String) = 2,
+}
+
+impl Display for HintsModeDto {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            HintsModeDto::InputModeNone => write!(f, "None"),
+            HintsModeDto::InputModeUri(inputs) => {
+                write!(f, "Path({})", inputs)
+            }
+            HintsModeDto::InputModeStream(inputs) => {
                 write!(f, "Stream({})", inputs)
             }
         }
@@ -101,7 +120,7 @@ pub struct LaunchProofRequestDto {
     pub data_id: DataId,
     pub compute_capacity: u32,
     pub inputs_mode: InputModeDto,
-    pub hints_mode: InputModeDto,
+    pub hints_mode: HintsModeDto,
     pub simulated_node: Option<u32>,
 }
 
@@ -135,7 +154,7 @@ pub enum CoordinatorMessageDto {
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum StreamTypeDto {
     Start,
-    Data,  
+    Data,
     End,
 }
 
@@ -188,7 +207,7 @@ pub enum ExecuteTaskRequestTypeDto {
 pub struct ContributionParamsDto {
     pub data_id: DataId,
     pub input_source: InputSourceDto,
-    pub hints_source: InputSourceDto,
+    pub hints_source: HintsSourceDto,
     pub rank_id: u32,
     pub total_workers: u32,
     pub worker_allocation: Vec<u32>,
@@ -199,8 +218,14 @@ pub struct ContributionParamsDto {
 pub enum InputSourceDto {
     InputPath(String),
     InputData(Vec<u8>),
-    InputStream(String),
     InputNull,
+}
+
+#[derive(Debug, Clone, BorshSerialize, BorshDeserialize)]
+pub enum HintsSourceDto {
+    HintsPath(String),
+    HintsStream(String),
+    HintsNull,
 }
 
 pub struct ProveParamsDto {

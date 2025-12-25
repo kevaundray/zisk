@@ -99,14 +99,12 @@ impl PrecompileHintsRelay {
 
     fn send_hints_start(&self) {
         let seq_num = self.sequence_number.fetch_add(1, Ordering::SeqCst);
-        println!("Sending CTRL_START with sequence number {}", seq_num);
 
         self.runtime_handle.block_on((self.dispatcher)(seq_num, StreamTypeDto::Start, vec![]));
     }
 
     fn send_hints_data(&self, hints: Vec<u64>) {
         let seq_num = self.sequence_number.fetch_add(1, Ordering::SeqCst);
-        println!("Sending Hints DATA with sequence number {}", seq_num);
 
         // Convert Vec<u64> to Vec<u8> for wire protocol
         let payload = unsafe {
@@ -123,7 +121,6 @@ impl PrecompileHintsRelay {
 
     fn send_hints_end(&self) {
         let seq_num = self.sequence_number.fetch_add(1, Ordering::SeqCst);
-        println!("Sending CTRL_END with sequence number {}", seq_num);
 
         self.runtime_handle.block_on((self.dispatcher)(seq_num, StreamTypeDto::End, vec![]));
     }

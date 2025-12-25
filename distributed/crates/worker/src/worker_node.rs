@@ -11,8 +11,8 @@ use tonic::transport::Channel;
 use tonic::Request;
 use tracing::{error, info};
 use zisk_distributed_common::{
-    AggProofData, AggregationParams, DataCtx, InputSourceDto, StreamPayloadDto, StreamTypeDto,
-    WorkerState,
+    AggProofData, AggregationParams, DataCtx, HintsSourceDto, InputSourceDto, StreamPayloadDto,
+    StreamTypeDto, WorkerState,
 };
 use zisk_distributed_common::{DataId, JobId};
 use zisk_distributed_grpc_api::contribution_params::InputSource;
@@ -549,13 +549,13 @@ impl<T: ZiskBackend + 'static> WorkerNodeGrpc<T> {
                 )
                 .await?;
 
-                InputSourceDto::InputPath(hints_uri.to_string_lossy().to_string())
+                HintsSourceDto::HintsPath(hints_uri.to_string_lossy().to_string())
             } else {
                 // Hints will be streamed - use placeholder, will be updated when stream completes
-                InputSourceDto::InputStream(params.hints_path.as_ref().unwrap().clone())
+                HintsSourceDto::HintsStream(params.hints_path.as_ref().unwrap().clone())
             }
         } else {
-            InputSourceDto::InputNull
+            HintsSourceDto::HintsNull
         };
 
         let data_ctx =
@@ -749,9 +749,6 @@ impl<T: ZiskBackend + 'static> WorkerNodeGrpc<T> {
         let stream_data_dto: StreamDataDto = stream_data.into();
         let job_id = stream_data_dto.job_id;
         let stream_type = stream_data_dto.stream_type;
-
-        println!("Job ID: {}", job_id.as_string());
-        println!("Stream Type: {:?}", stream_type);
 
         // Check the existence of stream buffer based on stream type
         if stream_type == StreamTypeDto::Start {

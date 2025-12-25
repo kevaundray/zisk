@@ -42,7 +42,6 @@ use dashmap::DashMap;
 use proofman::ContributionsInfo;
 use std::{
     collections::HashMap,
-    hint,
     sync::{
         atomic::{AtomicU64, Ordering},
         Arc,
@@ -55,11 +54,12 @@ use zisk_common::io::{StreamSource, ZiskStream};
 use zisk_distributed_common::{
     AggParamsDto, AggProofData, ChallengesDto, ComputeCapacity, ContributionParamsDto,
     CoordinatorMessageDto, DataId, ExecuteTaskRequestDto, ExecuteTaskRequestTypeDto,
-    ExecuteTaskResponseDto, ExecuteTaskResponseResultDataDto, HeartbeatAckDto, InputModeDto,
-    InputSourceDto, Job, JobExecutionMode, JobId, JobPhase, JobResult, JobResultData, JobState,
-    JobStatusDto, JobsListDto, LaunchProofRequestDto, LaunchProofResponseDto, MetricsDto, ProofDto,
-    ProveParamsDto, StatusInfoDto, StreamTypeDto, SystemStatusDto, WorkerErrorDto, WorkerId,
-    WorkerReconnectRequestDto, WorkerRegisterRequestDto, WorkerState, WorkersListDto,
+    ExecuteTaskResponseDto, ExecuteTaskResponseResultDataDto, HeartbeatAckDto, HintsModeDto,
+    HintsSourceDto, InputModeDto, InputSourceDto, Job, JobExecutionMode, JobId, JobPhase,
+    JobResult, JobResultData, JobState, JobStatusDto, JobsListDto, LaunchProofRequestDto,
+    LaunchProofResponseDto, MetricsDto, ProofDto, ProveParamsDto, StatusInfoDto, StreamTypeDto,
+    SystemStatusDto, WorkerErrorDto, WorkerId, WorkerReconnectRequestDto, WorkerRegisterRequestDto,
+    WorkerState, WorkersListDto,
 };
 
 /// Trait for sending messages to workers through various communication channels.
@@ -531,7 +531,7 @@ impl Coordinator {
         data_id: DataId,
         required_compute_capacity: ComputeCapacity,
         inputs_mode: InputModeDto,
-        hints_mode: InputModeDto,
+        hints_mode: HintsModeDto,
         simulated_node: Option<u32>,
     ) -> CoordinatorResult<Job> {
         let execution_mode = if let Some(node) = simulated_node {
@@ -622,31 +622,18 @@ impl Coordinator {
                 })?;
                 InputSourceDto::InputData(inputs)
             }
-            InputModeDto::InputModeStream(_) => {
-                // TODO! Inputs streaming not yet supported
-                InputSourceDto::InputNull
-            }
             InputModeDto::InputModeNone => InputSourceDto::InputNull,
         };
 
         let hints_source = match &job.hints_mode {
-            InputModeDto::InputModeUri(ref hints_uri) => {
-                InputSourceDto::InputPath(hints_uri.clone())
+            HintsModeDto::InputModeUri(ref hints_uri) => {
+                HintsSourceDto::HintsPath(hints_uri.clone())
             }
-            InputModeDto::InputModeData(ref hints_uri) => {
-                let hints = tokio::fs::read(hints_uri).await.map_err(|e| {
-                    CoordinatorError::Internal(format!(
-                        "Failed to read hints data for job {}: {}",
-                        job.job_id, e
-                    ))
-                })?;
-                InputSourceDto::InputData(hints)
-            }
-            InputModeDto::InputModeStream(hints_uri) => {
+            HintsModeDto::InputModeStream(hints_uri) => {
                 // Hints will be streamed separately
-                InputSourceDto::InputStream(hints_uri.clone())
+                HintsSourceDto::HintsStream(hints_uri.clone())
             }
-            InputModeDto::InputModeNone => InputSourceDto::InputNull,
+            HintsModeDto::InputModeNone => HintsSourceDto::HintsNull,
         };
 
         // Use Arc to avoid expensive clones
@@ -694,7 +681,7 @@ impl Coordinator {
             }
         });
 
-        if matches!(hints_source, InputSourceDto::InputStream(_)) {
+        if matches!(hints_source, HintsSourceDto::HintsStream(_)) {
             self.initialize_stream(job, cloned_active_workers)?;
         }
 
@@ -726,7 +713,7 @@ impl Coordinator {
         cloned_active_workers: Vec<WorkerId>,
     ) -> Result<(), CoordinatorError> {
         let hints_uri = match &job.hints_mode {
-            InputModeDto::InputModeStream(uri) => uri,
+            HintsModeDto::InputModeStream(uri) => uri,
             _ => unreachable!(),
         };
         let job_id_clone = job.job_id.clone();

@@ -9,10 +9,9 @@
 //! model. All conversions implement the `From` and/or `Into` traits for idiomatic Rust usage.
 
 use crate::{
-    contribution_params::{InputSource},
-    coordinator_message::Payload,
-    execute_task_request, execute_task_response, job_status_response, jobs_list_response,
-    launch_proof_response, system_status_response, workers_list_response, AggParams, Challenges,
+    contribution_params::InputSource, coordinator_message::Payload, execute_task_request,
+    execute_task_response, job_status_response, jobs_list_response, launch_proof_response,
+    system_status_response, workers_list_response, AggParams, Challenges,
     ComputeCapacity as GrpcComputeCapacity, ContributionParams, CoordinatorMessage,
     ExecuteTaskRequest, ExecuteTaskResponse, Heartbeat, HeartbeatAck, InputMode, JobCancelled,
     JobStatus, JobStatusResponse, JobsList, JobsListResponse, LaunchProofRequest,
@@ -159,14 +158,12 @@ impl From<LaunchProofRequestDto> for LaunchProofRequest {
             InputModeDto::InputModeNone => (InputMode::None, None),
             InputModeDto::InputModeUri(inputs_uri) => (InputMode::Uri, Some(inputs_uri)),
             InputModeDto::InputModeData(inputs_uri) => (InputMode::Data, Some(inputs_uri)),
-            InputModeDto::InputModeStream(inputs_uri) => (InputMode::Stream, Some(inputs_uri)),
         };
 
         let (hints_mode, hints_uri) = match dto.hints_mode {
-            InputModeDto::InputModeNone => (InputMode::None, None),
-            InputModeDto::InputModeUri(hints_uri) => (InputMode::Uri, Some(hints_uri)),
-            InputModeDto::InputModeData(hints_uri) => (InputMode::Data, Some(hints_uri)),
-            InputModeDto::InputModeStream(hints_uri) => (InputMode::Stream, Some(hints_uri)),
+            HintsModeDto::InputModeNone => (InputMode::None, None),
+            HintsModeDto::InputModeUri(hints_uri) => (InputMode::Uri, Some(hints_uri)),
+            HintsModeDto::InputModeStream(hints_uri) => (InputMode::Stream, Some(hints_uri)),
         };
 
         LaunchProofRequest {
@@ -204,33 +201,23 @@ impl TryFrom<LaunchProofRequest> for LaunchProofRequestDto {
                     })?;
                     InputModeDto::InputModeData(inputs_uri)
                 }
-                InputMode::Stream => {
-                    let inputs_uri = req.inputs_uri.ok_or_else(|| {
-                        anyhow::anyhow!("Input mode is Stream but inputs_uri is missing")
-                    })?;
-                    InputModeDto::InputModeStream(inputs_uri)
-                }
+                _ => return Err(anyhow::anyhow!("Invalid inputs_mode for LaunchProofRequestDto")),
             },
             hints_mode: match InputMode::try_from(req.hints_mode).unwrap_or(InputMode::None) {
-                InputMode::None => InputModeDto::InputModeNone,
+                InputMode::None => HintsModeDto::InputModeNone,
                 InputMode::Uri => {
                     let hints_uri = req.hints_uri.ok_or_else(|| {
                         anyhow::anyhow!("Hints mode is Path but hints_uri is missing")
                     })?;
-                    InputModeDto::InputModeUri(hints_uri)
-                }
-                InputMode::Data => {
-                    let hints_uri = req.hints_uri.ok_or_else(|| {
-                        anyhow::anyhow!("Hints mode is Data but hints_uri is missing")
-                    })?;
-                    InputModeDto::InputModeData(hints_uri)
+                    HintsModeDto::InputModeUri(hints_uri)
                 }
                 InputMode::Stream => {
                     let hints_uri = req.hints_uri.ok_or_else(|| {
                         anyhow::anyhow!("Hints mode is Stream but hints_uri is missing")
                     })?;
-                    InputModeDto::InputModeStream(hints_uri)
+                    HintsModeDto::InputModeStream(hints_uri)
                 }
+                _ => return Err(anyhow::anyhow!("Invalid hints_mode for LaunchProofRequestDto")),
             },
             simulated_node: req.simulated_node,
         })
@@ -360,14 +347,13 @@ impl From<ContributionParamsDto> for ContributionParams {
         let input_source = match dto.input_source {
             InputSourceDto::InputPath(inputs_path) => Some(InputSource::InputPath(inputs_path)),
             InputSourceDto::InputData(data) => Some(InputSource::InputData(data)),
-            InputSourceDto::InputStream(_) | InputSourceDto::InputNull => None,
+            InputSourceDto::InputNull => None,
         };
 
         let (hints_path, hints_stream) = match dto.hints_source {
-            InputSourceDto::InputPath(hints_path) => (Some(hints_path), false),
-            InputSourceDto::InputData(_) => (None, false),
-            InputSourceDto::InputStream(hints_path) => (Some(hints_path), true),
-            InputSourceDto::InputNull => (None, false),
+            HintsSourceDto::HintsPath(hints_path) => (Some(hints_path), false),
+            HintsSourceDto::HintsStream(hints_path) => (Some(hints_path), true),
+            HintsSourceDto::HintsNull => (None, false),
         };
 
         ContributionParams {
