@@ -11,7 +11,7 @@ pub fn secp256k1_fn_reduce(x: &[u64; 4], hints: &mut Vec<u64>) -> [u64; 4] {
     }
 
     // x·1 + 0
-    let mut module: [u64; 4] = N.clone();
+    let mut module: [u64; 4] = N;
     let mut d: [u64; 4] = [0; 4];
     arith256_mod_c(x, &O, &Z, &mut module, &mut d);
     hints.extend_from_slice(&d);
@@ -21,7 +21,7 @@ pub fn secp256k1_fn_reduce(x: &[u64; 4], hints: &mut Vec<u64>) -> [u64; 4] {
 
 pub fn secp256k1_fn_mul(x: &[u64; 4], y: &[u64; 4], result: &mut [u64; 4], hints: &mut Vec<u64>) {
     // x·y + 0
-    let mut module: [u64; 4] = N.clone();
+    let mut module: [u64; 4] = N;
     arith256_mod_c(x, y, &Z, &mut module, result);
     hints.extend_from_slice(result);
 }
@@ -33,7 +33,7 @@ pub fn secp256k1_fn_inv(x: &[u64; 4], x_inv: &mut [u64; 4], hints: &mut Vec<u64>
     hints.extend_from_slice(x_inv);
 
     // Check that x·x_inv = 1 (N)
-    let mut module: [u64; 4] = N.clone();
+    let mut module: [u64; 4] = N;
     let mut d: [u64; 4] = [0; 4];
     arith256_mod_c(x, x_inv, &Z, &mut module, &mut d);
     hints.extend_from_slice(&module);

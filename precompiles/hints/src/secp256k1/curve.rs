@@ -77,7 +77,7 @@ pub fn secp256k1_double_scalar_mul_with_g(
     let mut k1_rec = [0u64; 4];
     let mut k2_rec = [0u64; 4];
     // We do the first iteration separately
-    let _max_limb = max_limb as usize;
+    let _max_limb = max_limb;
     let k1_bit = (k1[_max_limb] >> max_bit) & 1;
     let k2_bit = (k2[_max_limb] >> max_bit) & 1;
     assert!(k1_bit == 1 || k2_bit == 1); // At least one of the scalars should start with 1
@@ -135,7 +135,7 @@ pub fn secp256k1_double_scalar_mul_with_g(
 
     // Perform the rest of the loop
     for i in (0..=max_limb).rev() {
-        let _i = i as usize;
+        let _i = i;
         let bit_len = if i == max_limb { max_bit - 1 } else { 63 };
         for j in (0..=bit_len).rev() {
             let k1_bit = (k1[_i] >> j) & 1;
@@ -218,11 +218,11 @@ pub fn secp256k1_ecdsa_verify(
     secp256k1_fn_inv(s, s_inv, hints);
 
     let u1: &mut [u64; 4] = &mut [0; 4];
-    secp256k1_fn_mul(z, &s_inv, u1, hints);
+    secp256k1_fn_mul(z, s_inv, u1, hints);
     let u2: &mut [u64; 4] = &mut [0; 4];
-    secp256k1_fn_mul(r, &s_inv, u2, hints);
+    secp256k1_fn_mul(r, s_inv, u2, hints);
 
-    let (is_infinity, res) = secp256k1_double_scalar_mul_with_g(&u1, &u2, pk, hints);
+    let (is_infinity, res) = secp256k1_double_scalar_mul_with_g(u1, u2, pk, hints);
     if is_infinity {
         return false;
     }
