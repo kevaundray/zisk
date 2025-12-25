@@ -13,8 +13,8 @@ use crate::{
     execute_task_response, job_status_response, jobs_list_response, launch_proof_response,
     system_status_response, workers_list_response, AggParams, Challenges,
     ComputeCapacity as GrpcComputeCapacity, ContributionParams, CoordinatorMessage,
-    ExecuteTaskRequest, ExecuteTaskResponse, Heartbeat, HeartbeatAck, InputMode, JobCancelled,
-    JobStatus, JobStatusResponse, JobsList, JobsListResponse, LaunchProofRequest,
+    ExecuteTaskRequest, ExecuteTaskResponse, Heartbeat, HeartbeatAck, HintsMode, InputMode,
+    JobCancelled, JobStatus, JobStatusResponse, JobsList, JobsListResponse, LaunchProofRequest,
     LaunchProofResponse, Metrics, Proof, ProofList, ProveParams, Shutdown, StatusInfoResponse,
     StreamData, StreamPayload, StreamType, SystemStatus, SystemStatusResponse, TaskType,
     WorkerError, WorkerInfo, WorkerReconnectRequest, WorkerRegisterRequest, WorkerRegisterResponse,
@@ -161,9 +161,9 @@ impl From<LaunchProofRequestDto> for LaunchProofRequest {
         };
 
         let (hints_mode, hints_uri) = match dto.hints_mode {
-            HintsModeDto::HintsNone => (InputMode::None, None),
-            HintsModeDto::HintsUri(hints_uri) => (InputMode::Uri, Some(hints_uri)),
-            HintsModeDto::HintsStream(hints_uri) => (InputMode::Stream, Some(hints_uri)),
+            HintsModeDto::HintsNone => (HintsMode::None, None),
+            HintsModeDto::HintsUri(hints_uri) => (HintsMode::Uri, Some(hints_uri)),
+            HintsModeDto::HintsStream(hints_uri) => (HintsMode::Stream, Some(hints_uri)),
         };
 
         LaunchProofRequest {
@@ -191,7 +191,7 @@ impl TryFrom<LaunchProofRequest> for LaunchProofRequestDto {
                 InputMode::None => InputsModeDto::InputsNone,
                 InputMode::Uri => {
                     let inputs_uri = req.inputs_uri.ok_or_else(|| {
-                        anyhow::anyhow!("Input mode is Path but inputs_uri is missing")
+                        anyhow::anyhow!("Input mode is Uri but inputs_uri is missing")
                     })?;
                     InputsModeDto::InputsUri(inputs_uri)
                 }
@@ -201,23 +201,21 @@ impl TryFrom<LaunchProofRequest> for LaunchProofRequestDto {
                     })?;
                     InputsModeDto::InputsData(inputs_uri)
                 }
-                _ => return Err(anyhow::anyhow!("Invalid inputs_mode for LaunchProofRequestDto")),
             },
-            hints_mode: match InputMode::try_from(req.hints_mode).unwrap_or(InputMode::None) {
-                InputMode::None => HintsModeDto::HintsNone,
-                InputMode::Uri => {
+            hints_mode: match HintsMode::try_from(req.hints_mode).unwrap_or(HintsMode::None) {
+                HintsMode::None => HintsModeDto::HintsNone,
+                HintsMode::Uri => {
                     let hints_uri = req.hints_uri.ok_or_else(|| {
-                        anyhow::anyhow!("Hints mode is Path but hints_uri is missing")
+                        anyhow::anyhow!("Hints mode is Uri but hints_uri is missing")
                     })?;
                     HintsModeDto::HintsUri(hints_uri)
                 }
-                InputMode::Stream => {
+                HintsMode::Stream => {
                     let hints_uri = req.hints_uri.ok_or_else(|| {
                         anyhow::anyhow!("Hints mode is Stream but hints_uri is missing")
                     })?;
                     HintsModeDto::HintsStream(hints_uri)
                 }
-                _ => return Err(anyhow::anyhow!("Invalid hints_mode for LaunchProofRequestDto")),
             },
             simulated_node: req.simulated_node,
         })

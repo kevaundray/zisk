@@ -5,10 +5,11 @@ use tonic::transport::Channel;
 use tracing::{error, info};
 use zisk_distributed_coordinator::Config;
 use zisk_distributed_grpc_api::{
-    zisk_distributed_api_client::ZiskDistributedApiClient, InputMode, LaunchProofRequest,
+    zisk_distributed_api_client::ZiskDistributedApiClient, HintsMode, InputMode, LaunchProofRequest,
 };
 
 /// Handle the prove subcommand - makes RPC request to coordinator
+#[allow(clippy::too_many_arguments)]
 pub async fn handle(
     coordinator_url: Option<String>,
     data_id: Option<String>,
@@ -37,9 +38,9 @@ pub async fn handle(
     };
 
     let hints_mode = match hints_uri {
-        None => InputMode::None,
-        Some(_) if direct_hints => InputMode::Stream,
-        Some(_) => InputMode::Uri,
+        None => HintsMode::None,
+        Some(_) if direct_hints => HintsMode::Stream,
+        Some(_) => HintsMode::Uri,
     };
 
     // ID will be id if present, else input file name or random UUID
