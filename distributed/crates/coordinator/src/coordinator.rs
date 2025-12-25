@@ -57,7 +57,7 @@ use zisk_distributed_common::{
     ExecuteTaskResponseDto, ExecuteTaskResponseResultDataDto, HeartbeatAckDto, HintsModeDto,
     HintsSourceDto, InputSourceDto, InputsModeDto, Job, JobExecutionMode, JobId, JobPhase,
     JobResult, JobResultData, JobState, JobStatusDto, JobsListDto, LaunchProofRequestDto,
-    LaunchProofResponseDto, MetricsDto, ProofDto, ProveParamsDto, StatusInfoDto, StreamTypeDto,
+    LaunchProofResponseDto, MetricsDto, ProofDto, ProveParamsDto, StatusInfoDto, StreamMessageKind,
     SystemStatusDto, WorkerErrorDto, WorkerId, WorkerReconnectRequestDto, WorkerRegisterRequestDto,
     WorkerState, WorkersListDto,
 };
@@ -720,7 +720,7 @@ impl Coordinator {
 
         // Async dispatcher - no blocking, pure async flow for maximum performance
         let dispatcher =
-            move |sequence_number: u32, stream_type: StreamTypeDto, payload: Vec<u8>| {
+            move |sequence_number: u32, stream_type: StreamMessageKind, payload: Vec<u8>| {
                 use futures::future::join_all;
                 use zisk_distributed_common::{StreamDataDto, StreamPayloadDto};
 

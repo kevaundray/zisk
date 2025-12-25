@@ -149,16 +149,19 @@ pub enum CoordinatorMessageDto {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub enum StreamTypeDto {
+pub enum StreamMessageKind {
+    /// Marks the beginning of a stream. No payload is expected.
     Start,
+    /// Contains a chunk of stream data.
     Data,
+    /// Marks the end of a stream. No payload is expected.
     End,
 }
 
 #[derive(Debug, Clone)]
 pub struct StreamDataDto {
     pub job_id: JobId,
-    pub stream_type: StreamTypeDto,
+    pub stream_type: StreamMessageKind,
     pub stream_payload: Option<StreamPayloadDto>,
 }
 

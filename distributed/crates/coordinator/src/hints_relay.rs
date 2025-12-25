@@ -6,10 +6,12 @@ use std::pin::Pin;
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::Arc;
 use zisk_common::{io::StreamProcessor, PrecompileHint, CTRL_END, CTRL_START, NUM_HINT_TYPES};
-use zisk_distributed_common::StreamTypeDto;
+use zisk_distributed_common::StreamMessageKind;
 
 type AsyncDispatcher = Arc<
-    dyn Fn(u32, StreamTypeDto, Vec<u8>) -> Pin<Box<dyn Future<Output = ()> + Send>> + Send + Sync,
+    dyn Fn(u32, StreamMessageKind, Vec<u8>) -> Pin<Box<dyn Future<Output = ()> + Send>>
+        + Send
+        + Sync,
 >;
 
 pub struct PrecompileHintsRelay {
@@ -21,12 +23,12 @@ pub struct PrecompileHintsRelay {
 impl PrecompileHintsRelay {
     pub fn new<F, Fut>(dispatcher: F) -> Self
     where
-        F: Fn(u32, StreamTypeDto, Vec<u8>) -> Fut + Send + Sync + 'static,
+        F: Fn(u32, StreamMessageKind, Vec<u8>) -> Fut + Send + Sync + 'static,
         Fut: Future<Output = ()> + Send + 'static,
     {
         let dispatcher = Arc::new(
             move |seq: u32,
-                  stream_type: StreamTypeDto,
+                  stream_type: StreamMessageKind,
                   payload: Vec<u8>|
                   -> Pin<Box<dyn Future<Output = ()> + Send>> {
                 Box::pin(dispatcher(seq, stream_type, payload))
@@ -100,7 +102,7 @@ impl PrecompileHintsRelay {
     fn send_hints_start(&self) {
         let seq_num = self.sequence_number.fetch_add(1, Ordering::SeqCst);
 
-        self.runtime_handle.block_on((self.dispatcher)(seq_num, StreamTypeDto::Start, vec![]));
+        self.runtime_handle.block_on((self.dispatcher)(seq_num, StreamMessageKind::Start, vec![]));
     }
 
     fn send_hints_data(&self, hints: Vec<u64>) {
@@ -116,13 +118,13 @@ impl PrecompileHintsRelay {
             Vec::from_raw_parts(ptr, len, capacity)
         };
 
-        self.runtime_handle.block_on((self.dispatcher)(seq_num, StreamTypeDto::Data, payload));
+        self.runtime_handle.block_on((self.dispatcher)(seq_num, StreamMessageKind::Data, payload));
     }
 
     fn send_hints_end(&self) {
         let seq_num = self.sequence_number.fetch_add(1, Ordering::SeqCst);
 
-        self.runtime_handle.block_on((self.dispatcher)(seq_num, StreamTypeDto::End, vec![]));
+        self.runtime_handle.block_on((self.dispatcher)(seq_num, StreamMessageKind::End, vec![]));
     }
 }
 

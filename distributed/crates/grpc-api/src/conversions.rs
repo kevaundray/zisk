@@ -470,22 +470,22 @@ impl From<HeartbeatAck> for HeartbeatAckDto {
     }
 }
 
-impl From<StreamTypeDto> for StreamType {
-    fn from(dto: StreamTypeDto) -> StreamType {
+impl From<StreamMessageKind> for StreamType {
+    fn from(dto: StreamMessageKind) -> StreamType {
         match dto {
-            StreamTypeDto::Start => StreamType::Start,
-            StreamTypeDto::Data => StreamType::Data,
-            StreamTypeDto::End => StreamType::End,
+            StreamMessageKind::Start => StreamType::Start,
+            StreamMessageKind::Data => StreamType::Data,
+            StreamMessageKind::End => StreamType::End,
         }
     }
 }
 
-impl From<StreamType> for StreamTypeDto {
-    fn from(stream_type: StreamType) -> StreamTypeDto {
+impl From<StreamType> for StreamMessageKind {
+    fn from(stream_type: StreamType) -> StreamMessageKind {
         match stream_type {
-            StreamType::Start => StreamTypeDto::Start,
-            StreamType::Data => StreamTypeDto::Data,
-            StreamType::End => StreamTypeDto::End,
+            StreamType::Start => StreamMessageKind::Start,
+            StreamType::Data => StreamMessageKind::Data,
+            StreamType::End => StreamMessageKind::End,
         }
     }
 }
@@ -505,8 +505,8 @@ impl From<StreamData> for StreamDataDto {
         StreamDataDto {
             job_id: JobId::from(data.job_id),
             stream_type: StreamType::try_from(data.stream_type)
-                .map(StreamTypeDto::from)
-                .unwrap_or(StreamTypeDto::Data),
+                .map(StreamMessageKind::from)
+                .unwrap_or(StreamMessageKind::Data),
             stream_payload: data.payload.map(Into::into),
         }
     }

@@ -11,8 +11,8 @@ use tonic::transport::Channel;
 use tonic::Request;
 use tracing::{error, info};
 use zisk_distributed_common::{
-    AggProofData, AggregationParams, DataCtx, HintsSourceDto, InputSourceDto, StreamPayloadDto,
-    StreamTypeDto, WorkerState,
+    AggProofData, AggregationParams, DataCtx, HintsSourceDto, InputSourceDto, StreamMessageKind,
+    StreamPayloadDto, WorkerState,
 };
 use zisk_distributed_common::{DataId, JobId};
 use zisk_distributed_grpc_api::contribution_params::InputSource;
@@ -751,7 +751,7 @@ impl<T: ZiskBackend + 'static> WorkerNodeGrpc<T> {
         let stream_type = stream_data_dto.stream_type;
 
         // Check the existence of stream buffer based on stream type
-        if stream_type == StreamTypeDto::Start {
+        if stream_type == StreamMessageKind::Start {
             // Check if buffer already exists
             match self.stream_buffers.entry(job_id.clone()) {
                 Entry::Occupied(_) => {
@@ -763,7 +763,7 @@ impl<T: ZiskBackend + 'static> WorkerNodeGrpc<T> {
             }
 
             return Ok(());
-        } else if stream_type == StreamTypeDto::End {
+        } else if stream_type == StreamMessageKind::End {
             // Ensure buffer exists
             if !self.stream_buffers.contains_key(&job_id) {
                 return Err(
