@@ -5,7 +5,7 @@ use std::{
 
 use colored::Colorize;
 
-use crate::{get_elf_data_hash, DEFAULT_CACHE_PATH};
+use crate::{ensure_dir_exists, get_elf_data_hash, DEFAULT_CACHE_PATH};
 
 #[allow(unused_variables)]
 pub fn rom_full_setup(
@@ -41,10 +41,6 @@ pub fn rom_full_setup(
 
     tracing::info!("Computing merkle root");
     crate::rom_merkle_setup(elf, &elf_hash, output_path.as_path(), proving_key, false)?;
-
-    tracing::info!("Computing Verification key");
-    crate::rom_vkey()?;
-
     // Assembly setup is not needed on macOS due to the lack of support for assembly generation.
     #[cfg(not(target_os = "macos"))]
     {
@@ -67,12 +63,4 @@ pub fn rom_full_setup(
     );
 
     Ok(())
-}
-
-fn ensure_dir_exists(path: &PathBuf) {
-    if let Err(e) = std::fs::create_dir_all(path) {
-        if e.kind() != std::io::ErrorKind::AlreadyExists {
-            panic!("Failed to create cache directory {path:?}: {e}");
-        }
-    }
 }
