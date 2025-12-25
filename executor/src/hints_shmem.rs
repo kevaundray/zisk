@@ -1,4 +1,4 @@
-//! HintsShmem is responsible for writting precompile processed hints to shared memory.
+//! HintsShmem is responsible for writing precompile processed hints to shared memory.
 //!
 //! It implements the HintsSink trait to receive processed hints and write them to shared memory
 //! using SharedMemoryWriter instances.
