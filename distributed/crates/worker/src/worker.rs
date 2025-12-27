@@ -5,13 +5,15 @@ use rom_setup::{
     gen_elf_hash, get_elf_bin_file_path, get_elf_data_hash, get_rom_blowup_factor_and_arity,
     DEFAULT_CACHE_PATH,
 };
+use std::collections::hash_map::Entry;
 use std::fs;
 use std::sync::Arc;
 use tokio::sync::{mpsc, Mutex};
 use tokio::task::JoinHandle;
 use zisk_common::io::{StreamSource, ZiskStdin};
 use zisk_distributed_common::{
-    AggregationParams, DataCtx, HintsSourceDto, InputSourceDto, JobPhase, WorkerState,
+    AggregationParams, DataCtx, HintsSourceDto, InputSourceDto, JobPhase, StreamDataDto,
+    StreamMessageKind, StreamPayloadDto, WorkerState,
 };
 use zisk_distributed_common::{ComputeCapacity, JobId, WorkerId};
 use zisk_sdk::{Asm, Emu, ProverClient, ZiskBackend, ZiskProver};
@@ -257,6 +259,8 @@ pub struct Worker<T: ZiskBackend + 'static> {
 
     prover: Arc<ZiskProver<T>>,
     prover_config: ProverConfig,
+
+    stream_buffers: HashMap<JobId, (u32, HashMap<u32, Vec<u8>>)>, // (job_id, (next_seq, (seq_number, data)))
 }
 
 impl<T: ZiskBackend + 'static> Worker<T> {
@@ -289,6 +293,7 @@ impl<T: ZiskBackend + 'static> Worker<T> {
             current_computation: None,
             prover,
             prover_config,
+            stream_buffers: HashMap::new(),
         })
     }
 
@@ -324,6 +329,7 @@ impl<T: ZiskBackend + 'static> Worker<T> {
             current_computation: None,
             prover,
             prover_config,
+            stream_buffers: HashMap::new(),
         })
     }
 
@@ -584,6 +590,78 @@ impl<T: ZiskBackend + 'static> Worker<T> {
         };
 
         Ok(challenge)
+    }
+
+    pub async fn process_stream_data(&mut self, stream_data: StreamDataDto) -> Result<()> {
+        let job_id = stream_data.job_id;
+        let stream_type = stream_data.stream_type;
+
+        // Check the existence of stream buffer based on stream type
+        if stream_type == StreamMessageKind::Start {
+            dbg!("Received START for job {}", job_id.clone());
+            // Check if buffer already exists
+            match self.stream_buffers.entry(job_id.clone()) {
+                Entry::Occupied(_) => {
+                    return Err(anyhow::anyhow!("Received duplicate START for job {}", job_id));
+                }
+                Entry::Vacant(entry) => {
+                    entry.insert((1, HashMap::new()));
+                }
+            }
+
+            return Ok(());
+        } else if stream_type == StreamMessageKind::End {
+            dbg!("Received END for job {}", job_id.clone());
+            // Ensure buffer exists
+            if !self.stream_buffers.contains_key(&job_id) {
+                return Err(anyhow::anyhow!(
+                    "Received {:?} without START for job {}",
+                    stream_type,
+                    job_id,
+                ));
+            }
+
+            return Ok(());
+        }
+
+        let element = self.stream_buffers.get_mut(&job_id).ok_or_else(|| {
+            anyhow::anyhow!(
+                "Received stream data without START for job {} stream type {:?}",
+                job_id,
+                stream_type
+            )
+        })?;
+
+        let next_seq = &mut element.0;
+        let stream_buffer = &mut element.1;
+
+        let StreamPayloadDto { sequence_number, payload: data } =
+            stream_data.stream_payload.ok_or_else(|| {
+                anyhow::anyhow!(
+                    "Missing stream payload for job {} stream type {:?}",
+                    job_id,
+                    stream_type
+                )
+            })?;
+
+        // Validate sequence number
+        if sequence_number != *next_seq {
+            stream_buffer.insert(sequence_number, data);
+            return Ok(());
+        }
+
+        // TODO!!!!! submit to HintsShmem
+
+        // If equals, process it and check for subsequent buffered chunks
+        *next_seq += 1;
+        println!("Received stream data seq {} for job {}", sequence_number, job_id);
+
+        while let Some(_buffered_data) = stream_buffer.remove(next_seq) {
+            *next_seq += 1;
+            println!("Processed buffered stream data seq {} for job {}", next_seq, job_id);
+        }
+
+        Ok(())
     }
 
     pub async fn prove(
