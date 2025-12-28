@@ -156,13 +156,13 @@ impl From<LaunchProofRequestDto> for LaunchProofRequest {
     fn from(dto: LaunchProofRequestDto) -> Self {
         let (inputs_mode, inputs_uri) = match dto.inputs_mode {
             InputsModeDto::InputsNone => (InputMode::None, None),
-            InputsModeDto::InputsUri(inputs_uri) => (InputMode::Uri, Some(inputs_uri)),
+            InputsModeDto::InputsPath(inputs_path) => (InputMode::Path, Some(inputs_path)),
             InputsModeDto::InputsData(inputs_uri) => (InputMode::Data, Some(inputs_uri)),
         };
 
         let (hints_mode, hints_uri) = match dto.hints_mode {
             HintsModeDto::HintsNone => (HintsMode::None, None),
-            HintsModeDto::HintsUri(hints_uri) => (HintsMode::Uri, Some(hints_uri)),
+            HintsModeDto::HintsPath(hints_path) => (HintsMode::Path, Some(hints_path)),
             HintsModeDto::HintsStream(hints_uri) => (HintsMode::Stream, Some(hints_uri)),
         };
 
@@ -189,11 +189,11 @@ impl TryFrom<LaunchProofRequest> for LaunchProofRequestDto {
             compute_capacity: req.compute_capacity,
             inputs_mode: match InputMode::try_from(req.inputs_mode).unwrap_or(InputMode::None) {
                 InputMode::None => InputsModeDto::InputsNone,
-                InputMode::Uri => {
+                InputMode::Path => {
                     let inputs_uri = req.inputs_uri.ok_or_else(|| {
                         anyhow::anyhow!("Input mode is Uri but inputs_uri is missing")
                     })?;
-                    InputsModeDto::InputsUri(inputs_uri)
+                    InputsModeDto::InputsPath(inputs_uri)
                 }
                 InputMode::Data => {
                     let inputs_uri = req.inputs_uri.ok_or_else(|| {
@@ -204,11 +204,11 @@ impl TryFrom<LaunchProofRequest> for LaunchProofRequestDto {
             },
             hints_mode: match HintsMode::try_from(req.hints_mode).unwrap_or(HintsMode::None) {
                 HintsMode::None => HintsModeDto::HintsNone,
-                HintsMode::Uri => {
+                HintsMode::Path => {
                     let hints_uri = req.hints_uri.ok_or_else(|| {
                         anyhow::anyhow!("Hints mode is Uri but hints_uri is missing")
                     })?;
-                    HintsModeDto::HintsUri(hints_uri)
+                    HintsModeDto::HintsPath(hints_uri)
                 }
                 HintsMode::Stream => {
                     let hints_uri = req.hints_uri.ok_or_else(|| {

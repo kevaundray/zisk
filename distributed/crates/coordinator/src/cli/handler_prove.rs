@@ -34,13 +34,13 @@ pub async fn handle(
     let inputs_mode = match inputs_uri {
         None => InputMode::None,
         Some(_) if direct_inputs => InputMode::Data,
-        Some(_) => InputMode::Uri,
+        Some(_) => InputMode::Path,
     };
 
     let hints_mode = match hints_uri {
         None => HintsMode::None,
         Some(_) if stream_hints => HintsMode::Stream,
-        Some(_) => HintsMode::Uri,
+        Some(_) => HintsMode::Path,
     };
 
     // ID will be id if present, else input file name or random UUID

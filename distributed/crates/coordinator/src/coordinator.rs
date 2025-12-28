@@ -343,9 +343,10 @@ impl Coordinator {
             .await?;
 
         info!(
-            "[Job] Started {} successfully Inputs: {:?} Capacity: {} Workers: {}",
+            "[Job] Started {} successfully Inputs: {:?} Hints: {:?} Capacity: {} Workers: {}",
             job.job_id,
             job.inputs_mode,
+            job.hints_mode,
             job.compute_capacity,
             job.workers.len(),
         );
@@ -610,8 +611,8 @@ impl Coordinator {
         active_workers: &[WorkerId],
     ) -> CoordinatorResult<()> {
         let input_source = match job.inputs_mode {
-            InputsModeDto::InputsUri(ref inputs_uri) => {
-                InputSourceDto::InputPath(inputs_uri.clone())
+            InputsModeDto::InputsPath(ref inputs_path) => {
+                InputSourceDto::InputPath(inputs_path.clone())
             }
             InputsModeDto::InputsData(ref inputs_uri) => {
                 let inputs = tokio::fs::read(inputs_uri).await.map_err(|e| {
@@ -626,7 +627,7 @@ impl Coordinator {
         };
 
         let hints_source = match &job.hints_mode {
-            HintsModeDto::HintsUri(ref hints_uri) => HintsSourceDto::HintsPath(hints_uri.clone()),
+            HintsModeDto::HintsPath(ref hints_uri) => HintsSourceDto::HintsPath(hints_uri.clone()),
             HintsModeDto::HintsStream(hints_uri) => {
                 // Hints will be streamed separately
                 HintsSourceDto::HintsStream(hints_uri.clone())

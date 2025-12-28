@@ -68,7 +68,7 @@ pub enum InputsModeDto {
     // No inputs are provided
     InputsNone,
     /// Inputs are provided as a complete payload referenced by a URI.
-    InputsUri(String),
+    InputsPath(String),
     /// Inputs are provided directly as data.
     InputsData(String),
 }
@@ -78,7 +78,7 @@ pub enum HintsModeDto {
     /// No hints are provided.
     HintsNone,
     /// Hints are provided as a complete payload referenced by a URI.
-    HintsUri(String),
+    HintsPath(String),
     /// Hints will be streamed from the given URI endpoint.
     HintsStream(String),
 }
