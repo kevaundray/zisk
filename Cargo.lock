@@ -6020,6 +6020,7 @@ dependencies = [
  "config",
  "fields",
  "libloading",
+ "precompiles-hints",
  "proofman",
  "proofman-common",
  "rom-setup",
