@@ -680,11 +680,8 @@ impl Coordinator {
             }
         });
 
-        if matches!(hints_source, HintsSourceDto::HintsStream(_)) {
-            self.initialize_stream(job, cloned_active_workers)?;
-        }
-
-        let results: Vec<_> = stream::iter(tasks).buffer_unordered(10).collect().await;
+        // Process tasks with a concurrency limit
+        let results: Vec<_> = stream::iter(tasks).buffer_unordered(16).collect().await;
 
         // Check for any errors
         for (worker_id, send_result, state_result) in results {
@@ -701,6 +698,10 @@ impl Coordinator {
                     worker_id, e
                 ))
             })?;
+        }
+
+        if matches!(hints_source, HintsSourceDto::HintsStream(_)) {
+            self.initialize_stream(job, cloned_active_workers)?;
         }
 
         Ok(())
