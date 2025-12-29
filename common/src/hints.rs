@@ -84,9 +84,14 @@ pub struct PrecompileHint {
 
 impl std::fmt::Debug for PrecompileHint {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let data_display = if self.data.len() <= 10 {
+            format!("{:?}", self.data)
+        } else {
+            format!("{:?}... ({} more)", &self.data[..10], self.data.len() - 10)
+        };
         f.debug_struct("PrecompileHint")
             .field("hint_type", &self.hint_type)
-            .field("data", &self.data)
+            .field("data", &data_display)
             .finish()
     }
 }
