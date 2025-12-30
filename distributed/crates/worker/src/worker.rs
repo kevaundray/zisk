@@ -502,6 +502,7 @@ impl<T: ZiskBackend + 'static> Worker<T> {
                 guard.allocation.clone(),
                 guard.rank_id as usize,
             );
+
             let phase_inputs = proofman::ProvePhaseInputs::Contributions(proof_info);
 
             let inputs_source = guard.data_ctx.input_source.clone();
@@ -574,9 +575,9 @@ impl<T: ZiskBackend + 'static> Worker<T> {
                 let hints_stream = StreamSource::from_uri(hints_uri.into())?;
                 prover.set_hints_stream(hints_stream)?;
             }
-            HintsSourceDto::HintsStream(hints_uri) => {
-                let hints_stream = StreamSource::from_uri(hints_uri.into())?;
-                prover.set_hints_stream(hints_stream)?;
+            HintsSourceDto::HintsStream(_hints_uri) => {
+                // let hints_stream = StreamSource::from_uri(hints_uri.into())?;
+                // prover.set_hints_stream(hints_stream)?;
             }
             HintsSourceDto::HintsNull => {
                 // No hints to set

@@ -1208,11 +1208,9 @@ impl<F: PrimeField64> WitnessComponent<F> for ZiskExecutor<F> {
         self.stats.set_start_time(Instant::now());
 
         // Process and write precompile atomically
-        self.hints_stream
-            .lock()
-            .unwrap()
-            .start_stream()
-            .expect("Failed to write hints to shared memory");
+        if let Ok(mut hints_stream) = self.hints_stream.lock() {
+            let _ = hints_stream.start_stream();
+        }
 
         // Process the ROM to collect the Minimal Traces
         timer_start_info!(COMPUTE_MINIMAL_TRACE);
