@@ -11,4 +11,4 @@ mod core;
 pub use core::*;
 
 // Add hints-specific modules that only exist in ziskos-hints
-pub mod hints;
+pub mod handlers;
