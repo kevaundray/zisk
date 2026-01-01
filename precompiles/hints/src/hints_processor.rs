@@ -54,6 +54,58 @@ impl HintProcessorState {
     }
 }
 
+/// Builder for configuring and constructing a [`HintsProcessor`].
+pub struct HintsProcessorBuilder<HS: StreamSink + Send + Sync + 'static> {
+    hints_sink: HS,
+    num_threads: usize,
+    enable_stats: bool,
+}
+
+impl<HS: StreamSink + Send + Sync + 'static> HintsProcessorBuilder<HS> {
+    /// Sets the number of worker threads in the thread pool.
+    pub fn num_threads(mut self, num_threads: usize) -> Self {
+        self.num_threads = num_threads;
+        self
+    }
+
+    /// Enables or disables statistics collection.
+    pub fn enable_stats(mut self, enable: bool) -> Self {
+        self.enable_stats = enable;
+        self
+    }
+
+    /// Builds the [`HintsProcessor`] with the configured settings.
+    ///
+    /// # Returns
+    ///
+    /// * `Ok(HintsProcessor)` - Successfully constructed processor
+    /// * `Err` - If the thread pool fails to initialize
+    pub fn build(self) -> Result<HintsProcessor<HS>> {
+        let pool = ThreadPoolBuilder::new()
+            .num_threads(self.num_threads)
+            .build()
+            .map_err(|e| anyhow::anyhow!("Failed to create thread pool: {}", e))?;
+
+        let state = Arc::new(HintProcessorState::new());
+        let hints_sink = Arc::new(self.hints_sink);
+
+        // Spawn drainer thread
+        let drainer_state = Arc::clone(&state);
+        let drainer_sink = Arc::clone(&hints_sink);
+        let drainer_thread = std::thread::spawn(move || {
+            HintsProcessor::drainer_thread(drainer_state, drainer_sink);
+        });
+
+        Ok(HintsProcessor {
+            pool,
+            state,
+            stats: if self.enable_stats { Some(Mutex::new(HashMap::new())) } else { None },
+            hints_sink,
+            drainer_thread: ManuallyDrop::new(drainer_thread),
+        })
+    }
+}
+
 /// Processor for precompile hints that supports parallel execution.
 ///
 /// This struct provides methods to parse and process a stream of concatenated
@@ -67,7 +119,7 @@ pub struct HintsProcessor<HS: StreamSink + Send + Sync + 'static> {
     state: Arc<HintProcessorState>,
 
     /// Optional statistics collected during hint processing (for debugging).
-    stats: Mutex<HashMap<HintCode, usize>>,
+    stats: Option<Mutex<HashMap<HintCode, usize>>>,
 
     /// The hints sink used to submit processed hints (kept for ownership).
     #[allow(dead_code)]
@@ -80,52 +132,26 @@ pub struct HintsProcessor<HS: StreamSink + Send + Sync + 'static> {
 impl<HS: StreamSink + Send + Sync + 'static> HintsProcessor<HS> {
     const DEFAULT_NUM_THREADS: usize = 32;
 
-    /// Creates a new processor with the default number of threads.
-    ///
-    /// The default is 32 threads.
-    ///
-    /// # Returns
-    ///
-    /// * `Ok(PrecompileHintsProcessor)` - The configured processor
-    /// * `Err` - If the thread pool fails to initialize
-    pub fn new(hints_sink: HS) -> Result<Self> {
-        Self::with_num_threads(Self::DEFAULT_NUM_THREADS, hints_sink)
-    }
-
-    /// Creates a new processor with the specified number of threads.
+    /// Creates a builder for configuring a [`HintsProcessor`].
     ///
     /// # Arguments
     ///
-    /// * `num_threads` - The number of worker threads in the pool
     /// * `hints_sink` - The sink used to submit processed hints
     ///
-    /// # Returns
+    /// # Examples
     ///
-    /// * `Ok(PrecompileHintsProcessor)` - The configured processor
-    /// * `Err` - If the thread pool fails to initialize
-    pub fn with_num_threads(num_threads: usize, hints_sink: HS) -> Result<Self> {
-        let pool = ThreadPoolBuilder::new()
-            .num_threads(num_threads)
-            .build()
-            .map_err(|e| anyhow::anyhow!("Failed to create thread pool: {}", e))?;
-
-        let state = Arc::new(HintProcessorState::new());
-        let hints_sink = Arc::new(hints_sink);
-
-        // Spawn drainer thread
-        let drainer_state = Arc::clone(&state);
-        let drainer_sink = Arc::clone(&hints_sink);
-        let drainer_thread = std::thread::spawn(move || {
-            Self::drainer_thread(drainer_state, drainer_sink);
-        });
-
-        Ok(Self {
-            pool,
-            state,
-            stats: Mutex::new(HashMap::new()),
+    /// ```ignore
+    /// let processor = HintsProcessor::builder(my_sink)
+    ///     .num_threads(16)
+    ///     .enable_stats(false)
+    ///     .build()?;
+    /// ```
+    pub fn builder(hints_sink: HS) -> HintsProcessorBuilder<HS> {
+        HintsProcessorBuilder {
             hints_sink,
-            drainer_thread: ManuallyDrop::new(drainer_thread),
-        })
+            num_threads: Self::DEFAULT_NUM_THREADS,
+            enable_stats: false,
+        }
     }
 
     /// Processes hints in parallel with non-blocking, ordered output.
@@ -164,7 +190,9 @@ impl<HS: StreamSink + Send + Sync + 'static> HintsProcessor<HS> {
             let hint = PrecompileHint::from_u64_slice(hints, idx)?;
             let length = hint.data.len();
 
-            self.stats.lock().unwrap().entry(hint.hint_code).and_modify(|c| *c += 1).or_insert(1);
+            if let Some(stats) = &self.stats {
+                stats.lock().unwrap().entry(hint.hint_code).and_modify(|c| *c += 1).or_insert(1);
+            }
 
             // Check if this is a control code or data hint type
             match HintCode::try_from(hint.hint_code)? {
@@ -290,12 +318,14 @@ impl<HS: StreamSink + Send + Sync + 'static> HintsProcessor<HS> {
         }
 
         if has_ctrl_end {
-            debug!("Processed hints stats:");
-            let stats = self.stats.lock().unwrap();
-            let mut sorted_stats: Vec<_> = stats.iter().collect();
-            sorted_stats.sort_by_key(|(hint_code, _)| **hint_code as u32);
-            for (hint_code, count) in sorted_stats {
-                debug!("Hint type {}: {}", hint_code, count);
+            if let Some(stats) = &self.stats {
+                debug!("Processed hints stats:");
+                let stats = stats.lock().unwrap();
+                let mut sorted_stats: Vec<_> = stats.iter().collect();
+                sorted_stats.sort_by_key(|(hint_code, _)| **hint_code as u32);
+                for (hint_code, count) in sorted_stats {
+                    debug!("Hint type {}: {}", hint_code, count);
+                }
             }
         }
 
@@ -487,7 +517,7 @@ mod tests {
     }
 
     fn processor() -> HintsProcessor<NullHints> {
-        HintsProcessor::with_num_threads(2, NullHints).unwrap()
+        HintsProcessor::builder(NullHints).num_threads(2).build().unwrap()
     }
 
     // Positive tests
@@ -564,7 +594,7 @@ mod tests {
         // Should return error immediately during validation
         let result = p.process_hints(&data, false);
         assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("Invalid hint type"));
+        assert!(result.unwrap_err().to_string().contains("Invalid hint code"));
     }
 
     #[test]
@@ -577,7 +607,7 @@ mod tests {
         // Should error immediately when encountering invalid hint type
         let result = p.process_hints(&data, false);
         assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("Invalid hint type"));
+        assert!(result.unwrap_err().to_string().contains("Invalid hint code"));
     }
 
     #[test]
@@ -588,7 +618,7 @@ mod tests {
 
         // Should get synchronous error for invalid hint type
         assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("Invalid hint type"));
+        assert!(result.unwrap_err().to_string().contains("Invalid hint code"));
 
         // Reset should clear any error state
         p.reset();
@@ -696,12 +726,66 @@ mod tests {
         assert!(p.state.error_flag.load(Ordering::Acquire));
     }
 
+    // Builder tests
+    #[test]
+    fn test_builder_default() {
+        let p = HintsProcessor::builder(NullHints).build().unwrap();
+
+        // Should have stats disabled by default
+        assert!(p.stats.is_none());
+
+        // Should process hints normally
+        let data = vec![make_header(HintCode::HintsTypeResult as u32, 1), 0x42];
+        assert!(p.process_hints(&data, false).is_ok());
+        assert!(p.wait_for_completion().is_ok());
+    }
+
+    #[test]
+    fn test_builder_custom_threads() {
+        let p = HintsProcessor::builder(NullHints).num_threads(4).build().unwrap();
+
+        // Should process hints normally
+        let data = vec![make_header(HintCode::HintsTypeResult as u32, 1), 0x42];
+        assert!(p.process_hints(&data, false).is_ok());
+        assert!(p.wait_for_completion().is_ok());
+    }
+
+    #[test]
+    fn test_builder_stats_disabled() {
+        let p = HintsProcessor::builder(NullHints).enable_stats(false).build().unwrap();
+
+        // Stats should be None
+        assert!(p.stats.is_none());
+
+        // Should still process hints normally
+        let data = vec![
+            make_header(HintCode::HintsTypeResult as u32, 1),
+            0x111,
+            make_header(HintCode::HintsTypeResult as u32, 1),
+            0x222,
+        ];
+        assert!(p.process_hints(&data, false).is_ok());
+        assert!(p.wait_for_completion().is_ok());
+    }
+
+    #[test]
+    fn test_builder_chaining() {
+        let p =
+            HintsProcessor::builder(NullHints).num_threads(8).enable_stats(true).build().unwrap();
+
+        assert!(p.stats.is_some());
+
+        let data = vec![make_header(HintCode::HintsTypeResult as u32, 1), 0x42];
+        assert!(p.process_hints(&data, false).is_ok());
+        assert!(p.wait_for_completion().is_ok());
+    }
+
     // Stress test
     #[test]
     fn test_stress_throughput() {
         use std::time::Instant;
 
-        let p = HintsProcessor::with_num_threads(32, NullHints).unwrap();
+        let p = HintsProcessor::builder(NullHints).num_threads(32).build().unwrap();
 
         // Generate a large batch of hints
         const NUM_HINTS: usize = 100_000;
@@ -734,7 +818,7 @@ mod tests {
     fn test_stress_concurrent_batches() {
         use std::time::Instant;
 
-        let p = HintsProcessor::with_num_threads(32, NullHints).unwrap();
+        let p = HintsProcessor::builder(NullHints).num_threads(32).build().unwrap();
 
         const NUM_BATCHES: usize = 1_000;
         const HINTS_PER_BATCH: usize = 100;
@@ -773,7 +857,7 @@ mod tests {
     fn test_stress_with_resets() {
         use std::time::Instant;
 
-        let p = HintsProcessor::with_num_threads(32, NullHints).unwrap();
+        let p = HintsProcessor::builder(NullHints).num_threads(32).build().unwrap();
 
         const ITERATIONS: usize = 100;
         const HINTS_PER_ITER: usize = 1_000;

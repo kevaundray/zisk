@@ -614,7 +614,8 @@ impl<T: ZiskBackend + 'static> Worker<T> {
             let unlock_mapped_memory = self.prover_config.unlock_mapped_memory;
             let hints_shmem = HintsShmem::new(base_port, local_rank, unlock_mapped_memory)?;
             self.hints_processor = Some(
-                HintsProcessor::new(hints_shmem)
+                HintsProcessor::builder(hints_shmem)
+                    .build()
                     .map_err(|e| anyhow::anyhow!("Failed to initialize hints processor: {}", e))?,
             );
         }

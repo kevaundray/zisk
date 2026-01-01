@@ -199,8 +199,9 @@ impl<F: PrimeField64> ZiskExecutor<F> {
         let hints_shmem = HintsShmem::new(base_port, local_rank, unlock_mapped_memory)
             .expect("Failed to create HintsShmem");
 
-        let hints_processor =
-            HintsProcessor::new(hints_shmem).expect("Failed to create PrecompileHintsProcessor");
+        let hints_processor = HintsProcessor::builder(hints_shmem)
+            .build()
+            .expect("Failed to create PrecompileHintsProcessor");
 
         let hints_stream = Mutex::new(ZiskStream::new(hints_processor));
 
