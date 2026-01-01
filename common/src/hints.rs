@@ -41,8 +41,8 @@
 //! Control codes are for control only and do not have any associated data (Length should be zero).
 //!
 //! ### Data Hint Types:
-//! - `0x04` (`HINTS_TYPE_RESULT`): Pass-through data
-//! - `0x05` (`HINTS_TYPE_ECRECOVER`): ECRECOVER inputs (currently returns empty)
+//! - `0x04` (`Noop`): Pass-through data
+//! - `0x05` (`EcRecover`): ECRECOVER inputs (currently returns empty)
 //! ```
 
 use std::fmt::Display;
@@ -116,8 +116,8 @@ impl Display for HintCode {
             HintCode::CtrlEnd => "CTRL_END",
             HintCode::CtrlCancel => "CTRL_CANCEL",
             HintCode::CtrlError => "CTRL_ERROR",
-            HintCode::Noop => "HINTS_TYPE_RESULT",
-            HintCode::EcRecover => "HINTS_TYPE_ECRECOVER",
+            HintCode::Noop => "NOOP",
+            HintCode::EcRecover => "ECRECOVER",
             HintCode::RedMod256 => "REDMOD256",
             HintCode::AddMod256 => "ADDMOD256",
             HintCode::MulMod256 => "MULMOD256",

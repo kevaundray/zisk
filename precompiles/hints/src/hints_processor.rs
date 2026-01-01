@@ -485,7 +485,7 @@ impl<HS: StreamSink + Send + Sync + 'static> HintsProcessor<HS> {
         }
     }
 
-    /// Processes a [`HINTS_TYPE_ECRECOVER`] hint.
+    /// Processes a [`ECRECOVER`] hint.
     #[inline]
     fn process_hint_ecrecover(hint: &PrecompileHint) -> Result<Vec<u64>> {
         ziskos_hints::hints::process_ecrecover_hint(&hint.data).map_err(|e| anyhow::anyhow!(e))
