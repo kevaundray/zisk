@@ -35,6 +35,13 @@ pub extern "C" fn syscall_add256(
     #[cfg(feature = "hints")] hints: &mut Vec<u64>,
 ) -> u64 {
     #[cfg(not(all(target_os = "zkvm", target_vendor = "zisk")))]
+    {
+        let cout = precompiles_helpers::add256(params.a, params.b, params.cin, &mut params.c);
+        #[cfg(feature = "hints")]
+        {
+            hints.extend_from_slice(params.c);
+        }
+    }
     unreachable!();
     #[cfg(all(target_os = "zkvm", target_vendor = "zisk"))]
     ziskos_syscall_ret_u64!(0x811, params)

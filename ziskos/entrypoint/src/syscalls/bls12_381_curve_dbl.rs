@@ -34,5 +34,15 @@ pub extern "C" fn syscall_bls12_381_curve_dbl(
     #[cfg(all(target_os = "zkvm", target_vendor = "zisk"))]
     ziskos_syscall!(0x80D, p1);
     #[cfg(not(all(target_os = "zkvm", target_vendor = "zisk")))]
-    unreachable!()
+    {
+        let _p1 = [p1.x, p1.y].concat().try_into().unwrap();
+        let mut p2: [u64; 12] = [0; 12];
+        precompiles_helpers::bls12_381_curve_dbl(&_p1, &mut p2);
+        p1.x.copy_from_slice(&p2[0..6]);
+        p1.y.copy_from_slice(&p2[6..12]);
+        #[cfg(feature = "hints")]
+        {
+            hints.extend_from_slice(&p2);
+        }
+    }
 }

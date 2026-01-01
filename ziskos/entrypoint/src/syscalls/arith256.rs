@@ -40,5 +40,12 @@ pub extern "C" fn syscall_arith256(
     #[cfg(all(target_os = "zkvm", target_vendor = "zisk"))]
     ziskos_syscall!(0x801, params);
     #[cfg(not(all(target_os = "zkvm", target_vendor = "zisk")))]
-    unreachable!()
+    {
+        precompiles_helpers::arith256(params.a, params.b, params.c, &mut params.dl, &mut params.dh);
+        #[cfg(feature = "hints")]
+        {
+            hints.extend_from_slice(params.dl);
+            hints.extend_from_slice(params.dh);
+        }
+    }
 }

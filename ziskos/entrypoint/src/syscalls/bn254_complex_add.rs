@@ -43,5 +43,16 @@ pub extern "C" fn syscall_bn254_complex_add(
     #[cfg(all(target_os = "zkvm", target_vendor = "zisk"))]
     ziskos_syscall!(0x808, params);
     #[cfg(not(all(target_os = "zkvm", target_vendor = "zisk")))]
-    unreachable!()
+    {
+        let f1 = [params.f1.x, params.f1.y].concat().try_into().unwrap();
+        let f2 = [params.f2.x, params.f2.y].concat().try_into().unwrap();
+        let mut f3: [u64; 8] = [0; 8];
+        precompiles_helpers::bn254_complex_add(&f1, &f2, &mut f3);
+        params.f1.x.copy_from_slice(&f3[0..4]);
+        params.f1.y.copy_from_slice(&f3[4..8]);
+        #[cfg(feature = "hints")]
+        {
+            hints.extend_from_slice(&f3);
+        }
+    }
 }
