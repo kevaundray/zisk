@@ -5,6 +5,8 @@ cfg_if! {
         use core::arch::asm;
         use crate::{ziskos_fcall, ziskos_fcall_get, ziskos_fcall_param};
         use super::FCALL_SECP256K1_FP_SQRT_ID;
+    } else {
+        use crate::zisklib::fcalls_impl::secp256k1_fp_sqrt::secp256k1_fp_sqrt;
     }
 }
 
@@ -30,7 +32,15 @@ pub fn fcall_secp256k1_fp_sqrt(
     #[cfg(feature = "hints")] hints: &mut Vec<u64>,
 ) -> [u64; 5] {
     #[cfg(not(all(target_os = "zkvm", target_vendor = "zisk")))]
-    unreachable!();
+    {
+        let mut result: [u64; 5] = [0; 5];
+        secp256k1_fp_sqrt(p_value, parity, &mut result);
+        #[cfg(feature = "hints")]
+        {
+            hints.extend_from_slice(&result);
+        }
+        result
+    }
     #[cfg(all(target_os = "zkvm", target_vendor = "zisk"))]
     {
         ziskos_fcall_param!(p_value, 4);
@@ -53,7 +63,14 @@ pub fn fcall2_secp256k1_fp_sqrt(
     #[cfg(feature = "hints")] hints: &mut Vec<u64>,
 ) {
     #[cfg(not(all(target_os = "zkvm", target_vendor = "zisk")))]
-    unreachable!();
+    {
+        let mut result: [u64; 5] = [0; 5];
+        secp256k1_fp_sqrt(p_value, parity, &mut result);
+        #[cfg(feature = "hints")]
+        {
+            hints.extend_from_slice(&result);
+        }
+    }
     #[cfg(all(target_os = "zkvm", target_vendor = "zisk"))]
     {
         ziskos_fcall_param!(p_value, 4);

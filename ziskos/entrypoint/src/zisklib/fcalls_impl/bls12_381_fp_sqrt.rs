@@ -36,7 +36,7 @@ pub fn fcall_bls12_381_fp_sqrt(params: &[u64], results: &mut [u64]) -> i64 {
     7
 }
 
-fn bls12_381_fp_sqrt(a: &[u64; 6], results: &mut [u64]) {
+pub fn bls12_381_fp_sqrt(a: &[u64; 6], results: &mut [u64]) {
     let a_big = biguint_from_u64_digits(a);
 
     // Attempt to compute the square root of a

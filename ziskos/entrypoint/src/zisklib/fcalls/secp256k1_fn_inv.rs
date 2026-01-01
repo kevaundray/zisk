@@ -50,7 +50,14 @@ pub fn fcall_secp256k1_fn_inv(
 #[allow(unused_variables)]
 pub fn fcall2_secp256k1_fn_inv(p_value: &[u64; 4], #[cfg(feature = "hints")] hints: &mut Vec<u64>) {
     #[cfg(not(all(target_os = "zkvm", target_vendor = "zisk")))]
-    unreachable!();
+    {
+        let mut result: [u64; 4] = [0; 4];
+        secp256k1_fn_inv_c(p_value, &mut result);
+        #[cfg(feature = "hints")]
+        {
+            hints.extend_from_slice(&result);
+        }
+    }
     #[cfg(all(target_os = "zkvm", target_vendor = "zisk"))]
     {
         ziskos_fcall_param!(p_value, 4);

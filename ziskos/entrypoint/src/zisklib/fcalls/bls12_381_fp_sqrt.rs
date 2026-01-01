@@ -5,6 +5,8 @@ cfg_if! {
         use core::arch::asm;
         use crate::{ziskos_fcall, ziskos_fcall_get, ziskos_fcall_param};
         use super::FCALL_BLS12_381_FP_SQRT_ID;
+    } else {
+        use crate::zisklib::fcalls_impl::bls12_381_fp_sqrt::bls12_381_fp_sqrt;
     }
 }
 
@@ -27,7 +29,15 @@ pub fn fcall_bls12_381_fp_sqrt(
     #[cfg(feature = "hints")] hints: &mut Vec<u64>,
 ) -> [u64; 7] {
     #[cfg(not(all(target_os = "zkvm", target_vendor = "zisk")))]
-    unreachable!();
+    {
+        let mut result: [u64; 7] = [0; 7];
+        bls12_381_fp_sqrt(p_value, &mut result);
+        #[cfg(feature = "hints")]
+        {
+            hints.extend_from_slice(&result);
+        }
+        result
+    }
     #[cfg(all(target_os = "zkvm", target_vendor = "zisk"))]
     {
         ziskos_fcall_param!(p_value, 8);

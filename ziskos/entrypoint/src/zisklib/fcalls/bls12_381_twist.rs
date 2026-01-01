@@ -4,6 +4,9 @@ cfg_if! {
         use core::arch::asm;
         use crate::{ziskos_fcall, ziskos_fcall_get, ziskos_fcall_param};
         use super::{FCALL_BLS12_381_TWIST_ADD_LINE_COEFFS_ID, FCALL_BLS12_381_TWIST_DBL_LINE_COEFFS_ID};
+    } else {
+        use crate::zisklib::fcalls_impl::bls12_381_twist::bls12_381_twist_add_line_coeffs;
+        use crate::zisklib::fcalls_impl::bls12_381_twist::bls12_381_twist_dbl_line_coeffs;
     }
 }
 
@@ -22,7 +25,19 @@ pub fn fcall_bls12_381_add_line_coeffs(
     #[cfg(feature = "hints")] hints: &mut Vec<u64>,
 ) -> ([u64; 12], [u64; 12]) {
     #[cfg(not(all(target_os = "zkvm", target_vendor = "zisk")))]
-    unreachable!();
+    {
+        let x1: [u64; 12] = p1_value[0..12].try_into().unwrap();
+        let y1: [u64; 12] = p1_value[12..24].try_into().unwrap();
+        let x2: [u64; 12] = p2_value[0..12].try_into().unwrap();
+        let y2: [u64; 12] = p2_value[12..24].try_into().unwrap();
+        let (lambda, mu) = bls12_381_twist_add_line_coeffs(&x1, &y1, &x2, &y2);
+        #[cfg(feature = "hints")]
+        {
+            hints.extend_from_slice(&lambda);
+            hints.extend_from_slice(&mu);
+        }
+        (lambda, mu)
+    }
     #[cfg(all(target_os = "zkvm", target_vendor = "zisk"))]
     {
         ziskos_fcall_param!(p1_value, 24);
@@ -75,7 +90,17 @@ pub fn fcall_bls12_381_dbl_line_coeffs(
     #[cfg(feature = "hints")] hints: &mut Vec<u64>,
 ) -> ([u64; 12], [u64; 12]) {
     #[cfg(not(all(target_os = "zkvm", target_vendor = "zisk")))]
-    unreachable!();
+    {
+        let x: [u64; 12] = p_value[0..12].try_into().unwrap();
+        let y: [u64; 12] = p_value[12..24].try_into().unwrap();
+        let (lambda, mu) = bls12_381_twist_dbl_line_coeffs(&x, &y);
+        #[cfg(feature = "hints")]
+        {
+            hints.extend_from_slice(&lambda);
+            hints.extend_from_slice(&mu);
+        }
+        (lambda, mu)
+    }
     #[cfg(all(target_os = "zkvm", target_vendor = "zisk"))]
     {
         ziskos_fcall_param!(p_value, 24);

@@ -5,6 +5,8 @@ cfg_if! {
         use core::arch::asm;
         use crate::{ziskos_fcall, ziskos_fcall_get, ziskos_fcall_param};
         use super::FCALL_BIG_INT_DIV_ID;
+    } else {
+        use crate::zisklib::fcalls_impl::big_int_div::big_int_div_into;
     }
 }
 
@@ -25,7 +27,17 @@ pub fn fcall_division(
     #[cfg(feature = "hints")] hints: &mut Vec<u64>,
 ) -> (usize, usize) {
     #[cfg(not(all(target_os = "zkvm", target_vendor = "zisk")))]
-    unreachable!();
+    {
+        big_int_div_into(a_value, b_value, &mut quo.to_vec(), &mut rem.to_vec());
+        let len_quo = quo.len();
+        let len_rem = rem.len();
+        #[cfg(feature = "hints")]
+        {
+            hints.extend_from_slice(&quo);
+            hints.extend_from_slice(&rem);
+        }
+        return (len_quo, len_rem);
+    }
     #[cfg(all(target_os = "zkvm", target_vendor = "zisk"))]
     {
         let len_a = a_value.len() as usize;

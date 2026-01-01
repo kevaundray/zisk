@@ -5,6 +5,8 @@ cfg_if! {
         use core::arch::asm;
         use crate::{ziskos_fcall, ziskos_fcall_get, ziskos_fcall_param};
         use super::FCALL_BIG_INT256_DIV_ID;
+    } else {
+        use crate::zisklib::fcalls_impl::big_int256_div::big_int256_div;
     }
 }
 
@@ -28,7 +30,15 @@ pub fn fcall_bigint256_div(
     #[cfg(feature = "hints")] hints: &mut Vec<u64>,
 ) -> ([u64; 4], [u64; 4]) {
     #[cfg(not(all(target_os = "zkvm", target_vendor = "zisk")))]
-    unreachable!();
+    {
+        let (quotient, remainder) = big_int256_div(a_value, b_value);
+        #[cfg(feature = "hints")]
+        {
+            hints.extend_from_slice(&quotient);
+            hints.extend_from_slice(&remainder);
+        }
+        (quotient, remainder)
+    }
     #[cfg(all(target_os = "zkvm", target_vendor = "zisk"))]
     {
         ziskos_fcall_param!(a_value, 4);

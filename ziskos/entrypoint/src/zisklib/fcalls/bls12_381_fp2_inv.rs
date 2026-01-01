@@ -5,6 +5,8 @@ cfg_if! {
         use core::arch::asm;
         use crate::{ziskos_fcall, ziskos_fcall_get, ziskos_fcall_param};
         use super::FCALL_BLS12_381_FP2_INV_ID;
+    } else {
+        use crate::zisklib::fcalls_impl::bls12_381_fp2_inv::bls12_381_fp2_inv;
     }
 }
 
@@ -27,7 +29,14 @@ pub fn fcall_bls12_381_fp2_inv(
     #[cfg(feature = "hints")] hints: &mut Vec<u64>,
 ) -> [u64; 12] {
     #[cfg(not(all(target_os = "zkvm", target_vendor = "zisk")))]
-    unreachable!();
+    {
+        let result: [u64; 12] = bls12_381_fp2_inv(p_value);
+        #[cfg(feature = "hints")]
+        {
+            hints.extend_from_slice(&result);
+        }
+        result
+    }
     #[cfg(all(target_os = "zkvm", target_vendor = "zisk"))]
     {
         ziskos_fcall_param!(p_value, 12);
