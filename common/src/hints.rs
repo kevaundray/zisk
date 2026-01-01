@@ -67,9 +67,9 @@ pub enum HintCode {
     /// Pass-through hint type.
     /// When a hint has this type, the processor simply passes through the data
     /// without any additional computation.
-    HintsTypeResult = 0x04,
+    Noop = 0x04,
     /// Ecrecover precompile hint type.
-    HintsTypeEcrecover = 0x05,
+    EcRecover = 0x05,
     ///  Modular reduction of a 256-bit integer hint type.
     RedMod256 = 0x06,
     /// Modular addition of 256-bit integers hint type.
@@ -95,8 +95,8 @@ impl TryFrom<u32> for HintCode {
             0x01 => Ok(HintCode::CtrlEnd),
             0x02 => Ok(HintCode::CtrlCancel),
             0x03 => Ok(HintCode::CtrlError),
-            0x04 => Ok(HintCode::HintsTypeResult),
-            0x05 => Ok(HintCode::HintsTypeEcrecover),
+            0x04 => Ok(HintCode::Noop),
+            0x05 => Ok(HintCode::EcRecover),
             0x06 => Ok(HintCode::RedMod256),
             0x07 => Ok(HintCode::AddMod256),
             0x08 => Ok(HintCode::MulMod256),
@@ -116,8 +116,8 @@ impl Display for HintCode {
             HintCode::CtrlEnd => "CTRL_END",
             HintCode::CtrlCancel => "CTRL_CANCEL",
             HintCode::CtrlError => "CTRL_ERROR",
-            HintCode::HintsTypeResult => "HINTS_TYPE_RESULT",
-            HintCode::HintsTypeEcrecover => "HINTS_TYPE_ECRECOVER",
+            HintCode::Noop => "HINTS_TYPE_RESULT",
+            HintCode::EcRecover => "HINTS_TYPE_ECRECOVER",
             HintCode::RedMod256 => "REDMOD256",
             HintCode::AddMod256 => "ADDMOD256",
             HintCode::MulMod256 => "MULMOD256",

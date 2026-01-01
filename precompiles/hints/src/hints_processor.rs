@@ -244,8 +244,8 @@ impl<HS: StreamSink + Send + Sync + 'static> HintsProcessor<HS> {
                     self.state.drain_signal.notify_all();
                     return Err(anyhow::anyhow!("Stream error signalled"));
                 }
-                HintCode::HintsTypeResult
-                | HintCode::HintsTypeEcrecover
+                HintCode::Noop
+                | HintCode::EcRecover
                 | HintCode::RedMod256
                 | HintCode::AddMod256
                 | HintCode::MulMod256
@@ -268,7 +268,7 @@ impl<HS: StreamSink + Send + Sync + 'static> HintsProcessor<HS> {
             };
 
             // Handle HINTS_TYPE_RESULT synchronously - it doesn't need async processing
-            if hint.hint_code == HintCode::HintsTypeResult {
+            if hint.hint_code == HintCode::Noop {
                 // Immediately mark this slot as complete
                 {
                     let mut queue = self.state.queue.lock().unwrap();
@@ -467,10 +467,10 @@ impl<HS: StreamSink + Send + Sync + 'static> HintsProcessor<HS> {
             }
 
             // When hint type is HINTS_TYPE_RESULT, return the data as-is.
-            HintCode::HintsTypeResult => Ok(hint.data),
+            HintCode::Noop => Ok(hint.data),
 
             // Dispatch to the ECRECOVER handler.
-            HintCode::HintsTypeEcrecover => Self::process_hint_ecrecover(&hint),
+            HintCode::EcRecover => Self::process_hint_ecrecover(&hint),
 
             // TODO: Implement handlers for 256-bit operations
             HintCode::RedMod256
@@ -543,7 +543,7 @@ mod tests {
     #[test]
     fn test_single_result_hint_non_blocking() {
         let p = processor();
-        let data = vec![make_header(HintCode::HintsTypeResult as u32, 2), 0x111, 0x222];
+        let data = vec![make_header(HintCode::Noop as u32, 2), 0x111, 0x222];
 
         // Dispatch should succeed and be non-blocking
         assert!(p.process_hints(&data, false).is_ok());
@@ -560,11 +560,11 @@ mod tests {
     fn test_multiple_hints_ordered_output() {
         let p = processor();
         let data = vec![
-            make_header(HintCode::HintsTypeResult as u32, 1),
+            make_header(HintCode::Noop as u32, 1),
             0x111,
-            make_header(HintCode::HintsTypeResult as u32, 1),
+            make_header(HintCode::Noop as u32, 1),
             0x222,
-            make_header(HintCode::HintsTypeResult as u32, 1),
+            make_header(HintCode::Noop as u32, 1),
             0x333,
         ];
         assert!(p.process_hints(&data, false).is_ok());
@@ -579,8 +579,8 @@ mod tests {
     #[test]
     fn test_multiple_calls_global_sequence() {
         let p = processor();
-        let data1 = vec![make_header(HintCode::HintsTypeResult as u32, 1), 0xAAA];
-        let data2 = vec![make_header(HintCode::HintsTypeResult as u32, 1), 0xBBB];
+        let data1 = vec![make_header(HintCode::Noop as u32, 1), 0xAAA];
+        let data2 = vec![make_header(HintCode::Noop as u32, 1), 0xBBB];
 
         assert!(p.process_hints(&data1, false).is_ok());
         assert!(p.process_hints(&data2, false).is_ok());
@@ -620,8 +620,7 @@ mod tests {
     fn test_error_stops_wait() {
         let p = processor();
         // First valid, then invalid type
-        let data =
-            vec![make_header(HintCode::HintsTypeResult as u32, 1), 0x111, make_header(999, 0)];
+        let data = vec![make_header(HintCode::Noop as u32, 1), 0x111, make_header(999, 0)];
 
         // Should error immediately when encountering invalid hint type
         let result = p.process_hints(&data, false);
@@ -644,7 +643,7 @@ mod tests {
         assert!(!p.state.error_flag.load(Ordering::Acquire));
 
         // Should be able to process new hints after reset
-        let good = vec![make_header(HintCode::HintsTypeResult as u32, 1), 0x42];
+        let good = vec![make_header(HintCode::Noop as u32, 1), 0x42];
         assert!(p.process_hints(&good, false).is_ok());
         assert!(p.wait_for_completion().is_ok());
 
@@ -658,7 +657,7 @@ mod tests {
         let p = processor();
 
         // First batch increments sequence
-        let batch1 = vec![make_header(HintCode::HintsTypeResult as u32, 1), 0x01];
+        let batch1 = vec![make_header(HintCode::Noop as u32, 1), 0x01];
         p.process_hints(&batch1, false).unwrap();
         p.wait_for_completion().unwrap();
 
@@ -680,7 +679,7 @@ mod tests {
         }
 
         // Process new batch
-        let batch2 = vec![make_header(HintCode::HintsTypeResult as u32, 1), 0x02];
+        let batch2 = vec![make_header(HintCode::Noop as u32, 1), 0x02];
         p.process_hints(&batch2, false).unwrap();
 
         let end = vec![make_ctrl_header(HintCode::CtrlEnd as u32, 0)];
@@ -697,9 +696,9 @@ mod tests {
 
         // Dispatch hints
         let data = vec![
-            make_header(HintCode::HintsTypeResult as u32, 1),
+            make_header(HintCode::Noop as u32, 1),
             0x10,
-            make_header(HintCode::HintsTypeResult as u32, 1),
+            make_header(HintCode::Noop as u32, 1),
             0x20,
         ];
         p.process_hints(&data, false).unwrap();
@@ -751,7 +750,7 @@ mod tests {
 
         // CTRL_START not at position 0 should fail
         let data = vec![
-            make_header(HintCode::HintsTypeResult as u32, 1),
+            make_header(HintCode::Noop as u32, 1),
             0x42,
             make_ctrl_header(HintCode::CtrlStart as u32, 0),
         ];
@@ -766,7 +765,7 @@ mod tests {
         let p = processor();
 
         // First batch is ok
-        let batch1 = vec![make_header(HintCode::HintsTypeResult as u32, 1), 0x01];
+        let batch1 = vec![make_header(HintCode::Noop as u32, 1), 0x01];
         p.process_hints(&batch1, false).unwrap();
 
         // CTRL_START in non-first batch should fail
@@ -783,7 +782,7 @@ mod tests {
         // CTRL_END not at end should fail
         let data = vec![
             make_ctrl_header(HintCode::CtrlEnd as u32, 0),
-            make_header(HintCode::HintsTypeResult as u32, 1),
+            make_header(HintCode::Noop as u32, 1),
             0x42,
         ];
 
@@ -813,10 +812,10 @@ mod tests {
 
         // Send some data
         let data = vec![
-            make_header(HintCode::HintsTypeResult as u32, 2),
+            make_header(HintCode::Noop as u32, 2),
             0xAAA,
             0xBBB,
-            make_header(HintCode::HintsTypeResult as u32, 1),
+            make_header(HintCode::Noop as u32, 1),
             0xCCC,
         ];
 
@@ -854,7 +853,7 @@ mod tests {
         let p = HintsProcessor::builder(sink).num_threads(2).build().unwrap();
 
         // First batch succeeds
-        let data1 = vec![make_header(HintCode::HintsTypeResult as u32, 1), 0x01];
+        let data1 = vec![make_header(HintCode::Noop as u32, 1), 0x01];
         assert!(p.process_hints(&data1, false).is_ok());
         assert!(p.wait_for_completion().is_ok());
 
@@ -862,7 +861,7 @@ mod tests {
         should_fail.store(true, Ordering::Release);
 
         // Second batch should trigger sink error
-        let data2 = vec![make_header(HintCode::HintsTypeResult as u32, 1), 0x02];
+        let data2 = vec![make_header(HintCode::Noop as u32, 1), 0x02];
         assert!(p.process_hints(&data2, false).is_ok());
 
         // Wait should detect the error from drainer thread
@@ -879,7 +878,7 @@ mod tests {
         assert!(p.stats.is_none());
 
         // Should process hints normally
-        let data = vec![make_header(HintCode::HintsTypeResult as u32, 1), 0x42];
+        let data = vec![make_header(HintCode::Noop as u32, 1), 0x42];
         assert!(p.process_hints(&data, false).is_ok());
         assert!(p.wait_for_completion().is_ok());
     }
@@ -893,9 +892,9 @@ mod tests {
 
         // Process hints
         let data = vec![
-            make_header(HintCode::HintsTypeResult as u32, 1),
+            make_header(HintCode::Noop as u32, 1),
             0x111,
-            make_header(HintCode::HintsTypeResult as u32, 1),
+            make_header(HintCode::Noop as u32, 1),
             0x222,
         ];
         assert!(p.process_hints(&data, false).is_ok());
@@ -903,7 +902,7 @@ mod tests {
 
         // Verify stats were collected
         let stats = p.stats.as_ref().unwrap().lock().unwrap();
-        assert_eq!(stats.get(&HintCode::HintsTypeResult), Some(&2));
+        assert_eq!(stats.get(&HintCode::Noop), Some(&2));
     }
 
     #[test]
@@ -911,7 +910,7 @@ mod tests {
         let p = HintsProcessor::builder(NullHints).num_threads(4).build().unwrap();
 
         // Should process hints normally
-        let data = vec![make_header(HintCode::HintsTypeResult as u32, 1), 0x42];
+        let data = vec![make_header(HintCode::Noop as u32, 1), 0x42];
         assert!(p.process_hints(&data, false).is_ok());
         assert!(p.wait_for_completion().is_ok());
     }
@@ -925,9 +924,9 @@ mod tests {
 
         // Should still process hints normally
         let data = vec![
-            make_header(HintCode::HintsTypeResult as u32, 1),
+            make_header(HintCode::Noop as u32, 1),
             0x111,
-            make_header(HintCode::HintsTypeResult as u32, 1),
+            make_header(HintCode::Noop as u32, 1),
             0x222,
         ];
         assert!(p.process_hints(&data, false).is_ok());
@@ -941,7 +940,7 @@ mod tests {
 
         assert!(p.stats.is_some());
 
-        let data = vec![make_header(HintCode::HintsTypeResult as u32, 1), 0x42];
+        let data = vec![make_header(HintCode::Noop as u32, 1), 0x42];
         assert!(p.process_hints(&data, false).is_ok());
         assert!(p.wait_for_completion().is_ok());
     }
@@ -958,7 +957,7 @@ mod tests {
         let mut data = Vec::with_capacity(NUM_HINTS * 2);
 
         for i in 0..NUM_HINTS {
-            data.push(make_header(HintCode::HintsTypeResult as u32, 1));
+            data.push(make_header(HintCode::Noop as u32, 1));
             data.push(i as u64);
         }
 
@@ -995,7 +994,7 @@ mod tests {
         for batch_id in 0..NUM_BATCHES {
             let mut data = Vec::with_capacity(HINTS_PER_BATCH * 2);
             for i in 0..HINTS_PER_BATCH {
-                data.push(make_header(HintCode::HintsTypeResult as u32, 1));
+                data.push(make_header(HintCode::Noop as u32, 1));
                 data.push((batch_id * HINTS_PER_BATCH + i) as u64);
             }
             p.process_hints(&data, false).unwrap();
@@ -1038,7 +1037,7 @@ mod tests {
             // Process batch
             let mut data = Vec::with_capacity(HINTS_PER_ITER * 2);
             for i in 0..HINTS_PER_ITER {
-                data.push(make_header(HintCode::HintsTypeResult as u32, 1));
+                data.push(make_header(HintCode::Noop as u32, 1));
                 data.push(i as u64);
             }
             p.process_hints(&data, false).unwrap();
