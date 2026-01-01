@@ -469,19 +469,14 @@ impl<HS: StreamSink + Send + Sync + 'static> HintsProcessor<HS> {
             // When hint type is HINTS_TYPE_RESULT, return the data as-is.
             HintCode::Noop => Ok(hint.data),
 
-            // Dispatch to the ECRECOVER handler.
             HintCode::EcRecover => Self::process_hint_ecrecover(&hint),
-
-            // TODO: Implement handlers for 256-bit operations
-            HintCode::RedMod256
-            | HintCode::AddMod256
-            | HintCode::MulMod256
-            | HintCode::DivRem256
-            | HintCode::WPow256
-            | HintCode::OMul256
-            | HintCode::WMul256 => {
-                unimplemented!("Handler for hint type {:?} is not yet implemented", hint.hint_code)
-            }
+            HintCode::RedMod256 => Self::process_hint_redmod256(&hint),
+            HintCode::AddMod256 => Self::process_hint_addmod256(&hint),
+            HintCode::MulMod256 => Self::process_hint_mulmod256(&hint),
+            HintCode::DivRem256 => Self::process_hint_divrem256(&hint),
+            HintCode::WPow256 => Self::process_hint_wpow256(&hint),
+            HintCode::OMul256 => Self::process_hint_omul256(&hint),
+            HintCode::WMul256 => Self::process_hint_wmul256(&hint),
         }
     }
 
@@ -489,6 +484,42 @@ impl<HS: StreamSink + Send + Sync + 'static> HintsProcessor<HS> {
     #[inline]
     fn process_hint_ecrecover(hint: &PrecompileHint) -> Result<Vec<u64>> {
         ziskos_hints::hints::process_ecrecover_hint(&hint.data).map_err(|e| anyhow::anyhow!(e))
+    }
+
+    /// Processes a [`REDMOD256`] hint.
+    #[inline]
+    fn process_hint_redmod256(hint: &PrecompileHint) -> Result<Vec<u64>> {
+        ziskos_hints::hints::process_redmod256_hint(&hint.data).map_err(|e| anyhow::anyhow!(e))
+    }
+    /// Processes a [`ADDMOD256`] hint.
+    #[inline]
+    fn process_hint_addmod256(hint: &PrecompileHint) -> Result<Vec<u64>> {
+        ziskos_hints::hints::process_addmod256_hint(&hint.data).map_err(|e| anyhow::anyhow!(e))
+    }
+    /// Processes a [`MULMOD256`] hint.
+    #[inline]
+    fn process_hint_mulmod256(hint: &PrecompileHint) -> Result<Vec<u64>> {
+        ziskos_hints::hints::process_mulmod256_hint(&hint.data).map_err(|e| anyhow::anyhow!(e))
+    }
+    /// Processes a [`DIVREM256`] hint.
+    #[inline]
+    fn process_hint_divrem256(hint: &PrecompileHint) -> Result<Vec<u64>> {
+        ziskos_hints::hints::process_divrem256_hint(&hint.data).map_err(|e| anyhow::anyhow!(e))
+    }
+    /// Processes a [`WPOW256`] hint.
+    #[inline]
+    fn process_hint_wpow256(hint: &PrecompileHint) -> Result<Vec<u64>> {
+        ziskos_hints::hints::process_wpow256_hint(&hint.data).map_err(|e| anyhow::anyhow!(e))
+    }
+    /// Processes a [`OMUL256`] hint.
+    #[inline]
+    fn process_hint_omul256(hint: &PrecompileHint) -> Result<Vec<u64>> {
+        ziskos_hints::hints::process_omul256_hint(&hint.data).map_err(|e| anyhow::anyhow!(e))
+    }
+    /// Processes a [`WMUL256`] hint.
+    #[inline]
+    fn process_hint_wmul256(hint: &PrecompileHint) -> Result<Vec<u64>> {
+        ziskos_hints::hints::process_wmul256_hint(&hint.data).map_err(|e| anyhow::anyhow!(e))
     }
 }
 

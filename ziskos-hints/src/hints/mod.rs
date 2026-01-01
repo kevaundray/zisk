@@ -48,3 +48,28 @@ pub fn process_ecrecover_hint(data: &[u64]) -> Result<Vec<u64>, String> {
 
     Ok(processed_hints)
 }
+
+pub fn process_redmod256_hint(_data: &[u64]) -> Result<Vec<u64>, String> {
+    unimplemented!("REDMOD256 hint processing is not yet implemented");
+}
+
+pub fn process_addmod256_hint(_data: &[u64]) -> Result<Vec<u64>, String> {
+    unimplemented!("ADDMOD256 hint processing is not yet implemented");
+}
+
+pub fn process_mulmod256_hint(_data: &[u64]) -> Result<Vec<u64>, String> {
+    unimplemented!("MULMOD256 hint processing is not yet implemented");
+}
+
+pub fn process_divrem256_hint(_data: &[u64]) -> Result<Vec<u64>, String> {
+    unimplemented!("DIVREM256 hint processing is not yet implemented");
+}
+pub fn process_wpow256_hint(_data: &[u64]) -> Result<Vec<u64>, String> {
+    unimplemented!("WPOW256 hint processing is not yet implemented");
+}
+pub fn process_omul256_hint(_data: &[u64]) -> Result<Vec<u64>, String> {
+    unimplemented!("OMUL256 hint processing is not yet implemented");
+}
+pub fn process_wmul256_hint(_data: &[u64]) -> Result<Vec<u64>, String> {
+    unimplemented!("WMUL256 hint processing is not yet implemented");
+}
