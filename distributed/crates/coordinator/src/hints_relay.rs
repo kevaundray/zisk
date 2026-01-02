@@ -5,7 +5,7 @@ use std::future::Future;
 use std::pin::Pin;
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::Arc;
-use zisk_common::{io::StreamProcessor, HintCode, PrecompileHint};
+use zisk_common::{io::StreamProcessor, CtrlCode, HintCode, PrecompileHint};
 use zisk_distributed_common::StreamMessageKind;
 
 type AsyncDispatcher = Arc<
@@ -55,7 +55,7 @@ impl PrecompileHintsRelay {
             // Validate hint type is in valid range before accessing stats array
 
             // CTRL_START must be the first message of the first batch
-            if hint.hint_code == HintCode::CtrlStart {
+            if hint.hint_code == HintCode::Ctrl(CtrlCode::Start) {
                 if !first_batch {
                     return Err(anyhow::anyhow!(
                         "CTRL_START can only be sent as the first message in the stream"
@@ -77,7 +77,7 @@ impl PrecompileHintsRelay {
                     idx
                 ));
             }
-            has_ctrl_end = hint.hint_code == HintCode::CtrlEnd;
+            has_ctrl_end = hint.hint_code == HintCode::Ctrl(CtrlCode::End);
 
             idx += length + 1;
         }

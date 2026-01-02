@@ -49,21 +49,36 @@ use std::fmt::Display;
 
 use anyhow::Result;
 
-/// Hint code representing either a control code or a data hint type.
+/// Control code variants for stream control.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[repr(u32)]
-pub enum HintCode {
-    // CONTROL CODES
-    /// Control code: Reset processor state and global sequence.
-    CtrlStart = 0x00,
-    /// Control code: Wait until completion of all pending hints.
-    CtrlEnd = 0x01,
-    /// Control code: Cancel current stream and stop processing.
-    CtrlCancel = 0x02,
-    /// Control code: Signal error and stop processing.
-    CtrlError = 0x03,
+pub enum CtrlCode {
+    /// Reset processor state and global sequence.
+    Start = 0x00,
+    /// Wait until completion of all pending hints.
+    End = 0x01,
+    /// Cancel current stream and stop processing.
+    Cancel = 0x02,
+    /// Signal error and stop processing.
+    Error = 0x03,
+}
 
-    // BUILT-IN HINT TYPES
+impl Display for CtrlCode {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let name = match self {
+            CtrlCode::Start => "CTRL_START",
+            CtrlCode::End => "CTRL_END",
+            CtrlCode::Cancel => "CTRL_CANCEL",
+            CtrlCode::Error => "CTRL_ERROR",
+        };
+        write!(f, "{}", name)
+    }
+}
+
+/// Built-in hint type variants.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[repr(u32)]
+pub enum BuiltInHint {
     /// Pass-through hint type.
     /// When a hint has this type, the processor simply passes through the data
     /// without any additional computation.
@@ -86,47 +101,84 @@ pub enum HintCode {
     WMul256 = 0x0C,
 }
 
+impl Display for BuiltInHint {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let name = match self {
+            BuiltInHint::Noop => "NOOP",
+            BuiltInHint::EcRecover => "ECRECOVER",
+            BuiltInHint::RedMod256 => "REDMOD256",
+            BuiltInHint::AddMod256 => "ADDMOD256",
+            BuiltInHint::MulMod256 => "MULMOD256",
+            BuiltInHint::DivRem256 => "DIVREM256",
+            BuiltInHint::WPow256 => "WPOW256",
+            BuiltInHint::OMul256 => "OMUL256",
+            BuiltInHint::WMul256 => "WMUL256",
+        };
+        write!(f, "{}", name)
+    }
+}
+
+/// Hint code representing either a control code or built-in hint type.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[repr(u32)]
+pub enum HintCode {
+    /// Control code for stream management.
+    Ctrl(CtrlCode),
+    /// Built-in hint type.
+    BuiltIn(BuiltInHint),
+}
+
+impl Display for HintCode {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            HintCode::Ctrl(ctrl) => write!(f, "{}", ctrl),
+            HintCode::BuiltIn(builtin) => write!(f, "{}", builtin),
+        }
+    }
+}
+
 impl TryFrom<u32> for HintCode {
     type Error = anyhow::Error;
 
     fn try_from(value: u32) -> Result<Self> {
         match value {
-            0x00 => Ok(HintCode::CtrlStart),
-            0x01 => Ok(HintCode::CtrlEnd),
-            0x02 => Ok(HintCode::CtrlCancel),
-            0x03 => Ok(HintCode::CtrlError),
-            0x04 => Ok(HintCode::Noop),
-            0x05 => Ok(HintCode::EcRecover),
-            0x06 => Ok(HintCode::RedMod256),
-            0x07 => Ok(HintCode::AddMod256),
-            0x08 => Ok(HintCode::MulMod256),
-            0x09 => Ok(HintCode::DivRem256),
-            0x0A => Ok(HintCode::WPow256),
-            0x0B => Ok(HintCode::OMul256),
-            0x0C => Ok(HintCode::WMul256),
+            0x00 => Ok(HintCode::Ctrl(CtrlCode::Start)),
+            0x01 => Ok(HintCode::Ctrl(CtrlCode::End)),
+            0x02 => Ok(HintCode::Ctrl(CtrlCode::Cancel)),
+            0x03 => Ok(HintCode::Ctrl(CtrlCode::Error)),
+            0x04 => Ok(HintCode::BuiltIn(BuiltInHint::Noop)),
+            0x05 => Ok(HintCode::BuiltIn(BuiltInHint::EcRecover)),
+            0x06 => Ok(HintCode::BuiltIn(BuiltInHint::RedMod256)),
+            0x07 => Ok(HintCode::BuiltIn(BuiltInHint::AddMod256)),
+            0x08 => Ok(HintCode::BuiltIn(BuiltInHint::MulMod256)),
+            0x09 => Ok(HintCode::BuiltIn(BuiltInHint::DivRem256)),
+            0x0A => Ok(HintCode::BuiltIn(BuiltInHint::WPow256)),
+            0x0B => Ok(HintCode::BuiltIn(BuiltInHint::OMul256)),
+            0x0C => Ok(HintCode::BuiltIn(BuiltInHint::WMul256)),
             _ => Err(anyhow::anyhow!("Invalid hint code: {:#x}", value)),
         }
     }
 }
 
-impl Display for HintCode {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let name = match self {
-            HintCode::CtrlStart => "CTRL_START",
-            HintCode::CtrlEnd => "CTRL_END",
-            HintCode::CtrlCancel => "CTRL_CANCEL",
-            HintCode::CtrlError => "CTRL_ERROR",
-            HintCode::Noop => "NOOP",
-            HintCode::EcRecover => "ECRECOVER",
-            HintCode::RedMod256 => "REDMOD256",
-            HintCode::AddMod256 => "ADDMOD256",
-            HintCode::MulMod256 => "MULMOD256",
-            HintCode::DivRem256 => "DIVREM256",
-            HintCode::WPow256 => "WPOW256",
-            HintCode::OMul256 => "OMUL256",
-            HintCode::WMul256 => "WMUL256",
-        };
-        write!(f, "{}", name)
+impl HintCode {
+    /// Convert HintCode to its u32 discriminant value.
+    #[inline]
+    pub const fn to_u32(self) -> u32 {
+        match self {
+            HintCode::Ctrl(CtrlCode::Start) => 0x00,
+            HintCode::Ctrl(CtrlCode::End) => 0x01,
+            HintCode::Ctrl(CtrlCode::Cancel) => 0x02,
+            HintCode::Ctrl(CtrlCode::Error) => 0x03,
+            HintCode::BuiltIn(BuiltInHint::Noop) => 0x04,
+            HintCode::BuiltIn(BuiltInHint::EcRecover) => 0x05,
+            HintCode::BuiltIn(BuiltInHint::RedMod256) => 0x06,
+            HintCode::BuiltIn(BuiltInHint::AddMod256) => 0x07,
+            HintCode::BuiltIn(BuiltInHint::MulMod256) => 0x08,
+            HintCode::BuiltIn(BuiltInHint::DivRem256) => 0x09,
+            HintCode::BuiltIn(BuiltInHint::WPow256) => 0x0A,
+            HintCode::BuiltIn(BuiltInHint::OMul256) => 0x0B,
+            HintCode::BuiltIn(BuiltInHint::WMul256) => 0x0C,
+        }
     }
 }
 
@@ -174,7 +226,6 @@ impl PrecompileHint {
         }
 
         let header = slice[idx];
-        let hint_code = HintCode::try_from((header >> 32) as u32)?;
         let length = (header & 0xFFFFFFFF) as u32;
 
         if slice.len() < idx + length as usize + 1 {
@@ -184,6 +235,9 @@ impl PrecompileHint {
                 slice.len() - idx - 1
             ));
         }
+
+        let hint_code_32 = (header >> 32) as u32;
+        let hint_code = HintCode::try_from(hint_code_32)?;
 
         // Create a new Vec with the hint data.
         let data = slice[idx + 1..idx + length as usize + 1].to_vec();

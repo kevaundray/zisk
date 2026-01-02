@@ -12,7 +12,7 @@ use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::{Arc, Condvar, Mutex};
 use tracing::debug;
 use zisk_common::io::{StreamProcessor, StreamSink};
-use zisk_common::{HintCode, PrecompileHint};
+use zisk_common::{BuiltInHint, CtrlCode, HintCode, PrecompileHint};
 
 /// Ordered result buffer with drain state.
 ///
@@ -195,8 +195,9 @@ impl<HS: StreamSink + Send + Sync + 'static> HintsProcessor<HS> {
             }
 
             // Check if this is a control code or data hint type
+
             match hint.hint_code {
-                HintCode::CtrlStart => {
+                HintCode::Ctrl(CtrlCode::Start) => {
                     // CTRL_START must be the first message of the first batch
                     if !first_batch {
                         return Err(anyhow::anyhow!(
@@ -215,7 +216,7 @@ impl<HS: StreamSink + Send + Sync + 'static> HintsProcessor<HS> {
                     idx += length + 1;
                     continue;
                 }
-                HintCode::CtrlEnd => {
+                HintCode::Ctrl(CtrlCode::End) => {
                     // Control hint only; wait for completion then set flag
                     self.wait_for_completion()?;
                     has_ctrl_end = true;
@@ -232,29 +233,19 @@ impl<HS: StreamSink + Send + Sync + 'static> HintsProcessor<HS> {
                     }
                     break;
                 }
-                HintCode::CtrlCancel => {
+                HintCode::Ctrl(CtrlCode::Cancel) => {
                     // Cancel current stream: set error and notify
                     self.state.error_flag.store(true, Ordering::Release);
                     self.state.drain_signal.notify_all();
                     return Err(anyhow::anyhow!("Stream cancelled"));
                 }
-                HintCode::CtrlError => {
+                HintCode::Ctrl(CtrlCode::Error) => {
                     // External error signal
                     self.state.error_flag.store(true, Ordering::Release);
                     self.state.drain_signal.notify_all();
                     return Err(anyhow::anyhow!("Stream error signalled"));
                 }
-                HintCode::Noop
-                | HintCode::EcRecover
-                | HintCode::RedMod256
-                | HintCode::AddMod256
-                | HintCode::MulMod256
-                | HintCode::DivRem256
-                | HintCode::WPow256
-                | HintCode::OMul256
-                | HintCode::WMul256 => {
-                    // Data hint type - process normally
-                }
+                _ => {} // Built-in data hint; continue processing
             }
 
             // Atomically reserve slot and capture generation inside mutex
@@ -267,8 +258,8 @@ impl<HS: StreamSink + Send + Sync + 'static> HintsProcessor<HS> {
                 (gen, seq)
             };
 
-            // Handle HINTS_TYPE_RESULT synchronously - it doesn't need async processing
-            if hint.hint_code == HintCode::Noop {
+            // Handle HintCode::Noop synchronously - it doesn't need async processing
+            if hint.hint_code == HintCode::BuiltIn(BuiltInHint::Noop) {
                 // Immediately mark this slot as complete
                 {
                     let mut queue = self.state.queue.lock().unwrap();
@@ -282,43 +273,7 @@ impl<HS: StreamSink + Send + Sync + 'static> HintsProcessor<HS> {
                 // Spawn processing task
                 let state = Arc::clone(&self.state);
                 self.pool.spawn(move || {
-                    // Check if we should stop due to error
-                    if state.error_flag.load(Ordering::Acquire) {
-                        return;
-                    }
-
-                    // Process the hint
-                    let result = Self::dispatch_hint(hint);
-
-                    // Store result and try to drain
-                    let mut queue = state.queue.lock().unwrap();
-
-                    // Check generation first to detect stale workers from previous sessions
-                    let current_gen = state.generation.load(Ordering::SeqCst);
-                    if generation != current_gen {
-                        // Worker belongs to old generation; ignore result
-                        return;
-                    }
-
-                    // Calculate offset in buffer; handle drained slots
-                    if seq_id < queue.next_drain_seq {
-                        // This result belongs to a previous stream/session; ignore
-                        return;
-                    }
-                    let offset = seq_id - queue.next_drain_seq;
-
-                    // Check error flag again before storing to avoid processing after error
-                    if state.error_flag.load(Ordering::Acquire) {
-                        return;
-                    }
-
-                    queue.buffer[offset] = Some(result);
-
-                    // Release lock before notifying
-                    drop(queue);
-
-                    // Notify drainer thread
-                    state.drain_signal.notify_one();
+                    Self::worker_thread(state, hint, generation, seq_id);
                 });
             }
 
@@ -330,7 +285,7 @@ impl<HS: StreamSink + Send + Sync + 'static> HintsProcessor<HS> {
                 debug!("Processed hints stats:");
                 let stats = stats.lock().unwrap();
                 let mut sorted_stats: Vec<_> = stats.iter().collect();
-                sorted_stats.sort_by_key(|(hint_code, _)| **hint_code as u32);
+                sorted_stats.sort_by_key(|(&hint_code, _)| hint_code.to_u32());
                 for (hint_code, count) in sorted_stats {
                     debug!("Hint type {}: {}", hint_code, count);
                 }
@@ -338,6 +293,59 @@ impl<HS: StreamSink + Send + Sync + 'static> HintsProcessor<HS> {
         }
 
         Ok(has_ctrl_end)
+    }
+
+    /// Worker thread that processes a single hint and stores the result.
+    ///
+    /// # Arguments
+    ///
+    /// * `state` - Shared processor state
+    /// * `hint` - The hint to process
+    /// * `generation` - Generation number for detecting stale workers
+    /// * `seq_id` - Sequence ID for ordering results
+    fn worker_thread(
+        state: Arc<HintProcessorState>,
+        hint: PrecompileHint,
+        generation: usize,
+        seq_id: usize,
+    ) {
+        // Check if we should stop due to error
+        if state.error_flag.load(Ordering::Acquire) {
+            return;
+        }
+
+        // Process the hint
+        let result = Self::dispatch_hint(hint);
+
+        // Store result and try to drain
+        let mut queue = state.queue.lock().unwrap();
+
+        // Check generation first to detect stale workers from previous sessions
+        let current_gen = state.generation.load(Ordering::SeqCst);
+        if generation != current_gen {
+            // Worker belongs to old generation; ignore result
+            return;
+        }
+
+        // Calculate offset in buffer; handle drained slots
+        if seq_id < queue.next_drain_seq {
+            // This result belongs to a previous stream/session; ignore
+            return;
+        }
+        let offset = seq_id - queue.next_drain_seq;
+
+        // Check error flag again before storing to avoid processing after error
+        if state.error_flag.load(Ordering::Acquire) {
+            return;
+        }
+
+        queue.buffer[offset] = Some(result);
+
+        // Release lock before notifying
+        drop(queue);
+
+        // Notify drainer thread
+        state.drain_signal.notify_one();
     }
 
     /// Drainer thread that waits for hints to complete and drains ready results from queue.
@@ -452,31 +460,23 @@ impl<HS: StreamSink + Send + Sync + 'static> HintsProcessor<HS> {
     ///
     /// The result produced by the selected hint handler.
     ///
-    /// # Errors
+    /// # Note
     ///
-    /// Returns an error if the hint type is unknown or if the handler fails.
+    /// Control codes and Noop hints are handled before this function is called.
     #[inline]
     fn dispatch_hint(hint: PrecompileHint) -> Result<Vec<u64>> {
         match hint.hint_code {
-            // Control codes should not reach here
-            HintCode::CtrlStart
-            | HintCode::CtrlEnd
-            | HintCode::CtrlCancel
-            | HintCode::CtrlError => {
-                Err(anyhow::anyhow!("Control code {:?} should not be dispatched", hint.hint_code))
-            }
+            HintCode::BuiltIn(BuiltInHint::EcRecover) => Self::process_hint_ecrecover(&hint),
+            HintCode::BuiltIn(BuiltInHint::RedMod256) => Self::process_hint_redmod256(&hint),
+            HintCode::BuiltIn(BuiltInHint::AddMod256) => Self::process_hint_addmod256(&hint),
+            HintCode::BuiltIn(BuiltInHint::MulMod256) => Self::process_hint_mulmod256(&hint),
+            HintCode::BuiltIn(BuiltInHint::DivRem256) => Self::process_hint_divrem256(&hint),
+            HintCode::BuiltIn(BuiltInHint::WPow256) => Self::process_hint_wpow256(&hint),
+            HintCode::BuiltIn(BuiltInHint::OMul256) => Self::process_hint_omul256(&hint),
+            HintCode::BuiltIn(BuiltInHint::WMul256) => Self::process_hint_wmul256(&hint),
 
-            // When hint type is HINTS_TYPE_RESULT, return the data as-is.
-            HintCode::Noop => Ok(hint.data),
-
-            HintCode::EcRecover => Self::process_hint_ecrecover(&hint),
-            HintCode::RedMod256 => Self::process_hint_redmod256(&hint),
-            HintCode::AddMod256 => Self::process_hint_addmod256(&hint),
-            HintCode::MulMod256 => Self::process_hint_mulmod256(&hint),
-            HintCode::DivRem256 => Self::process_hint_divrem256(&hint),
-            HintCode::WPow256 => Self::process_hint_wpow256(&hint),
-            HintCode::OMul256 => Self::process_hint_omul256(&hint),
-            HintCode::WMul256 => Self::process_hint_wmul256(&hint),
+            // Control codes and Noop are handled before dispatch
+            _ => unreachable!("Unexpected hint code: {:?}", hint.hint_code),
         }
     }
 
@@ -575,7 +575,8 @@ mod tests {
     #[test]
     fn test_single_result_hint_non_blocking() {
         let p = processor();
-        let data = vec![make_header(HintCode::Noop as u32, 2), 0x111, 0x222];
+        let data =
+            vec![make_header(HintCode::BuiltIn(BuiltInHint::Noop).to_u32(), 2), 0x111, 0x222];
 
         // Dispatch should succeed and be non-blocking
         assert!(p.process_hints(&data, false).is_ok());
@@ -592,11 +593,11 @@ mod tests {
     fn test_multiple_hints_ordered_output() {
         let p = processor();
         let data = vec![
-            make_header(HintCode::Noop as u32, 1),
+            make_header(HintCode::BuiltIn(BuiltInHint::Noop).to_u32(), 1),
             0x111,
-            make_header(HintCode::Noop as u32, 1),
+            make_header(HintCode::BuiltIn(BuiltInHint::Noop).to_u32(), 1),
             0x222,
-            make_header(HintCode::Noop as u32, 1),
+            make_header(HintCode::BuiltIn(BuiltInHint::Noop).to_u32(), 1),
             0x333,
         ];
         assert!(p.process_hints(&data, false).is_ok());
@@ -611,8 +612,8 @@ mod tests {
     #[test]
     fn test_multiple_calls_global_sequence() {
         let p = processor();
-        let data1 = vec![make_header(HintCode::Noop as u32, 1), 0xAAA];
-        let data2 = vec![make_header(HintCode::Noop as u32, 1), 0xBBB];
+        let data1 = vec![make_header(HintCode::BuiltIn(BuiltInHint::Noop).to_u32(), 1), 0xAAA];
+        let data2 = vec![make_header(HintCode::BuiltIn(BuiltInHint::Noop).to_u32(), 1), 0xBBB];
 
         assert!(p.process_hints(&data1, false).is_ok());
         assert!(p.process_hints(&data2, false).is_ok());
@@ -652,7 +653,11 @@ mod tests {
     fn test_error_stops_wait() {
         let p = processor();
         // First valid, then invalid type
-        let data = vec![make_header(HintCode::Noop as u32, 1), 0x111, make_header(999, 0)];
+        let data = vec![
+            make_header(HintCode::BuiltIn(BuiltInHint::Noop).to_u32(), 1),
+            0x111,
+            make_header(999, 0),
+        ];
 
         // Should error immediately when encountering invalid hint type
         let result = p.process_hints(&data, false);
@@ -675,7 +680,7 @@ mod tests {
         assert!(!p.state.error_flag.load(Ordering::Acquire));
 
         // Should be able to process new hints after reset
-        let good = vec![make_header(HintCode::Noop as u32, 1), 0x42];
+        let good = vec![make_header(HintCode::BuiltIn(BuiltInHint::Noop).to_u32(), 1), 0x42];
         assert!(p.process_hints(&good, false).is_ok());
         assert!(p.wait_for_completion().is_ok());
 
@@ -689,7 +694,7 @@ mod tests {
         let p = processor();
 
         // First batch increments sequence
-        let batch1 = vec![make_header(HintCode::Noop as u32, 1), 0x01];
+        let batch1 = vec![make_header(HintCode::BuiltIn(BuiltInHint::Noop).to_u32(), 1), 0x01];
         p.process_hints(&batch1, false).unwrap();
         p.wait_for_completion().unwrap();
 
@@ -700,7 +705,7 @@ mod tests {
         }
 
         // Send START control - should reset sequence
-        let start = vec![make_ctrl_header(HintCode::CtrlStart as u32, 0)];
+        let start = vec![make_ctrl_header(HintCode::Ctrl(CtrlCode::Start).to_u32(), 0)];
         p.process_hints(&start, true).unwrap();
 
         // Sequence should be reset to 0
@@ -711,10 +716,10 @@ mod tests {
         }
 
         // Process new batch
-        let batch2 = vec![make_header(HintCode::Noop as u32, 1), 0x02];
+        let batch2 = vec![make_header(HintCode::BuiltIn(BuiltInHint::Noop).to_u32(), 1), 0x02];
         p.process_hints(&batch2, false).unwrap();
 
-        let end = vec![make_ctrl_header(HintCode::CtrlEnd as u32, 0)];
+        let end = vec![make_ctrl_header(HintCode::Ctrl(CtrlCode::End).to_u32(), 0)];
         p.process_hints(&end, false).unwrap();
 
         // Should have processed 1 hint (starting from 0 again)
@@ -728,15 +733,15 @@ mod tests {
 
         // Dispatch hints
         let data = vec![
-            make_header(HintCode::Noop as u32, 1),
+            make_header(HintCode::BuiltIn(BuiltInHint::Noop).to_u32(), 1),
             0x10,
-            make_header(HintCode::Noop as u32, 1),
+            make_header(HintCode::BuiltIn(BuiltInHint::Noop).to_u32(), 1),
             0x20,
         ];
         p.process_hints(&data, false).unwrap();
 
         // END should wait internally
-        let end = vec![make_ctrl_header(HintCode::CtrlEnd as u32, 0)];
+        let end = vec![make_ctrl_header(HintCode::Ctrl(CtrlCode::End).to_u32(), 0)];
         p.process_hints(&end, false).unwrap();
 
         // Buffer should already be empty
@@ -753,7 +758,7 @@ mod tests {
     #[test]
     fn test_stream_cancel_returns_error() {
         let p = processor();
-        let cancel = vec![make_ctrl_header(HintCode::CtrlCancel as u32, 0)];
+        let cancel = vec![make_ctrl_header(HintCode::Ctrl(CtrlCode::Cancel).to_u32(), 0)];
 
         let result = p.process_hints(&cancel, false);
         assert!(result.is_err());
@@ -766,7 +771,7 @@ mod tests {
     #[test]
     fn test_stream_error_signal_returns_error() {
         let p = processor();
-        let signal_err = vec![make_ctrl_header(HintCode::CtrlError as u32, 0)];
+        let signal_err = vec![make_ctrl_header(HintCode::Ctrl(CtrlCode::Error).to_u32(), 0)];
 
         let result = p.process_hints(&signal_err, false);
         assert!(result.is_err());
@@ -782,9 +787,9 @@ mod tests {
 
         // CTRL_START not at position 0 should fail
         let data = vec![
-            make_header(HintCode::Noop as u32, 1),
+            make_header(HintCode::BuiltIn(BuiltInHint::Noop).to_u32(), 1),
             0x42,
-            make_ctrl_header(HintCode::CtrlStart as u32, 0),
+            make_ctrl_header(HintCode::Ctrl(CtrlCode::Start).to_u32(), 0),
         ];
 
         let result = p.process_hints(&data, true);
@@ -797,11 +802,11 @@ mod tests {
         let p = processor();
 
         // First batch is ok
-        let batch1 = vec![make_header(HintCode::Noop as u32, 1), 0x01];
+        let batch1 = vec![make_header(HintCode::BuiltIn(BuiltInHint::Noop).to_u32(), 1), 0x01];
         p.process_hints(&batch1, false).unwrap();
 
         // CTRL_START in non-first batch should fail
-        let start = vec![make_ctrl_header(HintCode::CtrlStart as u32, 0)];
+        let start = vec![make_ctrl_header(HintCode::Ctrl(CtrlCode::Start).to_u32(), 0)];
         let result = p.process_hints(&start, false);
         assert!(result.is_err());
         assert!(result.unwrap_err().to_string().contains("first message in the stream"));
@@ -813,8 +818,8 @@ mod tests {
 
         // CTRL_END not at end should fail
         let data = vec![
-            make_ctrl_header(HintCode::CtrlEnd as u32, 0),
-            make_header(HintCode::Noop as u32, 1),
+            make_ctrl_header(HintCode::Ctrl(CtrlCode::End).to_u32(), 0),
+            make_header(HintCode::BuiltIn(BuiltInHint::Noop).to_u32(), 1),
             0x42,
         ];
 
@@ -844,10 +849,10 @@ mod tests {
 
         // Send some data
         let data = vec![
-            make_header(HintCode::Noop as u32, 2),
+            make_header(HintCode::BuiltIn(BuiltInHint::Noop).to_u32(), 2),
             0xAAA,
             0xBBB,
-            make_header(HintCode::Noop as u32, 1),
+            make_header(HintCode::BuiltIn(BuiltInHint::Noop).to_u32(), 1),
             0xCCC,
         ];
 
@@ -885,7 +890,7 @@ mod tests {
         let p = HintsProcessor::builder(sink).num_threads(2).build().unwrap();
 
         // First batch succeeds
-        let data1 = vec![make_header(HintCode::Noop as u32, 1), 0x01];
+        let data1 = vec![make_header(HintCode::BuiltIn(BuiltInHint::Noop).to_u32(), 1), 0x01];
         assert!(p.process_hints(&data1, false).is_ok());
         assert!(p.wait_for_completion().is_ok());
 
@@ -893,7 +898,7 @@ mod tests {
         should_fail.store(true, Ordering::Release);
 
         // Second batch should trigger sink error
-        let data2 = vec![make_header(HintCode::Noop as u32, 1), 0x02];
+        let data2 = vec![make_header(HintCode::BuiltIn(BuiltInHint::Noop).to_u32(), 1), 0x02];
         assert!(p.process_hints(&data2, false).is_ok());
 
         // Wait should detect the error from drainer thread
@@ -910,7 +915,7 @@ mod tests {
         assert!(p.stats.is_none());
 
         // Should process hints normally
-        let data = vec![make_header(HintCode::Noop as u32, 1), 0x42];
+        let data = vec![make_header(HintCode::BuiltIn(BuiltInHint::Noop).to_u32(), 1), 0x42];
         assert!(p.process_hints(&data, false).is_ok());
         assert!(p.wait_for_completion().is_ok());
     }
@@ -924,9 +929,9 @@ mod tests {
 
         // Process hints
         let data = vec![
-            make_header(HintCode::Noop as u32, 1),
+            make_header(HintCode::BuiltIn(BuiltInHint::Noop).to_u32(), 1),
             0x111,
-            make_header(HintCode::Noop as u32, 1),
+            make_header(HintCode::BuiltIn(BuiltInHint::Noop).to_u32(), 1),
             0x222,
         ];
         assert!(p.process_hints(&data, false).is_ok());
@@ -934,7 +939,7 @@ mod tests {
 
         // Verify stats were collected
         let stats = p.stats.as_ref().unwrap().lock().unwrap();
-        assert_eq!(stats.get(&HintCode::Noop), Some(&2));
+        assert_eq!(stats.get(&HintCode::BuiltIn(BuiltInHint::Noop)), Some(&2));
     }
 
     #[test]
@@ -942,7 +947,7 @@ mod tests {
         let p = HintsProcessor::builder(NullHints).num_threads(4).build().unwrap();
 
         // Should process hints normally
-        let data = vec![make_header(HintCode::Noop as u32, 1), 0x42];
+        let data = vec![make_header(HintCode::BuiltIn(BuiltInHint::Noop).to_u32(), 1), 0x42];
         assert!(p.process_hints(&data, false).is_ok());
         assert!(p.wait_for_completion().is_ok());
     }
@@ -956,9 +961,9 @@ mod tests {
 
         // Should still process hints normally
         let data = vec![
-            make_header(HintCode::Noop as u32, 1),
+            make_header(HintCode::BuiltIn(BuiltInHint::Noop).to_u32(), 1),
             0x111,
-            make_header(HintCode::Noop as u32, 1),
+            make_header(HintCode::BuiltIn(BuiltInHint::Noop).to_u32(), 1),
             0x222,
         ];
         assert!(p.process_hints(&data, false).is_ok());
@@ -972,7 +977,7 @@ mod tests {
 
         assert!(p.stats.is_some());
 
-        let data = vec![make_header(HintCode::Noop as u32, 1), 0x42];
+        let data = vec![make_header(HintCode::BuiltIn(BuiltInHint::Noop).to_u32(), 1), 0x42];
         assert!(p.process_hints(&data, false).is_ok());
         assert!(p.wait_for_completion().is_ok());
     }
@@ -989,7 +994,7 @@ mod tests {
         let mut data = Vec::with_capacity(NUM_HINTS * 2);
 
         for i in 0..NUM_HINTS {
-            data.push(make_header(HintCode::Noop as u32, 1));
+            data.push(make_header(HintCode::BuiltIn(BuiltInHint::Noop).to_u32(), 1));
             data.push(i as u64);
         }
 
@@ -1026,7 +1031,7 @@ mod tests {
         for batch_id in 0..NUM_BATCHES {
             let mut data = Vec::with_capacity(HINTS_PER_BATCH * 2);
             for i in 0..HINTS_PER_BATCH {
-                data.push(make_header(HintCode::Noop as u32, 1));
+                data.push(make_header(HintCode::BuiltIn(BuiltInHint::Noop).to_u32(), 1));
                 data.push((batch_id * HINTS_PER_BATCH + i) as u64);
             }
             p.process_hints(&data, false).unwrap();
@@ -1063,19 +1068,19 @@ mod tests {
 
         for _iter in 0..ITERATIONS {
             // Reset at start of each iteration
-            let reset = vec![make_ctrl_header(HintCode::CtrlStart as u32, 0)];
+            let reset = vec![make_ctrl_header(HintCode::Ctrl(CtrlCode::Start).to_u32(), 0)];
             p.process_hints(&reset, true).unwrap();
 
             // Process batch
             let mut data = Vec::with_capacity(HINTS_PER_ITER * 2);
             for i in 0..HINTS_PER_ITER {
-                data.push(make_header(HintCode::Noop as u32, 1));
+                data.push(make_header(HintCode::BuiltIn(BuiltInHint::Noop).to_u32(), 1));
                 data.push(i as u64);
             }
             p.process_hints(&data, false).unwrap();
 
             // End stream
-            let end = vec![make_ctrl_header(HintCode::CtrlEnd as u32, 0)];
+            let end = vec![make_ctrl_header(HintCode::Ctrl(CtrlCode::End).to_u32(), 0)];
             p.process_hints(&end, false).unwrap();
         }
 
