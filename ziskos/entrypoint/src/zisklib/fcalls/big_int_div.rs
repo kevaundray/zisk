@@ -39,7 +39,7 @@ pub fn fcall_division(
             hints.push(len_rem as u64);
             hints.extend_from_slice(&rem);
         }
-        
+
         (len_quo, len_rem)
     }
     #[cfg(all(target_os = "zkvm", target_vendor = "zisk"))]
