@@ -27,7 +27,8 @@ pub fn fcall_bin_decomp(
             hints.push(len_bits as u64);
             hints.extend_from_slice(&bits_u64);
         }
-        return (len_bits, bits_u64);
+        
+        (len_bits, bits_u64)
     }
     #[cfg(all(target_os = "zkvm", target_vendor = "zisk"))]
     {
