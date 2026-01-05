@@ -49,15 +49,19 @@ use std::fmt::Display;
 
 use anyhow::Result;
 
-// Control code constants
+// === CONTROL CODES ===
 const CTRL_START: u32 = 0x00;
 const CTRL_END: u32 = 0x01;
 const CTRL_CANCEL: u32 = 0x02;
 const CTRL_ERROR: u32 = 0x03;
 
-// Built-in hint code constants
+// === BUILT-IN HINT CODES ===
+// Noop hint code
 const HINT_NOOP: u32 = 0x04;
+// Ecrecover precompile hint code
 const HINT_ECRECOVER: u32 = 0x05;
+
+// Big integer arithmetic hint codes
 const HINT_REDMOD256: u32 = 0x06;
 const HINT_ADDMOD256: u32 = 0x07;
 const HINT_MULMOD256: u32 = 0x08;
@@ -65,7 +69,19 @@ const HINT_DIVREM256: u32 = 0x09;
 const HINT_WPOW256: u32 = 0x0A;
 const HINT_OMUL256: u32 = 0x0B;
 const HINT_WMUL256: u32 = 0x0C;
+
+// Modular exponentiation hint code
 const HINT_MODEXP: u32 = 0x0D;
+
+// BN254 precompile hint codes
+const HINT_TO_AFFINE_BN254: u32 = 0x0E;
+const HINT_IS_ON_CURVE_BN254: u32 = 0x0F;
+const HINT_ADD_BN254: u32 = 0x10;
+const HINT_MUL_BN254: u32 = 0x11;
+const HINT_TO_AFFINE_TWIST_BN254: u32 = 0x12;
+const HINT_IS_ON_CURVE_TWIST_BN254: u32 = 0x13;
+const HINT_IS_ON_SUBGROUP_TWIST_BN254: u32 = 0x14;
+const HINT_PAIRING_BATCH_BN254: u32 = 0x15;
 
 /// Control code variants for stream control.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -115,8 +131,11 @@ pub enum BuiltInHint {
     /// When a hint has this type, the processor simply passes through the data
     /// without any additional computation.
     Noop = HINT_NOOP,
+
     /// Ecrecover precompile hint type.
     EcRecover = HINT_ECRECOVER,
+
+    // Big Integer Arithmetic Hints
     ///  Modular reduction of a 256-bit integer hint type.
     RedMod256 = HINT_REDMOD256,
     /// Modular addition of 256-bit integers hint type.
@@ -131,8 +150,27 @@ pub enum BuiltInHint {
     OMul256 = HINT_OMUL256,
     /// Wrapping multiplication of 256-bit integers hint type.
     WMul256 = HINT_WMUL256,
+
     /// Modular exponentiation hint type.
     ModExp = HINT_MODEXP,
+
+    // BN254 Precompile Hints
+    /// Convert to affine coordinates hint type for BN254 curve.
+    ToAffineBn254 = HINT_TO_AFFINE_BN254,
+    /// Check if point is on curve hint type for BN254 curve.
+    IsOnCurveBn254 = HINT_IS_ON_CURVE_BN254,
+    /// Point addition hint type for BN254 curve.
+    AddBn254 = HINT_ADD_BN254,
+    /// Scalar multiplication hint type for BN254 curve.
+    MulBn254 = HINT_MUL_BN254,
+    /// Convert to affine coordinates hint type for BN254 twist.
+    ToAffineTwistBn254 = HINT_TO_AFFINE_TWIST_BN254,
+    /// Check if point is on curve hint type for BN254 twist.
+    IsOnCurveTwistBn254 = HINT_IS_ON_CURVE_TWIST_BN254,
+    /// Check if point is in subgroup hint type for BN254 twist.
+    IsOnSubgroupTwistBn254 = HINT_IS_ON_SUBGROUP_TWIST_BN254,
+    /// Pairing batch computation hint type for BN254 curve.
+    PairingBatchBn254 = HINT_PAIRING_BATCH_BN254,
 }
 
 impl Display for BuiltInHint {
@@ -148,6 +186,14 @@ impl Display for BuiltInHint {
             BuiltInHint::OMul256 => "OMUL256",
             BuiltInHint::WMul256 => "WMUL256",
             BuiltInHint::ModExp => "MODEXP",
+            BuiltInHint::ToAffineBn254 => "TO_AFFINE_BN254",
+            BuiltInHint::IsOnCurveBn254 => "IS_ON_CURVE_BN254",
+            BuiltInHint::AddBn254 => "ADD_BN254",
+            BuiltInHint::MulBn254 => "MUL_BN254",
+            BuiltInHint::ToAffineTwistBn254 => "TO_AFFINE_TWIST_BN254",
+            BuiltInHint::IsOnCurveTwistBn254 => "IS_ON_CURVE_TWIST_BN254",
+            BuiltInHint::IsOnSubgroupTwistBn254 => "IS_ON_SUBGROUP_TWIST_BN254",
+            BuiltInHint::PairingBatchBn254 => "PAIRING_BATCH_BN254",
         };
         write!(f, "{} ({:#x})", name, *self as u32)
     }
@@ -168,6 +214,14 @@ impl TryFrom<u32> for BuiltInHint {
             HINT_OMUL256 => Ok(Self::OMul256),
             HINT_WMUL256 => Ok(Self::WMul256),
             HINT_MODEXP => Ok(Self::ModExp),
+            HINT_TO_AFFINE_BN254 => Ok(Self::ToAffineBn254),
+            HINT_IS_ON_CURVE_BN254 => Ok(Self::IsOnCurveBn254),
+            HINT_ADD_BN254 => Ok(Self::AddBn254),
+            HINT_MUL_BN254 => Ok(Self::MulBn254),
+            HINT_TO_AFFINE_TWIST_BN254 => Ok(Self::ToAffineTwistBn254),
+            HINT_IS_ON_CURVE_TWIST_BN254 => Ok(Self::IsOnCurveTwistBn254),
+            HINT_IS_ON_SUBGROUP_TWIST_BN254 => Ok(Self::IsOnSubgroupTwistBn254),
+            HINT_PAIRING_BATCH_BN254 => Ok(Self::PairingBatchBn254),
             _ => Err(anyhow::anyhow!("Invalid built-in hint code: {:#x}", value)),
         }
     }
@@ -217,20 +271,30 @@ impl HintCode {
     #[inline]
     pub const fn to_u32(self) -> u32 {
         match self {
-            HintCode::Ctrl(CtrlHint::Start) => 0x00,
-            HintCode::Ctrl(CtrlHint::End) => 0x01,
-            HintCode::Ctrl(CtrlHint::Cancel) => 0x02,
-            HintCode::Ctrl(CtrlHint::Error) => 0x03,
-            HintCode::BuiltIn(BuiltInHint::Noop) => 0x04,
-            HintCode::BuiltIn(BuiltInHint::EcRecover) => 0x05,
-            HintCode::BuiltIn(BuiltInHint::RedMod256) => 0x06,
-            HintCode::BuiltIn(BuiltInHint::AddMod256) => 0x07,
-            HintCode::BuiltIn(BuiltInHint::MulMod256) => 0x08,
-            HintCode::BuiltIn(BuiltInHint::DivRem256) => 0x09,
-            HintCode::BuiltIn(BuiltInHint::WPow256) => 0x0A,
-            HintCode::BuiltIn(BuiltInHint::OMul256) => 0x0B,
-            HintCode::BuiltIn(BuiltInHint::WMul256) => 0x0C,
-            HintCode::BuiltIn(BuiltInHint::ModExp) => 0x0D,
+            HintCode::Ctrl(CtrlHint::Start) => CTRL_START,
+            HintCode::Ctrl(CtrlHint::End) => CTRL_END,
+            HintCode::Ctrl(CtrlHint::Cancel) => CTRL_CANCEL,
+            HintCode::Ctrl(CtrlHint::Error) => CTRL_ERROR,
+            HintCode::BuiltIn(BuiltInHint::Noop) => HINT_NOOP,
+            HintCode::BuiltIn(BuiltInHint::EcRecover) => HINT_ECRECOVER,
+            HintCode::BuiltIn(BuiltInHint::RedMod256) => HINT_REDMOD256,
+            HintCode::BuiltIn(BuiltInHint::AddMod256) => HINT_ADDMOD256,
+            HintCode::BuiltIn(BuiltInHint::MulMod256) => HINT_MULMOD256,
+            HintCode::BuiltIn(BuiltInHint::DivRem256) => HINT_DIVREM256,
+            HintCode::BuiltIn(BuiltInHint::WPow256) => HINT_WPOW256,
+            HintCode::BuiltIn(BuiltInHint::OMul256) => HINT_OMUL256,
+            HintCode::BuiltIn(BuiltInHint::WMul256) => HINT_WMUL256,
+            HintCode::BuiltIn(BuiltInHint::ModExp) => HINT_MODEXP,
+            HintCode::BuiltIn(BuiltInHint::ToAffineBn254) => HINT_TO_AFFINE_BN254,
+            HintCode::BuiltIn(BuiltInHint::IsOnCurveBn254) => HINT_IS_ON_CURVE_BN254,
+            HintCode::BuiltIn(BuiltInHint::AddBn254) => HINT_ADD_BN254,
+            HintCode::BuiltIn(BuiltInHint::MulBn254) => HINT_MUL_BN254,
+            HintCode::BuiltIn(BuiltInHint::ToAffineTwistBn254) => HINT_TO_AFFINE_TWIST_BN254,
+            HintCode::BuiltIn(BuiltInHint::IsOnCurveTwistBn254) => HINT_IS_ON_CURVE_TWIST_BN254,
+            HintCode::BuiltIn(BuiltInHint::IsOnSubgroupTwistBn254) => {
+                HINT_IS_ON_SUBGROUP_TWIST_BN254
+            }
+            HintCode::BuiltIn(BuiltInHint::PairingBatchBn254) => HINT_PAIRING_BATCH_BN254,
             HintCode::Custom(code) => code,
         }
     }
