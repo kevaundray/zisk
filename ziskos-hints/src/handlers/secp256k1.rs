@@ -1,3 +1,7 @@
+use elliptic_curve::FieldBytesEncoding;
+use k256::ecdsa::Signature;
+use k256::U256;
+
 use crate::handlers::validate_hint_length;
 use crate::hint_fields;
 use crate::zisklib;
@@ -6,7 +10,7 @@ use crate::zisklib;
 ///
 /// # Arguments
 ///
-/// * `data` - The hint data containing pk(8) + z(4) + r(4) + s(4) = 20 u64 values
+/// * `data` - The hint data containing pk(33 bytes) + z(32 bytes) + sig(64 bytes) = 129 bytes
 ///
 /// # Returns
 ///
@@ -14,23 +18,59 @@ use crate::zisklib;
 /// * `Err` - If the data length is invalid
 #[inline]
 pub fn secp256k1_ecdsa_verify_hint(data: &[u64]) -> Result<Vec<u64>, String> {
-    hint_fields![PK: 8, Z: 4, R: 4, S: 4];
+    hint_fields![PK: 4, Y_IS_ODD:1, Z: 4, SIG: 8];
 
-    validate_hint_length(data, EXPECTED_LEN, "ECRECOVER")?;
+    validate_hint_length(data, EXPECTED_LEN, "SECP256K1_ECDSA_VERIFY")?;
 
-    let mut processed_hints = Vec::new();
+    let pk = &data[PK_OFFSET..Y_IS_ODD_OFFSET];
+    let y_is_odd = (data[Y_IS_ODD_OFFSET] >> 56) as u8;
 
+    let mut hints = Vec::new();
+
+    let mut out: [u64; 8] = [0; 8];
     unsafe {
-        zisklib::secp256k1_ecdsa_verify_c(
-            &data[PK_OFFSET],
-            &data[Z_OFFSET],
-            &data[R_OFFSET],
-            &data[S_OFFSET],
-            &mut processed_hints,
+        zisklib::secp256k1_decompress_c(
+            &pk[0] as *const u64 as *const u8,
+            y_is_odd,
+            &mut out[0],
+            &mut hints,
         );
     }
 
-    Ok(processed_hints)
+    // Convert u64 slice to byte slice
+    // let byte_data = unsafe { slice::from_raw_parts(data.as_ptr() as *const u8, data.len() * 8) };
+
+    // Extract z (32 bytes), and sig (64 bytes)
+    let z = &data[Z_OFFSET..SIG_OFFSET];
+    let z_bytes: &[u8; 32] = unsafe { &*(z.as_ptr() as *const [u8; 32]) };
+
+    let z_dec: U256 = U256::decode_field_bytes(z_bytes.into());
+    let z_words = z_dec.to_words();
+
+    // Parse signature and decode r and s
+    let sig = &data[SIG_OFFSET..];
+    let sig_bytes: &[u8; 64] = unsafe { &*(sig.as_ptr() as *const [u8; 64]) };
+    let sig = Signature::try_from(sig_bytes.as_slice())
+        .map_err(|e| format!("Failed to parse signature: {}", e))?;
+
+    // Extract r and s as Scalars and convert to U256
+    let (r_scalar, s_scalar) = sig.split_scalars();
+    let r: U256 = U256::decode_field_bytes(&r_scalar.to_bytes());
+    let s: U256 = U256::decode_field_bytes(&s_scalar.to_bytes());
+    let r_words = r.to_words();
+    let s_words = s.to_words();
+
+    unsafe {
+        zisklib::secp256k1_ecdsa_verify_c(
+            &pk[0],
+            &z_words[0],
+            &r_words[0],
+            &s_words[0],
+            &mut hints,
+        );
+    }
+
+    Ok(hints)
 }
 
 // Processes a SECP256K1_TO_AFFINE hint.
