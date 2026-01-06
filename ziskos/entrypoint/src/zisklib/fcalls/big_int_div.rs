@@ -35,9 +35,9 @@ pub fn fcall_division(
         {
             hints.push(len_quo as u64 + len_rem as u64 + 2);
             hints.push(len_quo as u64);
-            hints.extend_from_slice(&quo);
+            hints.extend_from_slice(quo);
             hints.push(len_rem as u64);
-            hints.extend_from_slice(&rem);
+            hints.extend_from_slice(rem);
         }
 
         (len_quo, len_rem)
