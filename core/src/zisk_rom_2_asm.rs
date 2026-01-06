@@ -141,7 +141,8 @@ pub struct ZiskAsmContext {
     ptr: String, // "ptr ", ""
 
     //assert_rsp_counter: u64,
-    precompile_results: bool,
+    precompile_results: bool, // Set to true is we are consuming precompile results
+    wait_for_prec_counter: u64, // Counter of wait_for_prec_avail calls, reset at every instruction
 }
 
 impl ZiskAsmContext {
@@ -231,80 +232,61 @@ impl ZiskAsmContext {
         self.precompile_results
     }
     pub fn precompile_results_keccak(&self) -> bool {
-        //self.precompile_results()
-        true
+        self.precompile_results()
     }
     pub fn precompile_results_sha256(&self) -> bool {
-        //self.precompile_results()
-        false
+        self.precompile_results()
     }
     pub fn precompile_results_arith256(&self) -> bool {
-        //self.precompile_results()
-        false
+        self.precompile_results()
     }
     pub fn precompile_results_arith256mod(&self) -> bool {
-        //self.precompile_results()
-        false
+        self.precompile_results()
     }
     pub fn precompile_results_secp256k1add(&self) -> bool {
-        //self.precompile_results()
-        false
+        self.precompile_results()
     }
     pub fn precompile_results_secp256k1dbl(&self) -> bool {
-        //self.precompile_results()
-        false
+        self.precompile_results()
     }
     pub fn precompile_results_fcall(&self) -> bool {
-        //self.precompile_results()
-        false
+        self.precompile_results()
     }
     pub fn precompile_results_bn254curveadd(&self) -> bool {
-        //self.precompile_results()
-        false
+        self.precompile_results()
     }
     pub fn precompile_results_bn254curvedbl(&self) -> bool {
-        //self.precompile_results()
-        false
+        self.precompile_results()
     }
     pub fn precompile_results_bn254complexadd(&self) -> bool {
-        //self.precompile_results()
-        false
+        self.precompile_results()
     }
     pub fn precompile_results_bn254complexsub(&self) -> bool {
-        //self.precompile_results()
-        false
+        self.precompile_results()
     }
     pub fn precompile_results_bn254complexmul(&self) -> bool {
-        //self.precompile_results()
-        false
+        self.precompile_results()
     }
     pub fn precompile_results_arith384mod(&self) -> bool {
-        //self.precompile_results()
-        false
+        self.precompile_results()
     }
     pub fn precompile_results_bls12_381curveadd(&self) -> bool {
-        //self.precompile_results()
-        false
+        self.precompile_results()
     }
     pub fn precompile_results_bls12_381curvedbl(&self) -> bool {
-        //self.precompile_results()
-        false
+        self.precompile_results()
     }
     pub fn precompile_results_bls12_381complexadd(&self) -> bool {
-        //self.precompile_results()
-        false
+        self.precompile_results()
     }
     pub fn precompile_results_bls12_381complexsub(&self) -> bool {
-        //self.precompile_results()
-        false
+        self.precompile_results()
     }
     pub fn precompile_results_bls12_381complexmul(&self) -> bool {
-        //self.precompile_results()
-        false
+        self.precompile_results()
     }
     pub fn precompile_results_add256(&self) -> bool {
-        //self.precompile_results()
-        false
+        self.precompile_results()
     }
     pub fn call_wait_for_prec_avail(&self) -> bool {
         self.precompile_results()
@@ -501,6 +483,10 @@ impl ZiskRom2Asm {
         comments: bool,
         precompile_results: bool,
     ) {
+        // println!(
+        //     "ZiskRom2Asm::save_to_asm() generation_method={:?}, log_output={}, comments={}, precompile_results={}",
+        //     generation_method, log_output, comments, precompile_results
+        // );
         // Clear output data, just in case
         code.clear();
 
@@ -917,6 +903,9 @@ impl ZiskRom2Asm {
         // For all program addresses in the vector, create an assembly set of instructions with an
         // instruction label pc_<pc_in_hex>
         for k in 0..rom.sorted_pc_list.len() {
+            // Reset wait for prec counter
+            ctx.wait_for_prec_counter = 0;
+
             // Get pc
             ctx.pc = rom.sorted_pc_list[k];
 
@@ -8234,25 +8223,34 @@ impl ZiskRom2Asm {
             ctx.comment_str("read ?= written")
         );
         *code += &format!(
-            "\tjz pc_{:x}_wait_for_prec_avail {}\n",
+            "\tjz pc_{:x}_{}_wait_for_prec_avail {}\n",
             ctx.pc,
+            ctx.wait_for_prec_counter,
             ctx.comment_str("if there is data, done")
         );
-        *code += &format!("pc_{:x}_wait_for_prec_avail_done:\n", ctx.pc,);
+        *code +=
+            &format!("pc_{:x}_{}_wait_for_prec_avail_done:\n", ctx.pc, ctx.wait_for_prec_counter);
 
         // Call wait_for_prec_avail()
-        *unusual_code += &format!("pc_{:x}_wait_for_prec_avail:\n", ctx.pc,);
+        *unusual_code +=
+            &format!("pc_{:x}_{}_wait_for_prec_avail:\n", ctx.pc, ctx.wait_for_prec_counter);
         Self::push_internal_registers(ctx, unusual_code, false);
         *unusual_code += "\tcall _wait_for_prec_avail\n";
         *unusual_code += "\tcmp rax, 0\n";
         *unusual_code += "\tjne execute_pop_internal_regs_and_end\n";
         Self::pop_internal_registers(ctx, unusual_code, false);
-        *unusual_code += &format!("\tjmp pc_{:x}_wait_for_prec_avail_done\n", ctx.pc,);
+        *unusual_code += &format!(
+            "\tjmp pc_{:x}_{}_wait_for_prec_avail_done\n",
+            ctx.pc, ctx.wait_for_prec_counter
+        );
 
         // TODO:
         // else if *precompile_written_address - *precompile_read_address < threshold -> call post_prec_read
 
         //*code += &format!("pc_{:x}_wait_for_prec_avail_end:\n", ctx.pc,);
+
+        // Increment wait_for_prec_counter
+        ctx.wait_for_prec_counter += 1;
     }
 
     /*******************/
