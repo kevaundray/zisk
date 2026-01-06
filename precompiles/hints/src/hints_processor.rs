@@ -1314,7 +1314,7 @@ mod tests {
                 // Pseudo-random delay based on hash of input value (0-15ms range)
                 // This creates unpredictable completion order across runs
                 let hash = data[0].wrapping_mul(2654435761);
-                let delay_ms = (hash % 16) as u64;
+                let delay_ms = hash % 16;
                 if delay_ms > 0 {
                     thread::sleep(Duration::from_millis(delay_ms));
                 }

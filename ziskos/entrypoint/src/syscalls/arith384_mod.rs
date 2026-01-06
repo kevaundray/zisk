@@ -44,13 +44,7 @@ pub extern "C" fn syscall_arith384_mod(
     ziskos_syscall!(0x80B, params);
     #[cfg(not(all(target_os = "zkvm", target_vendor = "zisk")))]
     {
-        precompiles_helpers::arith384_mod(
-            params.a,
-            params.b,
-            params.c,
-            params.module,
-            &mut params.d,
-        );
+        precompiles_helpers::arith384_mod(params.a, params.b, params.c, params.module, params.d);
         #[cfg(feature = "hints")]
         {
             hints.extend_from_slice(params.d);
