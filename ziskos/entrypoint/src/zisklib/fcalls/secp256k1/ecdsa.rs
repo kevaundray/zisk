@@ -9,7 +9,7 @@ cfg_if! {
 
 /// Hints the ECDSA recovery computation over the `secp256k1` curve.
 ///
-/// Given the public key `PK`, a message hash `z`, and signature components `(r, s)`, 
+/// Given the public key `PK`, a message hash `z`, and signature components `(r, s)`,
 /// this function hints a curve point `P` such that:
 ///
 /// ```text
@@ -18,8 +18,8 @@ cfg_if! {
 ///
 /// ### Parameters
 ///
-/// - `pk_value`: The public key `PK = (x, y)`, 
-///    represented as 8 `u64` limbs in little-endian order: `[x₀, x₁, x₂, x₃, y₀, y₁, y₂, y₃]`
+/// - `pk_value`: The public key `PK = (x, y)`,
+///   represented as 8 `u64` limbs in little-endian order: `[x₀, x₁, x₂, x₃, y₀, y₁, y₂, y₃]`
 /// - `z_value`: The message hash (prehash), represented as 4 `u64` limbs in little-endian order
 /// - `r_value`: The signature `r` component, represented as 4 `u64` limbs in little-endian order
 /// - `s_value`: The signature `s` component, represented as 4 `u64` limbs in little-endian order
@@ -31,9 +31,9 @@ cfg_if! {
 ///
 /// ### Safety
 ///
-/// The caller must ensure that all input pointers (`pk_value`, `z_value`, `r_value`, `s_value`) are 
+/// The caller must ensure that all input pointers (`pk_value`, `z_value`, `r_value`, `s_value`) are
 /// valid and aligned to an 8-byte boundary.
-/// 
+///
 /// Note that this is a *free-input call*, meaning the Zisk VM does not automatically verify the correctness
 /// of the result. It is the caller's responsibility to ensure it.
 #[allow(unused_variables)]
