@@ -17,6 +17,7 @@ mod asm_rh_runner;
 mod asm_rh_runner_stub;
 mod asm_runner;
 mod asm_services;
+mod hints_file;
 #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
 mod hints_shmem;
 #[cfg(not(all(target_os = "linux", target_arch = "x86_64")))]
@@ -42,6 +43,7 @@ pub use asm_rh_runner::*;
 pub use asm_rh_runner_stub::*;
 pub use asm_runner::*;
 pub use asm_services::*;
+pub use hints_file::*;
 #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
 pub use hints_shmem::*;
 #[cfg(not(all(target_os = "linux", target_arch = "x86_64")))]
