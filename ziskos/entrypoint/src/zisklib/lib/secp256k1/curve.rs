@@ -20,19 +20,10 @@ const G_POINT256: SyscallPoint256 = SyscallPoint256 { x: G_X, y: G_Y };
 
 /// Given a x-coordinate `x_bytes` and a parity `y_is_odd`,
 /// this function decompresses the point on the secp256k1 curve.
-pub fn secp256k1_decompress(
-    x_bytes: &[u8; 32],
-    y_is_odd: bool,
-) -> Result<([u64; 4], [u64; 4]), bool> {
-    // Convert the x-coordinate from BEu8 to LEu64
-    let mut x = [0u64; 4];
-    for i in 0..32 {
-        x[3 - i / 8] |= (x_bytes[i] as u64) << (8 * (7 - (i % 8)));
-    }
-
+pub fn secp256k1_decompress(x: &[u64; 4], y_is_odd: bool) -> Result<([u64; 4], [u64; 4]), bool> {
     // Calculate the y-coordinate of the point: y = sqrt(x³ + 7)
-    let x_sq = secp256k1_fp_square(&x);
-    let x_cb = secp256k1_fp_mul(&x_sq, &x);
+    let x_sq = secp256k1_fp_square(x);
+    let x_cb = secp256k1_fp_mul(&x_sq, x);
     let y_sq = secp256k1_fp_add(&x_cb, &E_B);
     let (y, has_sqrt) = secp256k1_fp_sqrt(&y_sq, y_is_odd as u64);
     if !has_sqrt {
@@ -43,7 +34,7 @@ pub fn secp256k1_decompress(
     let parity = (y[0] & 1) != 0;
     assert_eq!(parity, y_is_odd);
 
-    Ok((x, y))
+    Ok((*x, y))
 }
 
 /// Converts a non-infinity point `p` on the Secp256k1 curve from projective coordinates to affine coordinates
@@ -81,6 +72,20 @@ fn secp256k1_add_non_infinity_points(p1: &mut SyscallPoint256, p2: &SyscallPoint
         // p1 + (-p1) = 𝒪
         true
     }
+}
+
+/// Checks whether the given point `p` is on the Secp256k1 curve.
+/// It assumes that `p` is not the point at infinity.
+pub fn secp256k1_is_on_curve(p: &[u64; 8]) -> bool {
+    let x: [u64; 4] = p[0..4].try_into().unwrap();
+    let y: [u64; 4] = p[4..8].try_into().unwrap();
+
+    // p in E iff y² == x³ + 7
+    let lhs = secp256k1_fp_square(&y);
+    let mut rhs = secp256k1_fp_square(&x);
+    rhs = secp256k1_fp_mul(&rhs, &x);
+    rhs = secp256k1_fp_add(&rhs, &E_B);
+    eq(&lhs, &rhs)
 }
 
 /// Given a non-infinity point `p` and a scalar `k`, computes the scalar multiplication `k·p`
@@ -643,9 +648,11 @@ pub unsafe extern "C" fn secp256k1_decompress_c(
     y_is_odd: u8,
     out_ptr: *mut u64,
 ) -> u8 {
+    // Convert the x-coordinate from BEu8 to LEu64
     let x_bytes: &[u8; 32] = &*(x_bytes_ptr as *const [u8; 32]);
+    let x = bytes_be_to_u64_le(x_bytes);
 
-    let (x, y) = match secp256k1_decompress(x_bytes, y_is_odd != 0) {
+    let (x, y) = match secp256k1_decompress(&x, y_is_odd != 0) {
         Ok((x, y)) => (x, y),
         Err(_) => return 0,
     };
@@ -711,4 +718,24 @@ pub unsafe extern "C" fn secp256k1_double_scalar_mul_with_g_c(
             false
         }
     }
+}
+
+// Helper to convert 32 big-endian bytes to [u64; 4] little-endian limbs
+#[inline]
+fn bytes_be_to_u64_le(bytes: &[u8; 32]) -> [u64; 4] {
+    let mut result = [0u64; 4];
+    for (i, r) in result.iter_mut().enumerate() {
+        let offset = 24 - i * 8;
+        *r = u64::from_be_bytes([
+            bytes[offset],
+            bytes[offset + 1],
+            bytes[offset + 2],
+            bytes[offset + 3],
+            bytes[offset + 4],
+            bytes[offset + 5],
+            bytes[offset + 6],
+            bytes[offset + 7],
+        ]);
+    }
+    result
 }

@@ -19,6 +19,7 @@ pub const FCALL_BIG_INT256_DIV_ID: u16 = 16;
 pub const FCALL_BIG_INT_DIV_ID: u16 = 17;
 pub const FCALL_BIN_DECOMP_ID: u16 = 18;
 pub const FCALL_BLS12_381_FP2_SQRT_ID: u16 = 19;
+pub const FCALL_SECP256K1_ECDSA_VERIFY_ID: u16 = 20;
 
 mod big_int256_div;
 mod big_int_div;
