@@ -595,7 +595,6 @@ dependencies = [
  "proofman",
  "proofman-common",
  "proofman-util",
- "proofman-verifier",
  "rand 0.9.2",
  "reqwest",
  "rom-setup",
@@ -612,6 +611,7 @@ dependencies = [
  "zisk-core",
  "zisk-pil",
  "zisk-sdk",
+ "zisk-verifier",
  "zstd",
 ]
 
@@ -5718,6 +5718,14 @@ dependencies = [
  "zisk-common",
  "zisk-distributed-common",
  "zstd",
+]
+
+[[package]]
+name = "zisk-verifier"
+version = "0.16.0"
+dependencies = [
+ "anyhow",
+ "proofman-verifier",
 ]
 
 [[package]]
