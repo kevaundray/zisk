@@ -80,7 +80,7 @@ impl Riscv2zisk {
         generation_method: AsmGenerationMethod,
         log_output: bool,
         comments: bool,
-        precompile_hints: bool,
+        hints: bool,
     ) -> Result<(), Box<dyn Error>> {
         elf2romfile(
             &self.elf_file,
@@ -88,7 +88,7 @@ impl Riscv2zisk {
             generation_method,
             log_output,
             comments,
-            precompile_hints,
+            hints,
         )
         .map_err(|e| format!("Error converting elf to assembly: {e}").into())
     }

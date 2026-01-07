@@ -46,8 +46,8 @@ pub struct ZiskProve {
     pub inputs: Option<String>,
 
     /// Precompiles Hints path
-    #[clap(short = 'h', long)]
-    pub precompile_hints: Option<String>,
+    #[clap(long)]
+    pub hints: Option<String>,
 
     /// Setup folder path
     #[clap(short = 'k', long)]
@@ -124,7 +124,7 @@ impl ZiskProve {
             print_banner_field("Input", inputs);
         }
 
-        if let Some(hints) = &self.precompile_hints {
+        if let Some(hints) = &self.hints {
             print_banner_field("Prec. Hints", hints);
         }
 
@@ -142,7 +142,7 @@ impl ZiskProve {
 
         let stdin = ZiskStdin::from_uri(self.inputs.as_ref())?;
 
-        let hints_stream = StreamSource::from_uri(self.precompile_hints.as_deref())?;
+        let hints_stream = StreamSource::from_uri(self.hints.as_deref())?;
 
         let emulator = if cfg!(target_os = "macos") {
             if !self.emulator {
