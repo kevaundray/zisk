@@ -347,12 +347,17 @@ void precompile_cache_cleanup(void)
     precompile_cache_loading = false;
 }
 
+uint64_t total_precompile_cache_size = 0;
+uint64_t total_precompile_cache_counter = 0;
 void precompile_cache_store( uint8_t* data, uint64_t size)
 {
     assert(precompile_file != NULL);
     assert(precompile_cache_storing == true);
     fwrite(data, 1, size, precompile_file);
     fflush(precompile_file);
+    total_precompile_cache_size += size;
+    total_precompile_cache_counter++;
+    //printf("precompile_cache_store() Stored %lu bytes at pos=%lu total_precompile_cache_size=%lu total_precompile_cache_counter=%lu\n", size, ftell(precompile_file), total_precompile_cache_size, total_precompile_cache_counter);
 }
 
 void precompile_cache_load( uint8_t* data, uint64_t size)

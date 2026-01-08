@@ -1908,16 +1908,16 @@ typedef enum {
     PrecompileReadMode_Prefixed
 } PrecompileReadMode;
 
-//PrecompileReadMode precompile_read_mode = PrecompileReadMode_NoPrefix;
-PrecompileReadMode precompile_read_mode = PrecompileReadMode_Prefixed;
+PrecompileReadMode precompile_read_mode = PrecompileReadMode_NoPrefix;
+//PrecompileReadMode precompile_read_mode = PrecompileReadMode_Prefixed;
 
 typedef enum {
     PrecompileWriteMode_Full,
     PrecompileWriteMode_OnePrecAtATime
 } PrecompileWriteMode;
 
-//PrecompileWriteMode precompile_write_mode = PrecompileWriteMode_Full;
-PrecompileWriteMode precompile_write_mode = PrecompileWriteMode_OnePrecAtATime;
+PrecompileWriteMode precompile_write_mode = PrecompileWriteMode_Full;
+//PrecompileWriteMode precompile_write_mode = PrecompileWriteMode_OnePrecAtATime;
 
 //#define PRECOMPILE_FIXED_SIZE 25 // Keccak-f state size in u64s
 #define PRECOMPILE_FIXED_SIZE 4 // SHA-256 state size in u64s

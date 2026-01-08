@@ -502,7 +502,7 @@ impl ZiskRom2Asm {
             boc: "/* ".to_string(),
             eoc: " */".to_string(),
             min_program_pc: rom.min_program_pc,
-            precompile_results,
+            precompile_results: true,
             ..Default::default()
         };
 
@@ -8112,17 +8112,12 @@ impl ZiskRom2Asm {
             PRECOMPILE_BUFFER_SIZE_U64_MASK,
             ctx.comment_str("address %= buffer size")
         );
-        *code += &format!(
-            "\tadd {}, {} {}\n",
-            REG_ADDRESS,
-            REG_AUX,
-            ctx.comment_str("address += precompile_results_address")
-        );
 
         // Copy the result size (first u64 value) and store it in register B
         *code += &format!(
-            "\tmov {}, [{}] {}\n",
+            "\tmov {}, [{} + {}*8] {}\n",
             REG_B,
+            REG_AUX,
             REG_ADDRESS,
             ctx.comment_str("b = precompile_results[0]")
         );
@@ -8165,19 +8160,14 @@ impl ZiskRom2Asm {
             PRECOMPILE_BUFFER_SIZE_U64_MASK,
             ctx.comment_str("address %= buffer size")
         );
-        *code += &format!(
-            "\tadd {}, {} {}\n",
-            REG_ADDRESS,
-            REG_AUX,
-            ctx.comment_str("address += precompile_results_address")
-        );
 
         // Copy value from precompile_results to fcall[result_data + REG_A]
         *code += &format!(
-            "\tmov {}, [{}] {}\n",
+            "\tmov {}, [{} + {}*8] {}\n",
             REG_VALUE,
+            REG_AUX,
             REG_ADDRESS,
-            ctx.comment_str("value = precompile_results[]")
+            ctx.comment_str("value = precompile_results[a]")
         );
         *code += &format!(
             "\tmov [{} + {}*8 + {}*8], {} {}\n",
