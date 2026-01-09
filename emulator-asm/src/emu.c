@@ -347,17 +347,22 @@ void precompile_cache_cleanup(void)
     precompile_cache_loading = false;
 }
 
+// #define ASM_PRECOMPILE_CACHE_DEBUG
+#ifdef ASM_PRECOMPILE_CACHE_DEBUG
 uint64_t total_precompile_cache_size = 0;
 uint64_t total_precompile_cache_counter = 0;
+#endif
 void precompile_cache_store( uint8_t* data, uint64_t size)
 {
     assert(precompile_file != NULL);
     assert(precompile_cache_storing == true);
     fwrite(data, 1, size, precompile_file);
     fflush(precompile_file);
+#ifdef ASM_PRECOMPILE_CACHE_DEBUG
     total_precompile_cache_size += size;
     total_precompile_cache_counter++;
-    //printf("precompile_cache_store() Stored %lu bytes at pos=%lu total_precompile_cache_size=%lu total_precompile_cache_counter=%lu\n", size, ftell(precompile_file), total_precompile_cache_size, total_precompile_cache_counter);
+    printf("precompile_cache_store() Stored %lu bytes at pos=%lu total_precompile_cache_size=%lu total_precompile_cache_counter=%lu\n", size, ftell(precompile_file), total_precompile_cache_size, total_precompile_cache_counter);
+#endif
 }
 
 void precompile_cache_load( uint8_t* data, uint64_t size)
@@ -369,6 +374,11 @@ void precompile_cache_load( uint8_t* data, uint64_t size)
         printf("precompile_cache_load() Error reading file %s read_size=%lu expected size=%lu pos=%lu\n", precompile_cache_filename, read_size, size, ftell(precompile_file));
         exit(-1);
     }
+#ifdef ASM_PRECOMPILE_CACHE_DEBUG
+    total_precompile_cache_size += size;
+    total_precompile_cache_counter++;
+    printf("precompile_cache_load() Loaded %lu bytes at pos=%lu total_precompile_cache_size=%lu total_precompile_cache_counter=%lu\n", size, ftell(precompile_file), total_precompile_cache_size, total_precompile_cache_counter);
+#endif
 }
 
 #endif
