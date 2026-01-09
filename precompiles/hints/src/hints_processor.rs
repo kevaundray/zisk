@@ -386,13 +386,13 @@ impl<HS: StreamSink + Send + Sync + 'static> HintsProcessor<HS> {
             Self::dispatch_hint(hint, custom_handlers)
         };
 
-        println!(
-            "Hint result: {:x?} bytes",
-            match &result {
-                Ok(data) => format!("{:?}", data),
-                Err(e) => format!("Err({})", e),
-            }
-        );
+        // println!(
+        //     "Hint result: {:x?} bytes",
+        //     match &result {
+        //         Ok(data) => format!("{:?}", data),
+        //         Err(e) => format!("Err({})", e),
+        //     }
+        // );
 
         // Store result - MUST fill slot even if error occurred
         let mut queue = state.queue.lock().unwrap();
