@@ -127,6 +127,7 @@ impl<HS: StreamSink + Send + Sync + 'static> HintsProcessorBuilder<HS> {
 
         Ok(HintsProcessor {
             pool,
+            num_hint: AtomicUsize::new(0),
             state,
             stats: if self.enable_stats { Some(Mutex::new(HashMap::new())) } else { None },
             hints_sink,
@@ -144,6 +145,8 @@ impl<HS: StreamSink + Send + Sync + 'static> HintsProcessorBuilder<HS> {
 pub struct HintsProcessor<HS: StreamSink + Send + Sync + 'static> {
     /// The thread pool used for parallel hint processing.
     pool: ThreadPool,
+
+    num_hint: AtomicUsize,
 
     /// Shared state for parallel hint processing
     state: Arc<HintProcessorState>,
@@ -163,7 +166,7 @@ pub struct HintsProcessor<HS: StreamSink + Send + Sync + 'static> {
 }
 
 impl<HS: StreamSink + Send + Sync + 'static> HintsProcessor<HS> {
-    const DEFAULT_NUM_THREADS: usize = 32;
+    const DEFAULT_NUM_THREADS: usize = 1;
 
     /// Creates a builder for configuring a [`HintsProcessor`].
     ///
@@ -227,6 +230,8 @@ impl<HS: StreamSink + Send + Sync + 'static> HintsProcessor<HS> {
             }
 
             let hint = PrecompileHint::from_u64_slice(hints, idx, true)?;
+            self.num_hint.fetch_add(1, Ordering::Relaxed);
+            println!("[{}] Hint processed {:?}:", self.num_hint.load(Ordering::Relaxed), hint);
 
             // Check if custom handler is registered for custom hints
             if let HintCode::Custom(code) = hint.hint_code {
@@ -371,6 +376,8 @@ impl<HS: StreamSink + Send + Sync + 'static> HintsProcessor<HS> {
             return;
         }
 
+        println!("Hint processed {:?}:", hint);
+
         // Check if we should stop due to error - but still need to fill the slot
         let result = if state.error_flag.load(Ordering::Acquire) {
             Err(anyhow::anyhow!("Processing stopped due to error"))
@@ -378,6 +385,14 @@ impl<HS: StreamSink + Send + Sync + 'static> HintsProcessor<HS> {
             // Process the hint
             Self::dispatch_hint(hint, custom_handlers)
         };
+
+        println!(
+            "Hint result: {:x?} bytes",
+            match &result {
+                Ok(data) => format!("{:?}", data),
+                Err(e) => format!("Err({})", e),
+            }
+        );
 
         // Store result - MUST fill slot even if error occurred
         let mut queue = state.queue.lock().unwrap();
