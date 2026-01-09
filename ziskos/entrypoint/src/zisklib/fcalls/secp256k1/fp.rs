@@ -121,27 +121,3 @@ pub fn fcall_secp256k1_fp_sqrt(
         ]
     }
 }
-
-#[allow(unused_variables)]
-pub fn fcall2_secp256k1_fp_sqrt(
-    p_value: &[u64; 4],
-    parity: u64,
-    #[cfg(feature = "hints")] hints: &mut Vec<u64>,
-) {
-    #[cfg(not(all(target_os = "zkvm", target_vendor = "zisk")))]
-    {
-        let mut result: [u64; 5] = [0; 5];
-        secp256k1_fp_sqrt(p_value, parity, &mut result);
-        #[cfg(feature = "hints")]
-        {
-            hints.push(result.len() as u64);
-            hints.extend_from_slice(&result);
-        }
-    }
-    #[cfg(all(target_os = "zkvm", target_vendor = "zisk"))]
-    {
-        ziskos_fcall_param!(p_value, 4);
-        ziskos_fcall_param!(parity, 1);
-        ziskos_fcall!(FCALL_SECP256K1_FP_SQRT_ID);
-    }
-}
