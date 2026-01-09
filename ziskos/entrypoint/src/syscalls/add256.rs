@@ -40,6 +40,7 @@ pub extern "C" fn syscall_add256(
         #[cfg(feature = "hints")]
         {
             hints.extend_from_slice(params.c);
+            hints.push(cout);
         }
         cout
     }
