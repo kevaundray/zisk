@@ -37,7 +37,14 @@ pub fn secp256k1_ecdsa_verify(
     // saving us from expensive fn arithmetic
 
     // Hint the result
-    let p = fcall_secp256k1_ecdsa_verify(pk, z, r, s);
+    let p = fcall_secp256k1_ecdsa_verify(
+        pk,
+        z,
+        r,
+        s,
+        #[cfg(feature = "hints")]
+        hints,
+    );
 
     // Check the recovered point is valid
     assert!(secp256k1_is_on_curve(
