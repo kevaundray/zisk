@@ -23,7 +23,7 @@ pub fn secp256k1_ecdsa_verify_hint(data: &[u64]) -> Result<Vec<u64>, String> {
     validate_hint_length(data, EXPECTED_LEN, "SECP256K1_ECDSA_VERIFY")?;
 
     let pk = &data[PK_OFFSET..Y_IS_ODD_OFFSET];
-    let y_is_odd = (data[Y_IS_ODD_OFFSET] >> 56) as u8;
+    let y_is_odd = data[Y_IS_ODD_OFFSET] as u8;
 
     let mut hints = Vec::new();
 
@@ -60,15 +60,7 @@ pub fn secp256k1_ecdsa_verify_hint(data: &[u64]) -> Result<Vec<u64>, String> {
     let r_words = r.to_words();
     let s_words = s.to_words();
 
-    unsafe {
-        zisklib::secp256k1_ecdsa_verify_c(
-            &pk[0],
-            &z_words[0],
-            &r_words[0],
-            &s_words[0],
-            &mut hints,
-        );
-    }
+    zisklib::secp256k1_ecdsa_verify(&out, &z_words, &r_words, &s_words, &mut hints);
 
     Ok(hints)
 }
