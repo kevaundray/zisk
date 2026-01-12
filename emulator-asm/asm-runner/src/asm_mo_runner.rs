@@ -5,7 +5,6 @@ use zisk_common::Plan;
 
 use std::ffi::c_void;
 use std::sync::atomic::{fence, Ordering};
-use std::time::Duration;
 use tracing::error;
 
 use crate::sem_chunk_done_name;

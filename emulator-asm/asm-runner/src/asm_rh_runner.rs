@@ -8,7 +8,6 @@ use crate::{
 use anyhow::{Context, Result};
 use named_sem::NamedSemaphore;
 use std::sync::atomic::{fence, Ordering};
-use std::time::Duration;
 
 pub struct PreloadedRH {
     pub output_shmem: AsmSharedMemory,
