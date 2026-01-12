@@ -907,15 +907,36 @@ impl Mem {
         dst_section.buffer[dst_offset..dst_offset + count].copy_from_slice(bytes);
     }
 
-    pub fn memcmp(&self, a: u64, b: u64, count: u64) -> u64 {
+    /// Reads `count` bytes from memory starting at `addr` and appends them as u64 values to `data`.
+    /// The data is read in 64-bit aligned chunks and pushed to the vector.
+    pub fn push_from_mem(&mut self, data: &mut Vec<u64>, addr: u64, count: u64) {
         if count == 0 {
-            return 0;
+            return;
+        }
+
+        let section = self.get_readable_section(addr, count);
+        let addr64 = addr >> 3;
+        let to_addr64 = (addr + count - 1) >> 3;
+        let count64 = (to_addr64 - addr64 + 1) as usize;
+        let addr_offset: usize = (addr - section.start) as usize & !0x07;
+        let addr_offset64: usize = addr_offset >> 3;
+
+        let mem64: &[u64] = unsafe {
+            core::slice::from_raw_parts(
+                section.buffer.as_ptr() as *const u64,
+                section.buffer.len() / 8,
+            )
+        };
+        data.extend_from_slice(&mem64[addr_offset64..addr_offset64 + count64]);
+    }
+
+    pub fn memcmp(&self, a: u64, b: u64, count: u64) -> (u64, usize) {
+        if count == 0 {
+            return (0, 0);
         }
 
         let count_usize = count as usize;
 
-        println!("memcmp dump A:{}", self.memdump(a, count));
-        println!("memcmp dump B:{}", self.memdump(b, count));
         // Get sections for both addresses
         let a_section = self.get_readable_section(a, count);
         let b_section = self.get_readable_section(b, count);
@@ -931,12 +952,12 @@ impl Mem {
             if byte_a != byte_b {
                 // Sign extend the difference to 64 bits
                 let diff = (byte_a as i64) - (byte_b as i64);
-                return diff as u64;
+                return (diff as u64, i);
             }
         }
 
         // All bytes are equal
-        0
+        (0, count_usize)
     }
 
     pub fn memdump(&self, addr: u64, count: u64) -> String {

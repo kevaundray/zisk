@@ -1,290 +1,207 @@
-use crate::DmaHelpers;
+use precompiles_common::MemBusHelpers;
+use precompiles_helpers::{DmaHelpers, DmaInfo};
 use std::collections::VecDeque;
-use zisk_common::BusId;
-use zisk_common::MemCollectorInfo;
-
-#[derive(Debug)]
-pub struct DmaMemInputConfig {
-    pub indirect_params: usize,
-    pub rewrite_params: bool,
-    pub read_params: usize,
-    pub write_params: usize,
-    pub chunks_per_param: usize,
-}
-
-// all DMA memory operation are aligned
-
-// minimal trace
-// reads + writes
-const MASK_ALIGNED_ADDR: u64 = !0x07;
-/*
-pub fn calculate(dst: u64, src: u64, count: u64) -> (usize, usize, usize) {
-    let from_src = src & MASK_ALIGNED_ADDR;
-    let to_src = (src + count - 1) & MASK_ALIGNED_ADDR;
-    let count_src = (to_src - from_src) >> 3;
-
-    let first_dst_addr = dst & MASK_ALIGNED_ADDR;
-    let read_first_dst_addr = dst & 0x07 != 0;
-
-    let last_dst_addr = (dst + count - 1) & MASK_ALIGNED_ADDR;
-    let read_last_dst_addr = (dst + count) & 0x07 != 0 && last_dst_addr > first_dst_addr;
-}
-*/
+use zisk_common::{
+    BusId, MemCollectorInfo, A, B, DMA_ENCODED, OP, OPERATION_PRECOMPILED_BUS_DATA_SIZE, STEP,
+};
+use zisk_core::zisk_ops::ZiskOp;
 
 pub fn generate_dma_mem_inputs(
-    dst: u64,
-    src: u64,
-    count: usize,
-    _step_main: u64,
-    _data: &[u64],
-    _data_ext: &[u64],
+    data: &[u64],
+    data_ext: &[u64],
     _only_counters: bool,
-    _pending: &mut VecDeque<(BusId, Vec<u64>, Vec<u64>)>,
+    pending: &mut VecDeque<(BusId, Vec<u64>, Vec<u64>)>,
 ) {
-    let from_src = src & !0x07;
-    let to_src = (src + count as u64 - 1) & MASK_ALIGNED_ADDR;
-    let _count_src = (to_src - from_src) >> 3;
-
-    let first_dst_addr = dst & MASK_ALIGNED_ADDR;
-    let _read_first_dst_addr = dst & 0x07 != 0;
-
-    let last_dst_addr = (dst + count as u64 - 1) & MASK_ALIGNED_ADDR;
-    let _read_last_dst_addr = (dst + count as u64) & 0x07 != 0 && last_dst_addr > first_dst_addr;
-
-    let _dma = DmaHelpers::precalculate_dma_values(dst, src, count as usize);
-
-    unimplemented!();
-    /*
-        if dma.pre_count > 0 {
-            MemBusHelpers::mem_aligned_load(
-                dst_aligned,
-                step_main,
-                data[OPERATION_PRECOMPILED_BUS_DATA_SIZE + 0],
-                pending,
-            );
-            MemBusHelpers::mem_aligned_load(
-                dst_aligned,
-                step_main,
-                data[OPERATION_PRECOMPILED_BUS_DATA_SIZE + 0],
-                pending,
-            );
-
-            MemBusHelpers::mem_aligned_load(
-                dst_aligned,
-                step_main,
-                data[OPERATION_PRECOMPILED_BUS_DATA_SIZE + 0],
-                pending,
-            );
-            MemBusHelpers::mem_aligned_write(
-                dst_aligned,
-                step_main,
-                data[OPERATION_PRECOMPILED_BUS_DATA_SIZE + 0],
-                pending,
-            );
-        }
-
-        for i in 0..dma.memcpy_count / 8 {
-            MemBusHelpers::mem_aligned_load(
-                src_aligned + i as u32 * 8,
-                step_main,
-                data[OPERATION_PRECOMPILED_BUS_DATA_SIZE + i as usize],
-                pending,
-            );
-            MemBusHelpers::mem_aligned_write(
-                dst_aligned + i as u32 * 8,
-                step_main,
-                data[OPERATION_PRECOMPILED_BUS_DATA_SIZE + i as usize],
-                pending,
-            );
-        }
-
-        if dma.post_count > 0 {
-            MemBusHelpers::mem_aligned_load(
-                dst_aligned,
-                step_main,
-                data[OPERATION_PRECOMPILED_BUS_DATA_SIZE + 0],
-                pending,
-            );
-            MemBusHelpers::mem_aligned_load(
-                dst_aligned,
-                step_main,
-                data[OPERATION_PRECOMPILED_BUS_DATA_SIZE + 0],
-                pending,
-            );
-            MemBusHelpers::mem_aligned_write(
-                dst_aligned,
-                step_main,
-                data[OPERATION_PRECOMPILED_BUS_DATA_SIZE + 0],
-                pending,
-            );
-        }
-    */
-    /*
-    // Information collected during memory trace generation includes the alignated reads:
-    // - previous read dst & ~0x07 if dst % 8 > 0
-    // - previous read (dst + count - 1) & ~0x07 if use post
-    // - src reads from: src & ~0x07 to (src + count - 1) & ~0x07
-
-
-    let write_addr = dst & ~0x07;
-    let write_count = (((dst + count - 1) - write_addr - 1) / 8) + 1;
-
-
-
-    // full aligned src % 8 == 0 && dst % 8 == 0
-    // parcialy aligned src % 8 == dst % 8 == 0
-
-
-    // block
-    let mut read_index = 0;
-    let mut align_write_addr = 0;
-
-    if offset == 0 {
-
-    } else {
-        for i in 0..count {
-            MemBusHelpers::mem_aligned_store(
-                dst_aligned,
-                step_main,
-                data[OPERATION_PRECOMPILED_BUS_DATA_SIZE + 0],
-                pending,
-            );
-        }
-    }
-
-    let src_offset = dst & 0x07;
-    let dst_offset = src & 0x07;
-
-    if count <= dst_offset {
-        if count > 0 {
-            let dst_aligned = dst & 0xFFFF_FFFF_FFFF_FFF8;
-
-            MemBusHelpers::mem_aligned_load(
-                dst_aligned,
-                step_main,
-                data[OPERATION_PRECOMPILED_BUS_DATA_SIZE + 0],
-                pending,
-            );
-
-            MemBusHelpers::mem_aligned_store(
-                dst_aligned,
-                step_main,
-                data[OPERATION_PRECOMPILED_BUS_DATA_SIZE + 0],
-                pending,
-            );
-        }
-    } else {
-        if dst_offset > 0 {
-            self.dma_pre_pos_ops += 1
-        }
-        if dst_offset == src_offset {
-            self.dma_64_aligned_ops += (count - dst_offset) >> 3
-        } else {
-            self.dma_unaligned_ops += (count - dst_offset) >> 3
-        }
-
-        if (count - dst_offset) % 8 > 0 {
-            self.dma_pre_pos_ops += 1
-        }
-    }
-    self.dma_ops += 1;
-
     let dst = data[A];
     let src = data[B];
+    let encoded = data[DMA_ENCODED];
 
-    //
-    // precompiled_mem_load( sel: enabled, main_step: main_step, addr: src_addr * 8,     value: [values[0], values[1]]);
-    // precompiled_mem_load( sel: enabled_second_read, main_step: main_step, addr: src_addr * 8 + 8, value: [values[2], values[3]]);
-    // precompiled_mem_load( sel: enabled, main_step: main_step, addr: dst_addr * 8,     value: [values[4], values[5]]);
-    // precompiled_mem_store(sel: enabled, main_step: main_step, addr: dst_addr * 8,     value: write_value);
+    let dst64 = (dst & !0x07) as u32;
+    let src64 = (src & !0x07) as u32;
+    let main_step = data[STEP];
+    let pre_count = DmaInfo::get_pre_count(encoded) as u64;
+    let dst_offset = dst & 0x07;
+    let src_offset = src & 0x07;
+    let aligned = dst_offset == src_offset;
 
-    let src_aligned = src & 0xFFFF_FFFF_FFFF_FFF8;
-    MemBusHelpers::mem_aligned_load(
-        src_aligned + iparam as u32 * 8,
-        step_main,
-        data[OPERATION_PRECOMPILED_BUS_DATA_SIZE + iparam],
-        pending,
-    );
+    // NOTE: for dual memories it's very important to keep the order of loads and stores because
+    // stores happend after loads.
 
-    // ALIGNED, UNALIGNED
-    for iparam in 0..PARAMS {
-        MemBusHelpers::mem_aligned_load(
-            src + iparam as u32 * 8,
-            step_main,
-            data[OPERATION_PRECOMPILED_BUS_DATA_SIZE + iparam],
-            pending,
-        );
+    let mut wr_pending = VecDeque::new();
+    if pre_count > 0 {
+        let pre_data_offset = DmaInfo::get_pre_data_offset(encoded);
+        let read_value = data_ext[pre_data_offset];
+
+        #[cfg(feature = "debug_dma")]
+        println!("DMA: mem_aligned_load@pre 0x{src64:08X} S:{main_step} V:{read_value} (0x{read_value:016X})");
+
+        MemBusHelpers::mem_aligned_load(src64, main_step, read_value, pending);
+
+        // pre-load of write address before unaligned write
+        let pre_value = data_ext[DmaInfo::get_pre_write_offset(encoded)];
+
+        #[cfg(feature = "debug_dma")]
+        println!("DMA: mem_aligned_load@pre-p 0x{dst64:08X} S:{main_step} V:{pre_value} (0x{pre_value:016X})");
+
+        MemBusHelpers::mem_aligned_load(dst64, main_step, pre_value, pending);
+
+        let write_value = if DmaInfo::is_double_read_pre(encoded) {
+            let second_read_value = data_ext[pre_data_offset + 1];
+            #[cfg(feature = "debug_dma")]
+            println!(
+                "DMA: mem_aligned_load@pre2 0x{:08X} S:{main_step} V:{second_read_value} (0x{second_read_value:016X})",
+                src64 + 8
+            );
+            MemBusHelpers::mem_aligned_load(src64 + 8, main_step, second_read_value, pending);
+            DmaHelpers::calculate_write_value(
+                dst_offset,
+                src_offset,
+                pre_count,
+                pre_value,
+                &[read_value, second_read_value],
+            )
+        } else {
+            DmaHelpers::calculate_write_value(
+                dst_offset,
+                src_offset,
+                pre_count,
+                pre_value,
+                &[read_value],
+            )
+        };
+        #[cfg(feature = "debug_dma")]
+        println!("DMA: mem_aligned_write@pre 0x{dst64:08X} S:{main_step} V:{write_value} (0x{write_value:016X})");
+
+        MemBusHelpers::mem_aligned_write(dst64, main_step, write_value, &mut wr_pending);
     }
 
-    // generate load params
-    for iparam in 0..READ_PARAMS {
-        let param_addr = data[OPERATION_PRECOMPILED_BUS_DATA_SIZE + iparam] as u32;
-        for ichunk in 0..PARAM_CHUNKS {
-            MemBusHelpers::mem_aligned_load(
-                param_addr + ichunk as u32 * 8,
-                step_main,
-                data[START_READ_PARAMS + iparam * PARAM_CHUNKS + ichunk],
-                pending,
+    // this is part of words loop
+    let post_count = DmaInfo::get_post_count(encoded) as u64;
+    let loop_count = DmaInfo::get_loop_count(encoded);
+    if loop_count > 0 {
+        let loop_src = src as u32 + pre_count as u32;
+        let dst64 = (dst as u32 + pre_count as u32) & !0x07;
+        let src64 = loop_src & !0x07;
+        let loop_data_offset = DmaInfo::get_loop_data_offset(encoded);
+        let loop_data_count = DmaInfo::get_loop_count(encoded);
+        let loop_src_data_end =
+            loop_data_offset + loop_data_count + ((loop_src & 0x07) > 0) as usize;
+        let values = &data_ext[loop_data_offset..loop_src_data_end];
+
+        #[cfg(feature = "debug_dma")]
+        println!("DMA: mem_aligned_load_from_slice 0x{src64:08X} S:{main_step} V:{values:?}");
+
+        MemBusHelpers::mem_aligned_load_from_slice(src64, main_step, values, pending);
+
+        let src_offset = (src_offset + pre_count) & 0x07;
+        if aligned {
+            #[cfg(feature = "debug_dma")]
+            println!("DMA: mem_aligned_write_from_slice 0x{dst64:08X} S:{main_step} V:{values:?}");
+            MemBusHelpers::mem_aligned_write_from_slice(dst64, main_step, values, &mut wr_pending);
+        } else {
+            #[cfg(feature = "debug_dma")]
+            println!("DMA: mem_aligned_write_from_read_unaligned_slice 0x{dst64:08X} S:{main_step} V:{values:?}");
+            MemBusHelpers::mem_aligned_write_from_read_unaligned_slice(
+                dst64,
+                main_step,
+                src_offset as u8,
+                values,
+                &mut wr_pending,
             );
         }
     }
+    if post_count > 0 {
+        let src_offset = src & 0x07;
 
-    let mut write_data = [0u64; PARAM_CHUNKS];
-    if !only_counters {
-        let a: [u64; 4] =
-            data[START_READ_PARAMS..START_READ_PARAMS + PARAM_CHUNKS].try_into().unwrap();
-        let b: [u64; 4] = data
-            [START_READ_PARAMS + PARAM_CHUNKS..START_READ_PARAMS + 2 * PARAM_CHUNKS]
-            .try_into()
-            .unwrap();
-        dma(&a, &b, data[OPERATION_PRECOMPILED_BUS_DATA_SIZE + READ_PARAMS], &mut write_data);
+        let post_data_offset = DmaInfo::get_post_data_offset(encoded);
+        let src64 = (src as u32 + pre_count as u32 + loop_count as u32 * 8) & !0x07;
+        let dst64 = dst as u32 + pre_count as u32 + loop_count as u32 * 8;
+        let read_value = data_ext[post_data_offset];
+
+        #[cfg(feature = "debug_dma")]
+        println!("DMA: mem_aligned_load@post 0x{src64:08X} S:{main_step} V:{read_value} (0x{read_value:016X})");
+
+        MemBusHelpers::mem_aligned_load(src64, main_step, read_value, pending);
+
+        // pre-load of write address before unaligned write
+        let pre_value = data_ext[DmaInfo::get_post_write_offset(encoded)];
+
+        #[cfg(feature = "debug_dma")]
+        println!("DMA: mem_aligned_load@post-p 0x{dst64:08X} S:{main_step} V:{pre_value} (0x{pre_value:016X})");
+
+        MemBusHelpers::mem_aligned_load(dst64, main_step, pre_value, pending);
+
+        let write_value = if DmaInfo::is_double_read_post(encoded) {
+            let second_read_value = data_ext[post_data_offset + 1];
+            #[cfg(feature = "debug_dma")]
+            println!(
+                "DMA: mem_aligned_load@post2 0x{:08X} S:{main_step} V:{second_read_value} (0x{second_read_value:016X})",
+                src64 + 8
+            );
+            MemBusHelpers::mem_aligned_load(src64 + 8, main_step, second_read_value, pending);
+            DmaHelpers::calculate_write_value(
+                0,                               // in post offset it's 0
+                (src_offset + pre_count) & 0x07, // src_offset it's modified by pre, aligned/unaligned no change offset
+                post_count,
+                pre_value,
+                &[read_value, second_read_value],
+            )
+        } else {
+            DmaHelpers::calculate_write_value(
+                0,                               // in post offset it's 0
+                (src_offset + pre_count) & 0x07, // src_offset it's modified by pre, aligned/unaligned no change offset
+                post_count,
+                pre_value,
+                &[read_value],
+            )
+        };
+
+        #[cfg(feature = "debug_dma")]
+        println!("DMA: mem_aligned_write@post 0x{dst64:08X} S:{main_step} V:{write_value} (0x{write_value:016X})");
+        MemBusHelpers::mem_aligned_write(dst64, main_step, write_value, &mut wr_pending);
     }
-
-    // verify write param
-    let write_addr = data[OPERATION_PRECOMPILED_BUS_DATA_SIZE + WRITE_ADDR_PARAM] as u32;
-    for (ichunk, write_data) in write_data.iter().enumerate().take(PARAM_CHUNKS) {
-        let param_addr = write_addr + ichunk as u32 * 8;
-        MemBusHelpers::mem_aligned_write(param_addr, step_main, *write_data, pending);
-    }*/
+    pending.extend(wr_pending);
 }
 
-// op_a = step
-// op_b = addr_main
-// mem_trace: @a, @b, cin, @c, a[0..3], b[0..3], cout, [ c[0..3] ]
-
 pub fn skip_dma_mem_inputs(
-    dst: u64,
-    src: u64,
-    count: usize,
+    data: &[u64],
+    _data_ext: &[u64],
     mem_collectors_info: &[MemCollectorInfo],
 ) -> bool {
-    let to_dst = (dst + count as u64 - 1) as u32 & !0x07;
-    let to_src = (src + count as u64 - 1) as u32 & !0x07;
-    let mut dst = (dst & !0x07) as u32;
-    let mut src = (src & !0x07) as u32;
-    // TODO:
-    // for mem_collector in mem_collectors_info {
-    //     if !mem_collector.skip_addr_range(from_dst, to_dst) ||
-    //        !mem_collector.skip_addr_range(from_src, to_src) {
-    //         return false;
-    //     }
-    // }
+    let dst = data[A];
+    let src = data[B];
+    let op = data[OP] as u8;
 
-    while dst <= to_dst {
-        for mem_collector in mem_collectors_info {
-            if !mem_collector.skip_addr(dst) {
-                return false;
-            }
+    // A memcmp operation has two parts, any of them could be empty.
+    // - equal part, means that bytes of src and dst are the same (count_eq)
+    // - different part, at maximum one byte, to obtain difference (count - count_eq)
+    let count = DmaInfo::get_count(data[DMA_ENCODED]) as u64;
+    let use_count = match op {
+        ZiskOp::DMA_MEMCPY => count,
+        ZiskOp::DMA_MEMCMP => std::cmp::min(
+            count,
+            data[OPERATION_PRECOMPILED_BUS_DATA_SIZE + 1] + 1, // count_eq + 1 (different byte)
+        ),
+        _ => panic!("Invalid operation inside skip_dma_mem_inputs (op:{op})"),
+    };
+    // calculate range for dst and src to verify if any of them are included
+    // in the memcollector addresses.
+
+    let dst64_from = dst as u32 & !0x07;
+    let src64_from = src as u32 & !0x07;
+    let dst64_to = (dst + use_count + 7) as u32 & !0x07;
+    let src64_to = (src + use_count + 7) as u32 & !0x07;
+
+    for mem_collector in mem_collectors_info {
+        if !mem_collector.skip_addr_range(dst64_from, dst64_to) {
+            return false;
         }
-        dst += 8;
-    }
-    while src <= to_src {
-        for mem_collector in mem_collectors_info {
-            if !mem_collector.skip_addr(src) {
-                return false;
-            }
+        if !mem_collector.skip_addr_range(src64_from, src64_to) {
+            return false;
         }
-        src += 8;
     }
+
+    // If any mem_collector includes this addresses we could skip this precompiles
+    // at mem input data generation.
     true
 }

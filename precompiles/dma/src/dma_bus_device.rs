@@ -4,26 +4,30 @@
 
 use std::{collections::VecDeque, ops::Add};
 
-use zisk_common::{BusDevice, BusDeviceMode, BusId, Metrics, B, OPERATION_BUS_ID, OP_TYPE, STEP};
+use precompiles_helpers::DmaInfo;
+use zisk_common::{BusDevice, BusDeviceMode, BusId, Metrics, B, OPERATION_BUS_ID, OP_TYPE};
 use zisk_common::{MemCollectorInfo, A, OPERATION_PRECOMPILED_BUS_DATA_SIZE};
 use zisk_core::ZiskOperationType;
 
-use crate::{generate_dma_mem_inputs, skip_dma_mem_inputs};
+use crate::{generate_dma_mem_inputs, skip_dma_mem_inputs, DMA_64_ALIGNED_OPS_BY_ROW};
 
 /// The `DmaCounter` struct represents a counter that monitors and measures
 /// dma-related operations on the data bus.
 ///
 /// It tracks specific operation types (`ZiskOperationType`) and updates counters for each
 /// accepted operation type whenever data is processed on the bus.
+#[derive(Debug)]
 pub struct DmaCounterInputGen {
     /// sizes of memcpy
-    dma_pre_post_ops: usize,
-    dma_ops: usize,
-    dma_unaligned_ops: usize,
-    dma_64_aligned_ops: usize,
+    pub dma_pre_post_ops: usize,
+    pub dma_ops: usize,
+    pub dma_unaligned_inputs: usize,
+    pub dma_unaligned_rows: usize,
+    pub dma_64_aligned_inputs: usize,
+    pub dma_64_aligned_rows: usize,
 
     /// Bus device mode (counter or input generator).
-    mode: BusDeviceMode,
+    pub mode: BusDeviceMode,
 }
 
 impl DmaCounterInputGen {
@@ -35,7 +39,15 @@ impl DmaCounterInputGen {
     /// # Returns
     /// A new `DmaCounter` instance.
     pub fn new(mode: BusDeviceMode) -> Self {
-        Self { dma_pre_post_ops: 0, dma_ops: 0, dma_unaligned_ops: 0, dma_64_aligned_ops: 0, mode }
+        Self {
+            dma_pre_post_ops: 0,
+            dma_ops: 0,
+            dma_unaligned_inputs: 0,
+            dma_64_aligned_inputs: 0,
+            dma_unaligned_rows: 0,
+            dma_64_aligned_rows: 0,
+            mode,
+        }
     }
 
     /// Retrieves the count of instructions for a specific `ZiskOperationType`.
@@ -45,24 +57,37 @@ impl DmaCounterInputGen {
     /// * `src` - The source address of operation.
     /// * `count` - The bytes of operation.
     pub fn inst_count_memcpy(&mut self, dst: u64, src: u64, count: usize) {
-        let src_offset = dst & 0x07;
-        let dst_offset = src & 0x07;
+        let dst_offset = dst & 0x07;
+        let src_offset = src & 0x07;
 
         // offset => max bytes is 8 - offset
         if count > 0 {
             let remaining = if dst_offset > 0 {
                 self.dma_pre_post_ops += 1;
-                std::cmp::min(8 - dst_offset as usize, count)
+                count - std::cmp::min(8 - dst_offset as usize, count)
             } else {
                 count
             };
+
             if (remaining % 8) > 0 {
+                // adding a post because last write isn't full (8-bytes)
                 self.dma_pre_post_ops += 1;
             }
             if dst_offset == src_offset {
-                self.dma_64_aligned_ops += remaining >> 3;
-            } else {
-                self.dma_unaligned_ops += remaining >> 3;
+                // println!(
+                //     "count: {count} remaining: {remaining} self.dma_64_aligned_ops: {}",
+                //     self.dma_64_aligned_rows
+                // );
+                let rows = (remaining >> 3).div_ceil(DMA_64_ALIGNED_OPS_BY_ROW);
+                self.dma_64_aligned_rows += rows;
+                self.dma_64_aligned_inputs += 1;
+            } else if remaining > 7 {
+                // check remaining because unaligned add an extra row for each unaligned, means
+                // if remaming >> 3 is 0, add extra row.
+                // on unalignmed_ops, each dst write use its src read and next src read also.
+                // the last src read don't have write.
+                self.dma_unaligned_rows += (remaining >> 3) + 1;
+                self.dma_unaligned_inputs += 1;
             }
         }
         self.dma_ops += 1;
@@ -82,7 +107,7 @@ impl Metrics for DmaCounterInputGen {
     fn measure(&mut self, data: &[u64]) {
         let dst = data[A];
         let src = data[B];
-        let count = data[OPERATION_PRECOMPILED_BUS_DATA_SIZE] as usize;
+        let count = DmaInfo::get_count(data[OPERATION_PRECOMPILED_BUS_DATA_SIZE]);
         self.inst_count_memcpy(dst, src, count);
     }
 
@@ -110,8 +135,10 @@ impl Add for DmaCounterInputGen {
         DmaCounterInputGen {
             dma_pre_post_ops: self.dma_pre_post_ops + other.dma_pre_post_ops,
             dma_ops: self.dma_ops + other.dma_ops,
-            dma_unaligned_ops: self.dma_unaligned_ops + other.dma_unaligned_ops,
-            dma_64_aligned_ops: self.dma_64_aligned_ops + other.dma_64_aligned_ops,
+            dma_unaligned_inputs: self.dma_unaligned_inputs + other.dma_unaligned_inputs,
+            dma_64_aligned_inputs: self.dma_64_aligned_inputs + other.dma_64_aligned_inputs,
+            dma_unaligned_rows: self.dma_unaligned_rows + other.dma_unaligned_rows,
+            dma_64_aligned_rows: self.dma_64_aligned_rows + other.dma_64_aligned_rows,
             mode: self.mode,
         }
     }
@@ -133,7 +160,7 @@ impl BusDevice<u64> for DmaCounterInputGen {
         &mut self,
         bus_id: &BusId,
         data: &[u64],
-        _data_ext: &[u64],
+        data_ext: &[u64],
         pending: &mut VecDeque<(BusId, Vec<u64>, Vec<u64>)>,
         mem_collector_info: Option<&[MemCollectorInfo]>,
     ) -> bool {
@@ -143,11 +170,8 @@ impl BusDevice<u64> for DmaCounterInputGen {
             return true;
         }
 
-        let dst = data[A];
-        let src = data[B];
-        let count = data[OPERATION_PRECOMPILED_BUS_DATA_SIZE] as usize;
         if let Some(mem_collectors_info) = mem_collector_info {
-            if skip_dma_mem_inputs(dst, src, count, mem_collectors_info) {
+            if skip_dma_mem_inputs(data, data_ext, mem_collectors_info) {
                 return true;
             }
         }
@@ -157,10 +181,7 @@ impl BusDevice<u64> for DmaCounterInputGen {
             self.measure(data);
         }
 
-        let step_main = data[STEP];
-        let data_ext = &[0u64; 4];
-        generate_dma_mem_inputs(dst, src, count, step_main, data, data_ext, only_counters, pending);
-
+        generate_dma_mem_inputs(data, data_ext, only_counters, pending);
         true
     }
 

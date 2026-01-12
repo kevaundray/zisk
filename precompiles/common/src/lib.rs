@@ -1,3 +1,5 @@
+//! Common utilities and helpers for Zisk precompiles.
+
 mod goldilocks_constants;
 
 pub use goldilocks_constants::{get_ks, GOLDILOCKS_GEN, GOLDILOCKS_K};
@@ -6,14 +8,17 @@ use std::collections::VecDeque;
 use zisk_common::{BusId, MEM_BUS_ID};
 use zisk_core::InstContext;
 
+/// Represents a precompile operation code.
 #[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
 pub struct PrecompileCode(u16);
 
 impl PrecompileCode {
+    /// Creates a new precompile code from a u16 value.
     pub fn new(value: u16) -> Self {
         PrecompileCode(value)
     }
 
+    /// Returns the underlying u16 value of the precompile code.
     pub fn value(&self) -> u16 {
         self.0
     }
@@ -31,21 +36,32 @@ impl From<PrecompileCode> for u16 {
     }
 }
 
+/// Context for precompile execution.
 pub struct PrecompileContext {}
 
+/// Trait for implementing precompile calls.
 pub trait PrecompileCall: Send + Sync {
+    /// Executes the precompile operation with the given opcode and instruction context.
+    /// Returns an optional tuple containing the result value and a boolean flag.
     fn execute(&self, opcode: PrecompileCode, ctx: &mut InstContext) -> Option<(u64, bool)>;
 }
 
+/// Helper functions for memory bus operations.
 pub struct MemBusHelpers {}
 
+/// Memory load operation code.
 const MEMORY_LOAD_OP: u64 = 1;
+/// Memory store operation code.
 const MEMORY_STORE_OP: u64 = 2;
 
+/// Base step for memory operations.
 const MEM_STEP_BASE: u64 = 1;
+/// Maximum number of memory operations per main step.
 const MAX_MEM_OPS_BY_MAIN_STEP: u64 = 4;
 
 impl MemBusHelpers {
+    /// Generates an aligned memory load operation.
+    /// The address must be 8-byte aligned.
     pub fn mem_aligned_load(
         addr: u32,
         step: u64,
@@ -67,6 +83,8 @@ impl MemBusHelpers {
             vec![],
         ));
     }
+    /// Generates an aligned memory write operation.
+    /// The address must be 8-byte aligned.
     pub fn mem_aligned_write(
         addr: u32,
         step: u64,
@@ -88,6 +106,8 @@ impl MemBusHelpers {
             vec![],
         ));
     }
+    /// Generates an aligned memory operation (load or write).
+    /// The address must be 8-byte aligned.
     pub fn mem_aligned_op(
         addr: u32,
         step: u64,
@@ -109,44 +129,94 @@ impl MemBusHelpers {
             vec![],
         ));
     }
+    /// Generates multiple aligned memory load operations from a slice of values.
+    /// The address must be 8-byte aligned.
     pub fn mem_aligned_load_from_slice(
         addr: u32,
         step: u64,
         values: &[u64],
-        pending: &mut VecDeque<(BusId, Vec<u64>)>,
+        pending: &mut VecDeque<(BusId, Vec<u64>, Vec<u64>)>,
     ) {
         assert!(addr % 8 == 0);
         let mem_step = MEM_STEP_BASE + MAX_MEM_OPS_BY_MAIN_STEP * step + 2;
         for (i, &value) in values.iter().enumerate() {
             pending.push_back((
                 MEM_BUS_ID,
-                vec![MEMORY_LOAD_OP, (addr as usize + i * 8) as u64, mem_step, 8, 0, 0, value],
+                vec![MEMORY_LOAD_OP, (addr as usize + i * 8) as u64, mem_step, 8, value, 0, 0],
+                vec![],
             ));
         }
     }
+    /// Generates multiple aligned memory write operations from a slice of values.
+    /// The address must be 8-byte aligned.
     pub fn mem_aligned_write_from_slice(
         addr: u32,
         step: u64,
         values: &[u64],
-        pending: &mut VecDeque<(BusId, Vec<u64>)>,
+        pending: &mut VecDeque<(BusId, Vec<u64>, Vec<u64>)>,
     ) {
         assert!(addr % 8 == 0);
         let mem_step = MEM_STEP_BASE + MAX_MEM_OPS_BY_MAIN_STEP * step + 3;
         for (i, &value) in values.iter().enumerate() {
             pending.push_back((
                 MEM_BUS_ID,
-                vec![MEMORY_STORE_OP, (addr as usize + i * 8) as u64, mem_step, 8, value, 0, 0],
+                vec![MEMORY_STORE_OP, (addr as usize + i * 8) as u64, mem_step, 8, 0, 0, value],
+                vec![],
             ));
         }
     }
+    /// Generates aligned memory writes from an unaligned read slice using the specified source offset.
+    /// The number of writes generated is `values.len() - 1` because the last value is not enough to
+    /// create a full 8-byte write. This function is useful to use the same slice of values to generate
+    /// first aligned reads and then aligned writes.
+    /// The address must be 8-byte aligned.
+    pub fn mem_aligned_write_from_read_unaligned_slice(
+        addr: u32,
+        step: u64,
+        src_offset: u8,
+        values: &[u64],
+        pending: &mut VecDeque<(BusId, Vec<u64>, Vec<u64>)>,
+    ) {
+        assert!(addr % 8 == 0);
+        let mem_step = MEM_STEP_BASE + MAX_MEM_OPS_BY_MAIN_STEP * step + 3;
+        let write_count = values.len() - 1;
+        for i in 0..write_count {
+            let write_value = match src_offset {
+                1 => (values[i] >> 8) | (values[i + 1] << 56),
+                2 => (values[i] >> 16) | (values[i + 1] << 48),
+                3 => (values[i] >> 24) | (values[i + 1] << 40),
+                4 => (values[i] >> 32) | (values[i + 1] << 32),
+                5 => (values[i] >> 40) | (values[i + 1] << 24),
+                6 => (values[i] >> 48) | (values[i + 1] << 16),
+                7 => (values[i] >> 56) | (values[i + 1] << 8),
+                _ => panic!("invalid src_offset {src_offset} on DmaUnaligned"),
+            };
+            pending.push_back((
+                MEM_BUS_ID,
+                vec![
+                    MEMORY_STORE_OP,
+                    (addr as usize + i * 8) as u64,
+                    mem_step,
+                    8,
+                    0,
+                    0,
+                    write_value,
+                ],
+                vec![],
+            ));
+        }
+    }
+    /// Returns the memory read step for the given step number.
     pub fn get_mem_read_step(step: u64) -> u64 {
         MEM_STEP_BASE + MAX_MEM_OPS_BY_MAIN_STEP * step + 2
     }
+    /// Returns the memory write step for the given step number.
     pub fn get_mem_write_step(step: u64) -> u64 {
         MEM_STEP_BASE + MAX_MEM_OPS_BY_MAIN_STEP * step + 3
     }
 }
 
+/// Calculates the base-2 logarithm of n (floor).
 pub fn log2(n: usize) -> usize {
     let mut res = 0;
     let mut n = n;

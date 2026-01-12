@@ -16,7 +16,7 @@ use std::fmt;
 #[allow(dead_code)]
 type FieldExtension<F> = [F; 3];
 
-pub const PILOUT_HASH: &str = "b43b0a9602c2f7aae31d49817972ddde0b08eaf9ac20d3fa0975f58fb093d52b";
+pub const PILOUT_HASH: &str = "df61da337695fede0a6f599b8ccabd837dee610600b52f0567af38ccd6c0e808";
 
 //AIRGROUP CONSTANTS
 
@@ -113,7 +113,7 @@ values!(ZiskPublicValues<F> {
 });
  
 values!(ZiskProofValues<F> {
- enable_input_data: F, enable_rom_data: F,
+ enable_input_data: F, enable_rom_data: F, enable_dma_64_aligned: F, enable_dma_64_aligned_input: F, enable_dma_unaligned: F,
 });
  
 trace_row!(DmaFixedRow<F> {
@@ -122,7 +122,7 @@ trace_row!(DmaFixedRow<F> {
 pub type DmaFixed<F> = GenericTrace<DmaFixedRow<F>, 2097152, 0, 0>;
 
 trace_row!(DmaTraceRow<F> {
- h_count:ubit(24), count_ge_32:bit, l_count:ubit(6), h_src64:ubit(21), l_src64:u8, src_offset:ubit(3), h_dst64:ubit(21), l_dst64:u8, dst_offset:ubit(3), main_step:u32, sel:bit, use_pre:bit, use_memcpy:bit, use_post:bit, src64_inc_by_pre:bit, pre_count:ubit(3), l_count64:ubit(3), src_offset_after_pre:ubit(3), reg_prev_mem_step:bit,
+ sel:bit, h_count:ubit(24), count_lt_256:bit, l_count:ubit(9), h_src64:ubit(22), l_src64:ubit(7), src_offset:ubit(3), h_dst64:ubit(22), l_dst64:ubit(7), dst_offset:ubit(3), main_step:ubit(36), use_pre:bit, use_memcpy:bit, use_post:bit, src64_inc_by_pre:bit, pre_count:ubit(3), l_count64:ubit(9), src_offset_after_pre:ubit(3),
 });
 pub type DmaTrace<F> = GenericTrace<DmaTraceRow<F>, 2097152, 0, 0>;
 
@@ -136,7 +136,7 @@ trace_row!(Dma64AlignedFixedRow<F> {
 pub type Dma64AlignedFixed<F> = GenericTrace<Dma64AlignedFixedRow<F>, 2097152, 0, 1>;
 
 trace_row!(Dma64AlignedTraceRow<F> {
- main_step:u32, src64:ubit(29), dst64:ubit(29), count:u32, value:[[u32; 2]; 4], sel_op:[bit; 4], seq_end:bit, is_mem_eq:bit,
+ main_step:ubit(36), dst64:ubit(29), count:u32, sel_op:[bit; 4], seq_end:bit, is_mem_eq:bit, value:[[u32; 2]; 4], src64:ubit(29), previous_seq_end:bit,
 });
 pub type Dma64AlignedTrace<F> = GenericTrace<Dma64AlignedTraceRow<F>, 2097152, 0, 1>;
 
@@ -150,7 +150,7 @@ trace_row!(DmaUnalignedFixedRow<F> {
 pub type DmaUnalignedFixed<F> = GenericTrace<DmaUnalignedFixedRow<F>, 2097152, 0, 2>;
 
 trace_row!(DmaUnalignedTraceRow<F> {
- main_step:u32, src64:ubit(29), dst64:ubit(29), count:u32, value:[u32; 2], seq_end:bit, sel:bit, previous_seq_end:bit, is_mem_eq:bit, offset_7:bit, offset_6:bit, offset_5:bit, offset_4:bit, offset_3:bit, offset_2:bit, read_bytes:[u8; 8], write_value:[u32; 2],
+ main_step:ubit(36), src64:ubit(29), dst64:ubit(29), count:u32, seq_end:bit, previous_seq_end:bit, is_mem_eq:bit, offset_7:bit, offset_6:bit, offset_5:bit, offset_4:bit, offset_3:bit, offset_2:bit, read_bytes:[u8; 8], no_last_no_seq_end:bit, write_value:[u32; 2],
 });
 pub type DmaUnalignedTrace<F> = GenericTrace<DmaUnalignedTraceRow<F>, 2097152, 0, 2>;
 
@@ -164,7 +164,7 @@ trace_row!(DmaPrePostFixedRow<F> {
 pub type DmaPrePostFixed<F> = GenericTrace<DmaPrePostFixedRow<F>, 2097152, 0, 3>;
 
 trace_row!(DmaPrePostTraceRow<F> {
- main_step:u32, src_addr:ubit(29), dst_addr:ubit(29), dst_offset:ubit(3), count:ubit(3), offset_7:bit, offset_6:bit, offset_5:bit, offset_4:bit, offset_3:bit, offset_2:bit, offset_1:bit, enabled:bit, enabled_second_read:bit, bytes:[u8; 24], selb:[bit; 8], write_value:[u32; 2],
+ main_step:ubit(36), src64:ubit(29), dst64:ubit(29), dst_offset:ubit(3), src_offset:ubit(3), count:ubit(3), selread:[bit; 7], dst_offset_gt_src_offset:bit, enabled:bit, enabled_second_read:bit, bytes:[u8; 24], selb:[bit; 8], write_value:[u32; 4],
 });
 pub type DmaPrePostTrace<F> = GenericTrace<DmaPrePostTraceRow<F>, 2097152, 0, 3>;
 
@@ -178,7 +178,7 @@ trace_row!(MainFixedRow<F> {
 pub type MainFixed<F> = GenericTrace<MainFixedRow<F>, 4194304, 0, 4>;
 
 trace_row!(MainTraceRow<F> {
- a:[u32; 2], b:[u32; 2], c:[u32; 2], flag:bit, pc:u32, a_src_imm:bit, a_src_mem:bit, a_offset_imm0:u64, a_imm1:u32, op_with_step:bit, b_src_imm:bit, b_src_mem:bit, b_offset_imm0:u64, b_imm1:u32, b_src_ind:bit, ind_width:ubit(4), is_external_op:bit, op:u8, store_pc:bit, store_mem:bit, store_ind:bit, store_offset:u64, set_pc:bit, jmp_offset1:u64, jmp_offset2:u64, m32:bit, addr1:u32, a_reg_prev_mem_step:ubit(40), b_reg_prev_mem_step:ubit(40), store_reg_prev_mem_step:ubit(40), store_reg_prev_value:[u32; 2], a_src_reg:bit, b_src_reg:bit, store_reg:bit,
+ a:[u32; 2], b:[u32; 2], c:[u32; 2], flag:bit, pc:u32, a_src_imm:bit, a_src_mem:bit, a_offset_imm0:u64, a_imm1:u32, op_with_step:bit, b_src_imm:bit, b_src_mem:bit, b_offset_imm0:u64, b_imm1:u32, b_src_ind:bit, ind_width:ubit(4), is_external_op:bit, op:u8, store_pc:bit, store_mem:bit, store_ind:bit, store_offset:u64, set_pc:bit, jmp_offset1:u64, jmp_offset2:u64, m32:bit, addr1:u32, a_reg_prev_mem_step:ubit(38), b_reg_prev_mem_step:ubit(38), store_reg_prev_mem_step:ubit(38), store_reg_prev_value:[u32; 2], a_src_reg:bit, b_src_reg:bit, store_reg:bit,
 });
 pub type MainTrace<F> = GenericTrace<MainTraceRow<F>, 4194304, 0, 4>;
 
@@ -203,7 +203,7 @@ trace_row!(MemFixedRow<F> {
 pub type MemFixed<F> = GenericTrace<MemFixedRow<F>, 4194304, 0, 6>;
 
 trace_row!(MemTraceRow<F> {
- addr:ubit(29), step:ubit(40), sel:bit, addr_changes:bit, step_dual:ubit(40), sel_dual:bit, value:[u32; 2], wr:bit, previous_step:ubit(40), increment:[ubit(18); 2], read_same_addr:bit,
+ addr:ubit(29), step:ubit(38), sel:bit, addr_changes:bit, step_dual:ubit(38), sel_dual:bit, value:[u32; 2], wr:bit, previous_step:ubit(40), increment:[ubit(18); 2], read_same_addr:bit,
 });
 pub type MemTrace<F> = GenericTrace<MemTraceRow<F>, 4194304, 0, 6>;
 
@@ -217,7 +217,7 @@ trace_row!(RomDataFixedRow<F> {
 pub type RomDataFixed<F> = GenericTrace<RomDataFixedRow<F>, 2097152, 0, 7>;
 
 trace_row!(RomDataTraceRow<F> {
- addr:ubit(29), step:ubit(40), sel:bit, addr_changes:bit, value:[u32; 2],
+ addr:ubit(29), step:ubit(38), sel:bit, addr_changes:bit, value:[u32; 2],
 });
 pub type RomDataTrace<F> = GenericTrace<RomDataTraceRow<F>, 2097152, 0, 7>;
 
@@ -231,7 +231,7 @@ trace_row!(InputDataFixedRow<F> {
 pub type InputDataFixed<F> = GenericTrace<InputDataFixedRow<F>, 2097152, 0, 8>;
 
 trace_row!(InputDataTraceRow<F> {
- addr:ubit(29), step:ubit(40), sel:bit, addr_changes:bit, value_word:[u16; 4], is_free_read:bit,
+ addr:ubit(29), step:ubit(38), sel:bit, addr_changes:bit, value_word:[u16; 4], is_free_read:bit,
 });
 pub type InputDataTrace<F> = GenericTrace<InputDataTraceRow<F>, 2097152, 0, 8>;
 
@@ -422,12 +422,12 @@ pub type Sha256fTracePacked<F> = GenericTrace<Sha256fTraceRowPacked<F>, 262144, 
 
 
 trace_row!(SpecifiedRangesFixedRow<F> {
- RANGE: [F; 35], __L1__: F,
+ RANGE: [F; 33], __L1__: F,
 });
 pub type SpecifiedRangesFixed<F> = GenericTrace<SpecifiedRangesFixedRow<F>, 1048576, 0, 22>;
 
 trace_row!(SpecifiedRangesTraceRow<F> {
- mul:[F; 35],
+ mul:[F; 33],
 });
 pub type SpecifiedRangesTrace<F> = GenericTrace<SpecifiedRangesTraceRow<F>, 1048576, 0, 22>;
 
@@ -461,7 +461,7 @@ pub type RomRomTrace<F> = GenericTrace<RomRomTraceRow<F>, 4194304, 0, 5, 0>;
 
 
 values!(Dma64AlignedAirValues<F> {
- segment_id: F, segment_previous_seq_end: F, segment_previous_src64: F, segment_previous_dst64: F, segment_previous_main_step: F, segment_previous_count: F, segment_previous_is_mem_eq: F, segment_last_seq_end: F, segment_last_src64: F, segment_last_dst64: F, segment_last_main_step: F, segment_last_count: F, segment_last_is_mem_eq: F, is_last_segment: F, im_direct: [FieldExtension<F>; 2],
+ segment_id: F, segment_previous_seq_end: F, segment_previous_dst64: F, segment_previous_main_step: F, segment_previous_count: F, segment_previous_is_mem_eq: F, segment_last_seq_end: F, segment_last_dst64: F, segment_last_main_step: F, segment_last_count: F, segment_last_is_mem_eq: F, is_last_segment: F, segment_previous_src64: F, segment_last_src64: F, last_count_chunk: [F; 2], padding_size: F, im_direct: [FieldExtension<F>; 5],
 });
 
 values!(DmaUnalignedAirValues<F> {
@@ -612,42 +612,42 @@ pub const PACKED_INFO: &[(usize, usize, PackedInfoConst)] = &[
     (0, 0, PackedInfoConst {
         is_packed: true,
         num_packed_words: 3,
-        unpack_info: &[24, 1, 6, 21, 8, 3, 21, 8, 3, 32, 1, 1, 1, 1, 1, 3, 3, 3, 1],
+        unpack_info: &[1, 24, 1, 9, 22, 7, 3, 22, 7, 3, 36, 1, 1, 1, 1, 3, 9, 3],
     }),
     (0, 1, PackedInfoConst {
         is_packed: true,
-        num_packed_words: 6,
-        unpack_info: &[32, 29, 29, 32, 32, 32, 32, 32, 32, 32, 32, 32, 1, 1, 1, 1, 1, 1],
+        num_packed_words: 7,
+        unpack_info: &[36, 29, 32, 1, 1, 1, 1, 1, 1, 32, 32, 32, 32, 32, 32, 32, 32, 29, 1],
     }),
     (0, 2, PackedInfoConst {
         is_packed: true,
-        num_packed_words: 6,
-        unpack_info: &[32, 29, 29, 32, 32, 32, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 8, 8, 8, 8, 8, 8, 8, 8, 32, 32],
+        num_packed_words: 5,
+        unpack_info: &[36, 29, 29, 32, 1, 1, 1, 1, 1, 1, 1, 1, 1, 8, 8, 8, 8, 8, 8, 8, 8, 1, 32, 32],
     }),
     (0, 3, PackedInfoConst {
         is_packed: true,
-        num_packed_words: 6,
-        unpack_info: &[32, 29, 29, 3, 3, 1, 1, 1, 1, 1, 1, 1, 1, 1, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 1, 1, 1, 1, 1, 1, 1, 1, 32, 32],
+        num_packed_words: 7,
+        unpack_info: &[36, 29, 29, 3, 3, 3, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 1, 1, 1, 1, 1, 1, 1, 1, 32, 32, 32, 32],
     }),
     (0, 4, PackedInfoConst {
         is_packed: true,
         num_packed_words: 14,
-        unpack_info: &[32, 32, 32, 32, 32, 32, 1, 32, 1, 1, 64, 32, 1, 1, 1, 64, 32, 1, 4, 1, 8, 1, 1, 1, 64, 1, 64, 64, 1, 32, 40, 40, 40, 32, 32, 1, 1, 1],
+        unpack_info: &[32, 32, 32, 32, 32, 32, 1, 32, 1, 1, 64, 32, 1, 1, 1, 64, 32, 1, 4, 1, 8, 1, 1, 1, 64, 1, 64, 64, 1, 32, 38, 38, 38, 32, 32, 1, 1, 1],
     }),
     (0, 6, PackedInfoConst {
         is_packed: true,
         num_packed_words: 4,
-        unpack_info: &[29, 40, 1, 1, 40, 1, 32, 32, 1, 40, 18, 18, 1],
+        unpack_info: &[29, 38, 1, 1, 38, 1, 32, 32, 1, 40, 18, 18, 1],
     }),
     (0, 7, PackedInfoConst {
         is_packed: true,
         num_packed_words: 3,
-        unpack_info: &[29, 40, 1, 1, 32, 32],
+        unpack_info: &[29, 38, 1, 1, 32, 32],
     }),
     (0, 8, PackedInfoConst {
         is_packed: true,
         num_packed_words: 3,
-        unpack_info: &[29, 40, 1, 1, 16, 16, 16, 16, 1],
+        unpack_info: &[29, 38, 1, 1, 16, 16, 16, 16, 1],
     }),
     (0, 9, PackedInfoConst {
         is_packed: true,

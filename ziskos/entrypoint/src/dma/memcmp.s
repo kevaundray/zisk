@@ -6,8 +6,8 @@
         .p2align        4
         .type   memcmp,@function
 memcmp:
+        csrs    0x813, a2  # Marker: Write count (a2) to CSR 0x813
         add	a0,a0,a1
-        .insn	4, 0x81362073
         ret
 /*
                 beqz	a2, .memcmp_eq

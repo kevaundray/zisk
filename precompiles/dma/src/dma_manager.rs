@@ -2,14 +2,17 @@ use std::sync::Arc;
 
 use fields::PrimeField64;
 use pil_std_lib::Std;
+use proofman_common::ProofCtx;
 use zisk_common::{
     BusDevice, BusDeviceMetrics, BusDeviceMode, ComponentBuilder, Instance, InstanceCtx,
-    InstanceInfo, PayloadType, Planner,
+    PayloadType, Plan, Planner,
 };
-use zisk_core::ZiskOperationType;
-use zisk_pil::DmaTrace;
+use zisk_pil::{Dma64AlignedTrace, DmaPrePostTrace, DmaTrace, DmaUnalignedTrace, ZiskProofValues};
 
-use crate::{DmaCounterInputGen, DmaInstance, DmaPlanner, DmaSM};
+use crate::{
+    Dma64AlignedInstance, Dma64AlignedSM, DmaCounterInputGen, DmaInstance, DmaPlanner,
+    DmaPrePostInstance, DmaPrePostSM, DmaSM, DmaUnalignedInstance, DmaUnalignedSM,
+};
 
 /// The `DmaManager` struct represents the Dma manager,
 /// which is responsible for managing the Dma state machine and its table state machine.
@@ -17,6 +20,9 @@ use crate::{DmaCounterInputGen, DmaInstance, DmaPlanner, DmaSM};
 pub struct DmaManager<F: PrimeField64> {
     /// Dma state machine
     dma_sm: Arc<DmaSM<F>>,
+    dma_pre_post_sm: Arc<DmaPrePostSM<F>>,
+    dma_64_aligned_sm: Arc<Dma64AlignedSM<F>>,
+    dma_unaligned_sm: Arc<DmaUnalignedSM<F>>,
 }
 
 impl<F: PrimeField64> DmaManager<F> {
@@ -25,9 +31,12 @@ impl<F: PrimeField64> DmaManager<F> {
     /// # Returns
     /// An `Arc`-wrapped instance of `DmaManager`.
     pub fn new(std: Arc<Std<F>>) -> Arc<Self> {
-        let dma_sm = DmaSM::new(std);
+        let dma_sm = DmaSM::new(std.clone());
+        let dma_pre_post_sm = DmaPrePostSM::new(std.clone());
+        let dma_64_aligned_sm = Dma64AlignedSM::new(std.clone());
+        let dma_unaligned_sm = DmaUnalignedSM::new(std);
 
-        Arc::new(Self { dma_sm })
+        Arc::new(Self { dma_sm, dma_pre_post_sm, dma_64_aligned_sm, dma_unaligned_sm })
     }
 
     pub fn build_dma_counter(&self) -> DmaCounterInputGen {
@@ -54,14 +63,7 @@ impl<F: PrimeField64> ComponentBuilder<F> for DmaManager<F> {
     /// A boxed implementation of `RegularPlanner`.
     fn build_planner(&self) -> Box<dyn Planner> {
         // Get the number of Dmas that a single Dma instance can handle
-        let num_availables = self.dma_sm.num_availables;
-
-        Box::new(DmaPlanner::new().add_instance(InstanceInfo::new(
-            DmaTrace::<usize>::AIRGROUP_ID,
-            DmaTrace::<usize>::AIR_ID,
-            num_availables,
-            ZiskOperationType::BigInt,
-        )))
+        Box::new(DmaPlanner::<F>::new())
     }
 
     /// Builds an inputs data collector for Dma operations.
@@ -76,9 +78,23 @@ impl<F: PrimeField64> ComponentBuilder<F> for DmaManager<F> {
     /// # Panics
     /// Panics if the provided `air_id` is not supported.
     fn build_instance(&self, ictx: InstanceCtx) -> Box<dyn Instance<F>> {
+        println!("BUILD DMA INSTANCE {}", ictx.plan.air_id);
         match ictx.plan.air_id {
-            id if id == DmaTrace::<usize>::AIR_ID => {
+            DmaTrace::<F>::AIR_ID => {
+                println!("BUILD DMA INSTANCE");
                 Box::new(DmaInstance::new(self.dma_sm.clone(), ictx))
+            }
+            DmaPrePostTrace::<F>::AIR_ID => {
+                println!("BUILD DMA PRE-POST INSTANCE");
+                Box::new(DmaPrePostInstance::new(self.dma_pre_post_sm.clone(), ictx))
+            }
+            Dma64AlignedTrace::<F>::AIR_ID => {
+                println!("BUILD DMA 64-ALIGNED INSTANCE");
+                Box::new(Dma64AlignedInstance::new(self.dma_64_aligned_sm.clone(), ictx))
+            }
+            DmaUnalignedTrace::<F>::AIR_ID => {
+                println!("BUILD DMA UNALIGNED INSTANCE");
+                Box::new(DmaUnalignedInstance::new(self.dma_unaligned_sm.clone(), ictx))
             }
             _ => {
                 panic!("DmaBuilder::get_instance() Unsupported air_id: {:?}", ictx.plan.air_id)
@@ -88,5 +104,15 @@ impl<F: PrimeField64> ComponentBuilder<F> for DmaManager<F> {
 
     fn build_inputs_generator(&self) -> Option<Box<dyn BusDevice<PayloadType>>> {
         Some(Box::new(DmaCounterInputGen::new(BusDeviceMode::InputGenerator)))
+    }
+
+    fn configure_instances(&self, pctx: &ProofCtx<F>, plannings: &[Plan]) {
+        let enable_dma_64_aligned =
+            plannings.iter().any(|p| p.air_id == Dma64AlignedTrace::<F>::AIR_ID);
+        let enable_dma_unaligned =
+            plannings.iter().any(|p| p.air_id == DmaUnalignedTrace::<F>::AIR_ID);
+        let mut proof_values = ZiskProofValues::from_vec_guard(pctx.get_proof_values());
+        proof_values.enable_dma_64_aligned = F::from_bool(enable_dma_64_aligned);
+        proof_values.enable_dma_unaligned = F::from_bool(enable_dma_unaligned);
     }
 }

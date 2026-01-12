@@ -816,7 +816,12 @@ impl<F: PrimeField64> ZiskExecutor<F> {
                 .remove(&global_id)
                 .expect("Missing collectors for given global_id")
                 .into_iter()
-                .map(Option::unwrap) // All are guaranteed to be Some
+                .enumerate()
+                .map(|(idx, opt)| {
+                    opt.unwrap_or_else(|| {
+                        panic!("Collector at index {} for global_id {} is None", idx, global_id)
+                    })
+                })
                 .collect()
         };
 

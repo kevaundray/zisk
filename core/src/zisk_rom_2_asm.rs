@@ -6648,6 +6648,27 @@ impl ZiskRom2Asm {
             ZiskOp::DmaMemCmp => {
                 unimplemented!();
             }
+            ZiskOp::Param => {
+                unimplemented!();
+            }
+            ZiskOp::Params => {
+                unimplemented!();
+            }
+            ZiskOp::Dma64Aligned => {
+                unimplemented!();
+            }
+            ZiskOp::DmaUnaligned => {
+                unimplemented!();
+            }
+            ZiskOp::DmaPre => {
+                unimplemented!();
+            }
+            ZiskOp::DmaPost => {
+                unimplemented!();
+            }
+            ZiskOp::DmaCmpByte => {
+                unimplemented!();
+            }
         }
     }
 

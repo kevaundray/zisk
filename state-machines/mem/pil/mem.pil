@@ -107,7 +107,7 @@ airtemplate Mem(const int N = 2**21, const int id = MEMORY_ID, const int RC = 2,
     is_first_segment * segment_id === 0;
 
     col witness bits(29) addr;
-    col witness bits(40) step;
+    col witness bits(MEM_STEP_BITS) step;
     col witness bits(1) sel;
     col witness bits(1) addr_changes;
 
@@ -119,7 +119,7 @@ airtemplate Mem(const int N = 2**21, const int id = MEMORY_ID, const int RC = 2,
 
         // Two columns, one for step (timestap) of second operation, and other
         // to enable dual operation in the row.
-        col witness bits(40) air.step_dual;
+        col witness bits(MEM_STEP_BITS) air.step_dual;
         col witness bits(1) air.sel_dual;
 
         sel_dual * (1 - sel_dual) === 0;
@@ -375,9 +375,10 @@ airtemplate Mem(const int N = 2**21, const int id = MEMORY_ID, const int RC = 2,
 
         is_first_segment * SEGMENT_L1 * (1 - addr_changes) === 0;
 
-        // addr_change == 1 => [0,2^18-1] => 18 + 18 = 36 bits + 3 => 39 bits => 512 GB
-        // addr_change == 0 => [0,2^18-1] => 18 + 18 = 36 bits => STEP upto 2^34 => 16 GB steps
-        // 36 bits x 2^22 = 2^58 + 2^32 address = 2^59 secure.
+        // addr_change == 1 => [0,2^19-1] => 19 + 19 = 38 bits + 3 => 41 bits => 2 TB (limit address 32 bits)
+        // addr_change == 0 => [0,2^19-1] => 19 + 19 = 38 bits => 2 slots => 2^37 => 128 GB steps (32K main instances)
+        // 38 bits x 2^22 = 2^60 + 2^32 address = 2^61 secure.
+        // using control in the middle of instance, reduce to 2^60
 
         range_check(expression: increment[0], min: 0, max: 2**18 - 1);
         range_check(expression: increment[1], min: 0, max: 2**18 - 1);

@@ -257,9 +257,9 @@ airtemplate Main(int N = 2**21, int RC = 2, int stack_enabled = 0,
     //   region. As a result, no memory state machine can validate memory access in this area;
     //   only the main state machine can 'prove' such memory access.
 
-    col witness bits(40) a_reg_prev_mem_step;
-    col witness bits(40) b_reg_prev_mem_step;
-    col witness bits(40) store_reg_prev_mem_step;
+    col witness bits(REG_STEP_BITS) a_reg_prev_mem_step;
+    col witness bits(REG_STEP_BITS) b_reg_prev_mem_step;
+    col witness bits(REG_STEP_BITS) store_reg_prev_mem_step;
     col witness bits(32) store_reg_prev_value[RC];
     col witness bits(1) a_src_reg;
     col witness bits(1) b_src_reg;
@@ -331,7 +331,7 @@ airtemplate Main(int N = 2**21, int RC = 2, int stack_enabled = 0,
 
     range_check(expression: a_mem_step - a_reg_prev_mem_step - 1, min: 0, max: MAX_RANGE, sel: a_src_reg);
     range_check(expression: b_mem_step - b_reg_prev_mem_step - 1, min: 0, max: MAX_RANGE, sel: b_src_reg);
-    range_check(expression: store_mem_step - store_reg_prev_mem_step -1 , min: 0, max: MAX_RANGE, sel: store_reg);
+    range_check(expression: store_mem_step - store_reg_prev_mem_step - 1 , min: 0, max: MAX_RANGE, sel: store_reg);
 
     // Sent to bus the external operation
 
@@ -526,5 +526,5 @@ airtemplate Main(int N = 2**21, int RC = 2, int stack_enabled = 0,
 
 
     // Main Segment constraint
-    range_check(main_segment, min: 0, max: ((2**32)/N) - 1);
+    range_check(main_segment, min: 0, max: ((2**MAIN_STEP_BITS)/N) - 1);
 }

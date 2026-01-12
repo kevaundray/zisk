@@ -75,9 +75,10 @@ pub const OPERATION_BUS_ADD_256_DATA_SIZE: usize = OPERATION_PRECOMPILED_BUS_DAT
     + 2 * DATA_256_BITS_SIZE
     + SINGLE_RESULT_SIZE;
 
-// 5 bus_precompiled_data + count
+pub const DMA_ENCODED: usize = OPERATION_PRECOMPILED_BUS_DATA_SIZE;
+// 5 bus_precompiled_data + encoded
 pub const OPERATION_BUS_DMA_MEMCPY_DATA_SIZE: usize = OPERATION_PRECOMPILED_BUS_DATA_SIZE + 1;
-// 5 bus_precompiled_data + count + count_eq
+// 5 bus_precompiled_data + encoded + count_eq
 pub const OPERATION_BUS_DMA_MEMCMP_DATA_SIZE: usize = OPERATION_PRECOMPILED_BUS_DATA_SIZE + 2;
 
 // 4 bus_data + 5 addr + 4 x 384 = 4 + 5 + 4 * 6 = 33
@@ -330,7 +331,7 @@ impl OperationBusData<u64> {
         let b = if inst.m32 { ctx.b & 0xffff_ffff } else { ctx.b };
         let op = inst.op as u64;
         let op_type = inst.op_type as u64;
-        let step = ctx.step as u64;
+        let step = ctx.step;
 
         match inst.op_type {
             ZiskOperationType::Keccak => {
@@ -564,7 +565,7 @@ impl OperationBusData<u64> {
         let b = if inst.m32 { ctx.b & 0xffff_ffff } else { ctx.b };
         let op = inst.op as u64;
         let op_type = inst.op_type as u64;
-        let step = ctx.step as u64;
+        let step = ctx.step;
 
         match inst.op_type {
             ZiskOperationType::Keccak => {

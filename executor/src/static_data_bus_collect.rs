@@ -11,6 +11,11 @@ use precomp_arith_eq_384::ArithEq384Collector;
 use precomp_arith_eq_384::ArithEq384CounterInputGen;
 use precomp_big_int::Add256Collector;
 use precomp_big_int::Add256CounterInputGen;
+use precomp_dma::Dma64AlignedCollector;
+use precomp_dma::DmaCollector;
+use precomp_dma::DmaCounterInputGen;
+use precomp_dma::DmaPrePostCollector;
+use precomp_dma::DmaUnalignedCollector;
 use precomp_keccakf::KeccakfCollector;
 use precomp_keccakf::KeccakfCounterInputGen;
 use precomp_sha256f::Sha256fCollector;
@@ -67,6 +72,13 @@ pub struct StaticDataBusCollect<D> {
     pub add256_collector: Vec<(usize, Add256Collector)>,
     pub add256_inputs_generator: Add256CounterInputGen,
 
+    /// Dma collectors
+    pub dma_collector: Vec<(usize, DmaCollector)>,
+    pub dma_pre_post_collector: Vec<(usize, DmaPrePostCollector)>,
+    pub dma_64_aligned_collector: Vec<(usize, Dma64AlignedCollector)>,
+    pub dma_unaligned_collector: Vec<(usize, DmaUnalignedCollector)>,
+    pub dma_inputs_generator: DmaCounterInputGen,
+
     /// ROM collector
     pub rom_collector: Vec<(usize, RomCollector)>,
 
@@ -84,6 +96,7 @@ const SHA256_TYPE: u64 = ZiskOperationType::Sha256 as u64;
 const ARITH_EQ_TYPE: u64 = ZiskOperationType::ArithEq as u64;
 const ARITH_EQ_384_TYPE: u64 = ZiskOperationType::ArithEq384 as u64;
 const BIG_INT_OP_TYPE_ID: u64 = ZiskOperationType::BigInt as u64;
+const DMA_OP_TYPE_ID: u64 = ZiskOperationType::Dma as u64;
 
 impl StaticDataBusCollect<PayloadType> {
     /// Creates a new `DataBus` instance.
@@ -100,6 +113,10 @@ impl StaticDataBusCollect<PayloadType> {
         arith_eq_collector: Vec<(usize, ArithEqCollector)>,
         arith_eq_384_collector: Vec<(usize, ArithEq384Collector)>,
         add256_collector: Vec<(usize, Add256Collector)>,
+        dma_collector: Vec<(usize, DmaCollector)>,
+        dma_pre_post_collector: Vec<(usize, DmaPrePostCollector)>,
+        dma_64_aligned_collector: Vec<(usize, Dma64AlignedCollector)>,
+        dma_unaligned_collector: Vec<(usize, DmaUnalignedCollector)>,
         rom_collector: Vec<(usize, RomCollector)>,
         arith_eq_inputs_generator: ArithEqCounterInputGen,
         arith_eq_384_inputs_generator: ArithEq384CounterInputGen,
@@ -107,6 +124,7 @@ impl StaticDataBusCollect<PayloadType> {
         sha256f_inputs_generator: Sha256fCounterInputGen,
         arith_inputs_generator: ArithCounterInputGen,
         add256_inputs_generator: Add256CounterInputGen,
+        dma_inputs_generator: DmaCounterInputGen,
     ) -> Self {
         let mem_collectors_info: Vec<MemCollectorInfo> =
             mem_collector.iter().map(|(_, collector)| collector.get_mem_collector_info()).collect();
@@ -123,6 +141,10 @@ impl StaticDataBusCollect<PayloadType> {
             arith_eq_collector,
             arith_eq_384_collector,
             add256_collector,
+            dma_collector,
+            dma_pre_post_collector,
+            dma_64_aligned_collector,
+            dma_unaligned_collector,
             rom_collector,
             arith_eq_inputs_generator,
             arith_eq_384_inputs_generator,
@@ -130,6 +152,7 @@ impl StaticDataBusCollect<PayloadType> {
             sha256f_inputs_generator,
             arith_inputs_generator,
             add256_inputs_generator,
+            dma_inputs_generator,
             pending_transfers: VecDeque::with_capacity(64),
             mem_collectors_info,
         }
@@ -318,6 +341,52 @@ impl StaticDataBusCollect<PayloadType> {
                         Some(&self.mem_collectors_info),
                     );
                 }
+                DMA_OP_TYPE_ID => {
+                    for (_, dma_collector) in &mut self.dma_collector {
+                        dma_collector.process_data(
+                            &bus_id,
+                            data,
+                            data_ext,
+                            &mut self.pending_transfers,
+                            None,
+                        );
+                    }
+                    for (_, dma_pre_post_collector) in &mut self.dma_pre_post_collector {
+                        dma_pre_post_collector.process_data(
+                            &bus_id,
+                            data,
+                            data_ext,
+                            &mut self.pending_transfers,
+                            None,
+                        );
+                    }
+                    for (_, dma_64_aligned_collector) in &mut self.dma_64_aligned_collector {
+                        dma_64_aligned_collector.process_data(
+                            &bus_id,
+                            data,
+                            data_ext,
+                            &mut self.pending_transfers,
+                            None,
+                        );
+                    }
+                    for (_, dma_unaligned_collector) in &mut self.dma_unaligned_collector {
+                        dma_unaligned_collector.process_data(
+                            &bus_id,
+                            data,
+                            data_ext,
+                            &mut self.pending_transfers,
+                            None,
+                        );
+                    }
+
+                    self.dma_inputs_generator.process_data(
+                        &bus_id,
+                        data,
+                        data_ext,
+                        &mut self.pending_transfers,
+                        Some(&self.mem_collectors_info),
+                    );
+                }
                 _ => {}
             },
             ROM_BUS_ID => {
@@ -412,6 +481,22 @@ impl DataBusTrait<PayloadType, Box<dyn BusDevice<PayloadType>>>
         }
 
         for (id, collector) in self.add256_collector {
+            result.push((Some(id), Some(Box::new(collector) as Box<dyn BusDevice<PayloadType>>)));
+        }
+
+        for (id, collector) in self.dma_collector {
+            result.push((Some(id), Some(Box::new(collector) as Box<dyn BusDevice<PayloadType>>)));
+        }
+
+        for (id, collector) in self.dma_pre_post_collector {
+            result.push((Some(id), Some(Box::new(collector) as Box<dyn BusDevice<PayloadType>>)));
+        }
+
+        for (id, collector) in self.dma_64_aligned_collector {
+            result.push((Some(id), Some(Box::new(collector) as Box<dyn BusDevice<PayloadType>>)));
+        }
+
+        for (id, collector) in self.dma_unaligned_collector {
             result.push((Some(id), Some(Box::new(collector) as Box<dyn BusDevice<PayloadType>>)));
         }
 

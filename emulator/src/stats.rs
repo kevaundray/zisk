@@ -877,4 +877,9 @@ impl OpStats for Stats {
             self.on_memory_write(addr + 8 * index as u64, 8, 0);
         }
     }
+    fn add_extras(&mut self, extras: &[(u8, usize)]) {
+        for (opcode, count) in extras {
+            self.costs.ops[*opcode as usize] += *count as u64;
+        }
+    }
 }

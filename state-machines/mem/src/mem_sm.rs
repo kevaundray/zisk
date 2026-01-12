@@ -12,13 +12,10 @@ type MemTraceType<F> = MemTracePacked<F>;
 #[cfg(not(feature = "packed"))]
 type MemTraceType<F> = MemTrace<F>;
 #[cfg(feature = "debug_mem")]
-use {
-    num_bigint::ToBigInt,
-    std::{
-        env,
-        fs::File,
-        io::{BufWriter, Write},
-    },
+use std::{
+    env,
+    fs::File,
+    io::{BufWriter, Write},
 };
 
 use crate::{MemInput, MemModule};
@@ -72,17 +69,22 @@ impl<F: PrimeField64> MemSM<F> {
         println!("[MemDebug] writing information {} .....", file_name);
         let file = File::create(file_name).unwrap();
         let mut writer = BufWriter::new(file);
-        let num_rows = MemTrace::NUM_ROWS;
+        let num_rows = MemTrace::<F>::NUM_ROWS;
 
         for i in 0..num_rows {
-            let addr = trace[i].addr.as_canonical_biguint().to_bigint().unwrap() * 8;
-            let step = trace[i].step.as_canonical_biguint().to_bigint().unwrap();
-            writeln!(
-                writer,
-                "{:#010X} {} {} {:?}",
-                addr, trace[i].step, trace[i].wr, trace[i].value
-            )
-            .unwrap();
+            let addr = trace[i].addr.as_canonical_u64() * 8;
+            let step = trace[i].step.as_canonical_u64();
+            let op = if trace[i].wr.is_zero() { 'R' } else { 'W' };
+            let values =
+                [trace[i].value[0].as_canonical_u64(), trace[i].value[1].as_canonical_u64()];
+            let value = values[0] | (values[1] << 32);
+            writeln!(writer, "{i:<8} {addr:#010X} {step} {op} {values:?} 0x{value:016X}").unwrap();
+            let dual = !trace[i].sel_dual.is_zero();
+            if dual {
+                let step = trace[i].step_dual.as_canonical_u64();
+                writeln!(writer, "{i:<8} {addr:#010X} {step} R {values:?} 0x{value:016X} DUAL")
+                    .unwrap();
+            }
         }
         println!("[MemDebug] done");
     }
