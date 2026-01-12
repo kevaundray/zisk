@@ -5,7 +5,7 @@ use zisk_common::{ChunkId, EmuTrace, ExecutorStatsHandle};
 #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
 use std::sync::atomic::{fence, Ordering};
 use std::sync::Arc;
-use std::time::{Duration, Instant};
+use std::time::Instant;
 
 use tracing::{error, info};
 
