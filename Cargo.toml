@@ -36,7 +36,9 @@ members = [
     "ziskclib",
     "common",
     "tools/circuit",
-    "server",
+    "server", 
+    "riscv_fuzz",
+    "riscv_new",
 ]
 
 resolver = "2"
