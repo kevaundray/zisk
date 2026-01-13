@@ -1,5 +1,7 @@
 use elliptic_curve::FieldBytesEncoding;
+use elliptic_curve::PrimeField;
 use k256::ecdsa::Signature;
+use k256::Secp256k1;
 use k256::U256;
 
 use crate::handlers::validate_hint_length;
@@ -18,32 +20,19 @@ use crate::zisklib;
 /// * `Err` - If the data length is invalid
 #[inline]
 pub fn secp256k1_ecdsa_verify_hint(data: &[u64]) -> Result<Vec<u64>, String> {
-    hint_fields![PK: 4, Y_IS_ODD:1, Z: 4, SIG: 8];
+    hint_fields![X_Y: 8, INFINITY:1, Z: 4, SIG: 8];
 
     validate_hint_length(data, EXPECTED_LEN, "SECP256K1_ECDSA_VERIFY")?;
 
-    let pk = &data[PK_OFFSET..Y_IS_ODD_OFFSET];
-    let y_is_odd = data[Y_IS_ODD_OFFSET] as u8;
-
-    let mut hints = Vec::new();
-
-    let mut out: [u64; 8] = [0; 8];
-    unsafe {
-        zisklib::secp256k1_decompress_c(
-            &pk[0] as *const u64 as *const u8,
-            y_is_odd,
-            &mut out[0],
-            &mut hints,
-        );
+    // If the point is at infinity, return an error
+    if data[INFINITY_OFFSET] != 0 {
+        return Err("Error in secp256k1_ecdsa_verify: point at infinity".to_string());
     }
 
-    // Convert u64 slice to byte slice
-    // let byte_data = unsafe { slice::from_raw_parts(data.as_ptr() as *const u8, data.len() * 8) };
+    let pk = unsafe { &*(data[X_Y_OFFSET] as *const [u64; X_Y_SIZE]) };
 
     // Extract z (32 bytes), and sig (64 bytes)
-    let z = &data[Z_OFFSET..SIG_OFFSET];
-    let z_bytes: &[u8; 32] = unsafe { &*(z.as_ptr() as *const [u8; 32]) };
-
+    let z_bytes: &[u8; 32] = unsafe { &*(data[Z_OFFSET..SIG_OFFSET].as_ptr() as *const [u8; 32]) };
     let z_dec: U256 = U256::decode_field_bytes(z_bytes.into());
     let z_words = z_dec.to_words();
 
@@ -54,13 +43,14 @@ pub fn secp256k1_ecdsa_verify_hint(data: &[u64]) -> Result<Vec<u64>, String> {
         .map_err(|e| format!("Failed to parse signature: {}", e))?;
 
     // Extract r and s as Scalars and convert to U256
-    let (r_scalar, s_scalar) = sig.split_scalars();
-    let r: U256 = U256::decode_field_bytes(&r_scalar.to_bytes());
-    let s: U256 = U256::decode_field_bytes(&s_scalar.to_bytes());
+    let r = <U256 as FieldBytesEncoding<Secp256k1>>::decode_field_bytes(&sig.r().to_repr());
+    let s = <U256 as FieldBytesEncoding<Secp256k1>>::decode_field_bytes(&sig.s().to_repr());
     let r_words = r.to_words();
     let s_words = s.to_words();
 
-    zisklib::secp256k1_ecdsa_verify(&out, &z_words, &r_words, &s_words, &mut hints);
+    let mut hints = Vec::new();
+
+    zisklib::secp256k1_ecdsa_verify(pk, &z_words, &r_words, &s_words, &mut hints);
 
     Ok(hints)
 }
