@@ -2,7 +2,9 @@ require "std_direct.pil"
 
 require "operations.pil"
 require "opids.pil"
+require "config.pil"
 
+require "dma/pil/dual_range.pil"
 require "rom/pil/rom.pil"
 require "main/pil/main.pil"
 require "mem/pil/mem.pil"
@@ -18,6 +20,12 @@ require "arith_eq/pil/arith_eq.pil"
 require "arith_eq_384/pil/arith_eq_384.pil"
 require "keccakf/pil/keccakf.pil"
 require "sha256f/pil/sha256f.pil"
+require "dma/pil/dma.pil"
+require "dma/pil/dma_rom.pil"
+require "dma/pil/dma_pre_post.pil"
+require "dma/pil/dma_pre_post_table.pil"
+require "dma/pil/dma_64_aligned.pil"
+require "dma/pil/dma_unaligned.pil"
 
 proofval enable_input_data;
 enable_input_data * (1 - enable_input_data);

@@ -62,9 +62,9 @@ impl<F: PrimeField64> Add256SM<F> {
         trace: &mut Add256TraceRowType<F>,
         multiplicities: &mut [u32],
     ) {
+        debug_assert!(input.cin < 2);
         trace.set_cin(input.cin != 0);
         let mut cout_2 = input.cin as u32;
-
         for i in 0..4 {
             let al = input.a[i] as u32;
             let ah = (input.a[i] >> 32) as u32;
