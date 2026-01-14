@@ -28,7 +28,7 @@
 #define ROM_ROWS (1 << 21)
 #define INPUT_ROWS (1 << 21)
 #define MEM_ROWS (1 << 22)
-#define MAX_CHUNKS 8192     // 2^13 * 2^18 = 2^31
+#define MAX_CHUNKS (1 << 18)     // 2^36 / 2^18 = 2^18
 
 // THREAD_BITS >= 1
 #define THREAD_BITS 2
