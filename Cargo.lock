@@ -3210,6 +3210,7 @@ dependencies = [
  "lib-c",
  "precompiles-helpers",
  "rayon",
+ "rustls",
  "tracing",
  "zisk-common",
  "ziskos-hints",

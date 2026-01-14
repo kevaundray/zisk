@@ -231,7 +231,6 @@ impl<HS: StreamSink + Send + Sync + 'static> HintsProcessor<HS> {
 
             let hint = PrecompileHint::from_u64_slice(hints, idx, true)?;
             self.num_hint.fetch_add(1, Ordering::Relaxed);
-            println!("[{}] Hint processed {:?}:", self.num_hint.load(Ordering::Relaxed), hint);
 
             // Check if custom handler is registered for custom hints
             if let HintCode::Custom(code) = hint.hint_code {

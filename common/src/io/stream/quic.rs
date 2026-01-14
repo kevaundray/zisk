@@ -7,17 +7,43 @@ use std::sync::Arc;
 
 use anyhow::{Context, Result};
 use quinn::{Connection, Endpoint, ServerConfig};
-use tokio::runtime::Runtime;
+use tokio::runtime::{Handle, Runtime};
 
 use super::{StreamRead, StreamWrite};
+
+/// Helper to run async code, either using current runtime or creating one
+fn run_async<F, T>(f: F) -> Result<T>
+where
+    F: std::future::Future<Output = Result<T>> + Send + 'static,
+    T: Send + 'static,
+{
+    // Try to use current runtime handle if we're already in a tokio context
+    match Handle::try_current() {
+        Ok(handle) => {
+            // We're in a tokio runtime, use block_in_place to allow blocking
+            tokio::task::block_in_place(move || handle.block_on(f))
+        }
+        Err(_) => {
+            // Not in a runtime, create a temporary one
+            let rt = Runtime::new().context("Failed to create tokio runtime")?;
+            rt.block_on(f)
+        }
+    }
+}
+
+/// Ensure crypto provider is initialized (idempotent)
+fn ensure_crypto_provider() {
+    use std::sync::Once;
+    static INIT: Once = Once::new();
+    INIT.call_once(|| {
+        let _ = rustls::crypto::ring::default_provider().install_default();
+    });
+}
 
 /// A QUIC implementation of StreamRead that receives data over QUIC streams.
 pub struct QuicStreamReader {
     /// The QUIC connection
     connection: Option<Connection>,
-
-    /// Tokio runtime for async operations
-    runtime: Arc<Runtime>,
 
     /// Client endpoint
     endpoint: Option<Endpoint>,
@@ -31,14 +57,11 @@ impl QuicStreamReader {
     ///
     /// This creates a client endpoint that connects to the server to read data.
     pub fn new(server_addr: SocketAddr) -> Result<Self> {
-        let runtime = Arc::new(
-            tokio::runtime::Builder::new_multi_thread()
-                .enable_all()
-                .build()
-                .context("Failed to create tokio runtime")?,
-        );
+        // Ensure crypto provider is initialized
+        ensure_crypto_provider();
 
-        Ok(QuicStreamReader { connection: None, runtime, endpoint: None, server_addr })
+        // We don't need to store a runtime anymore since we'll use run_async helper
+        Ok(QuicStreamReader { connection: None, endpoint: None, server_addr })
     }
 }
 
@@ -51,7 +74,8 @@ impl StreamRead for QuicStreamReader {
             return Ok(());
         }
 
-        let (endpoint, connection) = self.runtime.block_on(async {
+        let server_addr = self.server_addr;
+        let (endpoint, connection) = run_async(async move {
             let mut endpoint = Endpoint::client("0.0.0.0:0".parse().unwrap())?;
 
             // Configure to accept self-signed certificates (for development)
@@ -73,7 +97,7 @@ impl StreamRead for QuicStreamReader {
             endpoint.set_default_client_config(client_config);
 
             let connection = endpoint
-                .connect(self.server_addr, "localhost")?
+                .connect(server_addr, "localhost")?
                 .await
                 .context("Failed to connect to server")?;
 
@@ -96,9 +120,10 @@ impl StreamRead for QuicStreamReader {
         let connection = self
             .connection
             .as_ref()
-            .ok_or_else(|| anyhow::anyhow!("QuicStreamReader: Connection not established"))?;
+            .ok_or_else(|| anyhow::anyhow!("QuicStreamReader: Connection not established"))?
+            .clone();
 
-        self.runtime.block_on(async {
+        run_async(async move {
             // Accept next unidirectional stream
             let mut recv = match connection.accept_uni().await {
                 Ok(stream) => stream,
@@ -128,8 +153,9 @@ impl StreamRead for QuicStreamReader {
             connection.close(0u32.into(), b"closing");
         }
         if let Some(endpoint) = self.endpoint.take() {
-            self.runtime.block_on(async {
+            let _ = run_async(async move {
                 endpoint.wait_idle().await;
+                Ok::<_, anyhow::Error>(())
             });
         }
         Ok(())
@@ -161,6 +187,9 @@ impl QuicStreamWriter {
     ///
     /// This creates a server endpoint that waits for incoming reader connections.
     pub fn new(bind_addr: SocketAddr) -> Result<Self> {
+        // Ensure crypto provider is initialized
+        ensure_crypto_provider();
+
         let runtime = Arc::new(
             tokio::runtime::Builder::new_multi_thread()
                 .enable_all()

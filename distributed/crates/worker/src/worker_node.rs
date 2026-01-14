@@ -531,9 +531,7 @@ impl<T: ZiskBackend + 'static> WorkerNodeGrpc<T> {
                 InputSourceDto::InputPath(inputs_uri.to_string_lossy().to_string())
             }
             Some(InputSource::InputData(data)) => InputSourceDto::InputData(data),
-            None => {
-                return Err(anyhow!("Input source missing in ContributionParams"));
-            }
+            None => InputSourceDto::InputNull,
         };
 
         let hints_source = if params.hints_path.is_some() {
