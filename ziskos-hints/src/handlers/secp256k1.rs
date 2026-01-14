@@ -29,11 +29,11 @@ pub fn secp256k1_ecdsa_verify_hint(data: &[u64]) -> Result<Vec<u64>, String> {
         data[X_OFFSET + 3].to_be(),
         data[X_OFFSET + 2].to_be(),
         data[X_OFFSET + 1].to_be(),
-        data[X_OFFSET + 0].to_be(),
+        data[X_OFFSET].to_be(),
         data[Y_OFFSET + 3].to_be(),
         data[Y_OFFSET + 2].to_be(),
         data[Y_OFFSET + 1].to_be(),
-        data[Y_OFFSET + 0].to_be(),
+        data[Y_OFFSET].to_be(),
     ];
 
     // Reverse limb order for signature (big-endian to little-endian)
@@ -41,7 +41,7 @@ pub fn secp256k1_ecdsa_verify_hint(data: &[u64]) -> Result<Vec<u64>, String> {
         data[SIG_OFFSET + 3].to_be(),
         data[SIG_OFFSET + 2].to_be(),
         data[SIG_OFFSET + 1].to_be(),
-        data[SIG_OFFSET + 0].to_be(),
+        data[SIG_OFFSET].to_be(),
         data[SIG_OFFSET + 7].to_be(),
         data[SIG_OFFSET + 6].to_be(),
         data[SIG_OFFSET + 5].to_be(),
