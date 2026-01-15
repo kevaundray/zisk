@@ -62,6 +62,7 @@ pub fn fcall_secp256k1_ecdsa_verify(
         // Hint the result
         #[cfg(feature = "hints")]
         {
+            hints.push(results.len() as u64);
             hints.extend_from_slice(&results);
         }
 
