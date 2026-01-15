@@ -19,7 +19,7 @@ const IDENTITY_POINT256: SyscallPoint256 = SyscallPoint256 { x: IDENTITY_X, y: I
 const G_POINT256: SyscallPoint256 = SyscallPoint256 { x: G_X, y: G_Y };
 
 /// Given a x-coordinate `x_bytes` and a parity `y_is_odd`,
-/// this function decompresses the point on the secp256k1 curve.
+/// this function decompresses a non-infinity point on the secp256k1 curve.
 pub fn secp256k1_decompress(x: &[u64; 4], y_is_odd: bool) -> Result<([u64; 4], [u64; 4]), bool> {
     // Calculate the y-coordinate of the point: y = sqrt(x³ + 7)
     let x_sq = secp256k1_fp_square(x);
@@ -37,7 +37,7 @@ pub fn secp256k1_decompress(x: &[u64; 4], y_is_odd: bool) -> Result<([u64; 4], [
     Ok((*x, y))
 }
 
-/// Converts a non-infinity point `p` on the Secp256k1 curve from projective coordinates to affine coordinates
+/// Converts a non-infinity point `p` on the Secp256k1 curve from jacobian coordinates to affine coordinates
 pub fn secp256k1_to_affine(p: &[u64; 12]) -> [u64; 8] {
     let z: [u64; 4] = [p[8], p[9], p[10], p[11]];
 
@@ -92,7 +92,7 @@ pub fn secp256k1_is_on_curve(p: &[u64; 8]) -> bool {
 ///
 /// Note: There are no (non-infinity) points of order 2 in Secp256k1.
 ///       All (non-infinity) points are of prime order N.
-fn secp256k1_scalar_mul(k: &[u64; 4], p: &[u64; 8]) -> Option<[u64; 8]> {
+pub fn secp256k1_scalar_mul(k: &[u64; 4], p: &[u64; 8]) -> Option<[u64; 8]> {
     // Direct cases: k = 0, k = 1, k = 2
     if eq(k, &ZERO_256) {
         return None;
@@ -670,7 +670,7 @@ pub unsafe extern "C" fn secp256k1_decompress_c(
 }
 
 /// # Safety
-/// - `p_ptr` must point to 12 u64s (projective point)
+/// - `p_ptr` must point to 12 u64s (jacobian point)
 /// - `out_ptr` must point to at least 8 u64s
 #[no_mangle]
 pub unsafe extern "C" fn secp256k1_to_affine_c(p_ptr: *const u64, out_ptr: *mut u64) {

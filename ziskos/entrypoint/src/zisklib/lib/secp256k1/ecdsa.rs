@@ -25,20 +25,22 @@ use super::{
 /// Verifies the signature (r, s) over the message hash z using the public key pk
 /// Returns true if the signature is valid, false otherwise
 pub fn secp256k1_ecdsa_verify(pk: &[u64; 8], z: &[u64; 4], r: &[u64; 4], s: &[u64; 4]) -> bool {
-    // Ecdsa verification computes P = [s⁻¹·z (mod n)]G + [s⁻¹·r (mod n)]PK
-    // We can equivalently hint p, check it's correct and verify that
-    //   [z]G + [r]pk + [-s]P == 𝒪,
+    // Ecdsa verification computes (x, y) = [s⁻¹·z (mod n)]G + [s⁻¹·r (mod n)]PK
+    // and checks that x ≡ r (mod n)
+    // We can equivalently hint y, and verify that
+    //   [z]G + [r]PK + [-s](r,y) == 𝒪,
     // saving us from expensive fn arithmetic
 
     // Hint the result
-    let p = fcall_secp256k1_ecdsa_verify(pk, z, r, s);
+    let coords = fcall_secp256k1_ecdsa_verify(pk, z, r, s);
+    let point = [r[0], r[1], r[2], r[3], coords[4], coords[5], coords[6], coords[7]];
 
     // Check the recovered point is valid
-    assert!(secp256k1_is_on_curve(&p)); // Note: Identity point would be raised here
+    assert!(secp256k1_is_on_curve(&point)); // Note: Identity point would be raised here
 
-    // Check that [z]G + [r]pk + [-s]P == 𝒪
+    // Check that [z]G + [r]PK + [-s](r,y) == 𝒪
     let neg_s = secp256k1_fn_neg(s);
-    secp256k1_triple_scalar_mul_with_g(z, r, &neg_s, pk, &p).is_none().then_some(()).is_some()
+    secp256k1_triple_scalar_mul_with_g(z, r, &neg_s, pk, &point).is_none()
 }
 
 // ==================== C FFI Functions ====================
