@@ -460,9 +460,9 @@ extern int _opcode_keccak(uint64_t address)
 #endif
 #ifdef DEBUG
 #ifdef ASM_CALL_METRICS
-    if (emu_verbose) printf("opcode_keccak() calling KeccakF1600() counter=%lu address=%08lx\n", asm_call_metrics.keccak_counter, address);
+    if (emu_verbose) printf("opcode_keccak() calling keccakf1600_generic() counter=%lu address=%08lx\n", asm_call_metrics.keccak_counter, address);
 #else
-    if (emu_verbose) printf("opcode_keccak() calling KeccakF1600() address=%08lx\n", address);
+    if (emu_verbose) printf("opcode_keccak() calling keccakf1600_generic() address=%08lx\n", address);
 #endif
 #endif
 
@@ -485,7 +485,7 @@ extern int _opcode_keccak(uint64_t address)
 #endif
 
 #ifdef DEBUG
-    if (emu_verbose) printf("opcode_keccak() called KeccakF1600()\n");
+    if (emu_verbose) printf("opcode_keccak() called keccakf1600_generic()\n");
 #endif
 #ifdef ASM_CALL_METRICS
     asm_call_metrics.keccak_counter++;
@@ -502,9 +502,9 @@ extern int _opcode_sha256(uint64_t * address)
 #endif
 #ifdef DEBUG
 #ifdef ASM_CALL_METRICS
-    if (emu_verbose) printf("opcode_sha256() calling sha256_transform_2() counter=%lu address=%p\n", asm_call_metrics.sha256_counter, address);
+    if (emu_verbose) printf("opcode_sha256() calling zisk_sha256() counter=%lu address=%p\n", asm_call_metrics.sha256_counter, address);
 #else
-    if (emu_verbose) printf("opcode_sha256() calling sha256_transform_2() address=%p\n", address);
+    if (emu_verbose) printf("opcode_sha256() calling zisk_sha256() address=%p\n", address);
 #endif
 #endif
 
@@ -527,7 +527,7 @@ extern int _opcode_sha256(uint64_t * address)
 #endif
 
 #ifdef DEBUG
-    if (emu_verbose) printf("opcode_sha256() called sha256_transform_2()\n");
+    if (emu_verbose) printf("opcode_sha256() called zisk_sha256()\n");
 #endif
 #ifdef ASM_CALL_METRICS
     asm_call_metrics.sha256_counter++;
@@ -899,8 +899,17 @@ extern int _opcode_fcall(struct FcallContext * ctx)
 #else
     if (emu_verbose) printf("_opcode_fcall(%lu)\n", ctx->function_id);
 #endif
+    if (emu_verbose)
+    {
+        printf("_opcode_fcall() calling Fcall() with params_size=%lu\n", ctx->params_size);
+        printf("params=");
+        for (uint64_t i=0; i<ctx->params_size; i++)
+        {
+            printf("%lx ", ctx->params[i]);
+        }
+        printf("\n");
+    }
 #endif
-
     int iresult;
 
 #ifdef ASM_PRECOMPILE_CACHE
@@ -925,6 +934,19 @@ extern int _opcode_fcall(struct FcallContext * ctx)
         // Load result from cache
         precompile_cache_load((uint8_t *)&ctx->result_size, 1*8);
         precompile_cache_load((uint8_t *)&ctx->result, ctx->result_size*8);
+    }
+#endif
+
+#ifdef DEBUG
+    if (emu_verbose)
+    {
+        printf("_opcode_fcall() called Fcall() and got result_size=%lu\n", ctx->result_size);
+        printf("results=");
+        for (uint64_t i=0; i<ctx->result_size; i++)
+        {
+            printf("%lx ", ctx->result[i]);
+        }
+        printf("\n");
     }
 #endif
 
@@ -1096,9 +1118,9 @@ extern int _opcode_bn254_curve_add(uint64_t * address)
     if (emu_verbose)
     {
 #ifdef ASM_CALL_METRICS
-        printf("_opcode_bn254_curve_add() calling AddPointEcP() counter=%lu address=%p p1_address=%p p2_address=%p\n", asm_call_metrics.bn254_curve_add_counter, address, p1, p2);
+        printf("_opcode_bn254_curve_add() calling BN254CurveAddP() counter=%lu address=%p p1_address=%p p2_address=%p\n", asm_call_metrics.bn254_curve_add_counter, address, p1, p2);
 #else
-        printf("_opcode_bn254_curve_add() calling AddPointEcP() address=%p p1_address=%p p2_address=%p\n", address, p1, p2);
+        printf("_opcode_bn254_curve_add() calling BN254CurveAddP() address=%p p1_address=%p p2_address=%p\n", address, p1, p2);
 #endif
         printf("p1.x = %lu:%lu:%lu:%lu = %lx:%lx:%lx:%lx\n", p1[3], p1[2], p1[1], p1[0], p1[3], p1[2], p1[1], p1[0]);
         printf("p1.y = %lu:%lu:%lu:%lu = %lx:%lx:%lx:%lx\n", p1[7], p1[6], p1[5], p1[4], p1[7], p1[6], p1[5], p1[4]);
@@ -1421,9 +1443,9 @@ extern int _opcode_bls12_381_curve_add(uint64_t * address)
     if (emu_verbose)
     {
 #ifdef ASM_CALL_METRICS
-        printf("_opcode_bls12_381_curve_add() calling AddPointEcP() counter=%lu address=%p p1_address=%p p2_address=%p\n", asm_call_metrics.bl12_381_curve_add_counter, address, p1, p2);
+        printf("_opcode_bls12_381_curve_add() calling BLS12_381CurveAddP() counter=%lu address=%p p1_address=%p p2_address=%p\n", asm_call_metrics.bl12_381_curve_add_counter, address, p1, p2);
 #else
-        printf("_opcode_bls12_381_curve_add() calling AddPointEcP() address=%p p1_address=%p p2_address=%p\n", address, p1, p2);
+        printf("_opcode_bls12_381_curve_add() calling BLS12_381CurveAddP() address=%p p1_address=%p p2_address=%p\n", address, p1, p2);
 #endif
         printf("p1.x = %lu:%lu:%lu:%lu:%lu:%lu = %lx:%lx:%lx:%lx:%lx:%lx\n", p1[5], p1[4], p1[3], p1[2], p1[1], p1[0], p1[5], p1[4], p1[3], p1[2], p1[1], p1[0]);
         printf("p1.y = %lu:%lu:%lu:%lu:%lu:%lu = %lx:%lx:%lx:%lx:%lx:%lx\n", p1[11], p1[10], p1[9], p1[8], p1[7], p1[6], p1[11], p1[10], p1[9], p1[8], p1[7], p1[6]);
