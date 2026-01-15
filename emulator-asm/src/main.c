@@ -22,6 +22,7 @@
 #include <arpa/inet.h>
 #include <netinet/tcp.h>
 #include <sys/file.h>
+#include <time.h>
 //#include <bits/local_lim.h>
 
 // Assembly-provided functions
@@ -344,6 +345,7 @@ char shmem_control_input_name[128];
 int shmem_control_input_fd = -1;
 uint64_t * shmem_control_input_address = NULL;
 volatile uint64_t * precompile_written_address = NULL;
+volatile uint64_t * precompile_exit_address = NULL;
 
 // Control output shared memory
 char shmem_control_output_name[128];
@@ -1829,6 +1831,7 @@ void client_setup (void)
         }
         shmem_control_input_address = (uint64_t *)pControl;
         precompile_written_address = &shmem_control_input_address[0];
+        precompile_exit_address = &shmem_control_input_address[1];
         if (verbose) printf("mmap(control_input) mapped %lu B and returned address %p in %lu us\n", CONTROL_INPUT_SIZE, shmem_control_input_address, duration);
 
         /*****************/
@@ -3437,6 +3440,7 @@ void server_setup (void)
         }
         shmem_control_input_address = (uint64_t *)pControl;
         precompile_written_address = &shmem_control_input_address[0];
+        precompile_exit_address = &shmem_control_input_address[1];
         if (verbose) printf("mmap(control_input) mapped %lu B and returned address %p in %lu us\n", CONTROL_INPUT_SIZE, shmem_control_input_address, duration);
 
         /******************/
@@ -4968,42 +4972,66 @@ int _wait_for_prec_avail (void)
     }
 
     // Wait again, but blocking this time
-    // printf("_wait_for_prec_avail() calling sem_wait precompile_written_address=%lu precompile_read_address=%lu\n", *precompile_written_address, *precompile_read_address);
-
-    int result = sem_wait(sem_prec_avail);
-    // printf("_wait_for_prec_avail() called sem_wait precompile_written_address=%lu precompile_read_address=%lu\n", *precompile_written_address, *precompile_read_address);
-    if (result == -1)
+    while (true)
     {
-        printf("ERROR: wait_for_prec_avail() failed calling sem_wait(%s) errno=%d=%s\n", sem_prec_avail_name, errno, strerror(errno));
-        fflush(stdout);
-        fflush(stderr);
-        exit(-1);
+        struct timespec ts;
+        int result = clock_gettime(CLOCK_REALTIME, &ts);
+        if (result == -1)
+        {
+            printf("ERROR: wait_for_prec_avail() failed calling clock_gettime() errno=%d=%s\n", errno, strerror(errno));
+            fflush(stdout);
+            fflush(stderr);
+            exit(-1);
+        }
+        ts.tv_sec += 5; // 5 seconds timeout
+
+        //printf("_wait_for_prec_avail() calling sem_wait precompile_written_address=%lu precompile_read_address=%lu\n", *precompile_written_address, *precompile_read_address);
+        result = sem_timedwait(sem_prec_avail, &ts);
+        //printf("_wait_for_prec_avail() called sem_wait precompile_written_address=%lu precompile_read_address=%lu\n", *precompile_written_address, *precompile_read_address);
+        if ((result == -1) && (errno != ETIMEDOUT))
+        {
+            printf("ERROR: wait_for_prec_avail() failed calling sem_wait(%s) errno=%d=%s\n", sem_prec_avail_name, errno, strerror(errno));
+            fflush(stdout);
+            fflush(stderr);
+            exit(-1);
+        }
+        if (*precompile_exit_address != 0)
+        {
+            printf("ERROR: wait_for_prec_avail() found precompile_exit_address=%lu\n", *precompile_exit_address);
+            fflush(stdout);
+            fflush(stderr);
+            exit(-1);
+        }
+        if (*precompile_written_address > *precompile_read_address)
+        {
+            return 0;
+        }
     }
 
-    // Wait for control input shared memory to synchronize
-    uint64_t written;
-    uint64_t read;
-    for (uint64_t i=0; i<CONTROL_NUMBER_OF_RETRIES; i++)
-    {
-        written = *precompile_written_address;
-        read = *precompile_read_address;
+    // // Wait for control input shared memory to synchronize
+    // uint64_t written;
+    // uint64_t read;
+    // for (uint64_t i=0; i<CONTROL_NUMBER_OF_RETRIES; i++)
+    // {
+    //     written = *precompile_written_address;
+    //     read = *precompile_read_address;
 
-        // When some data is available, exit the loop
-        if (written != read) break;
+    //     // When some data is available, exit the loop
+    //     if (written != read) break;
 
-        // Retry
-        //printf("WARNING: wait_for_prec_avail() found written=%lu == read=%lu i=%lu retrying...\n", written, read, i);
-        usleep(CONTROL_RETRY_DELAY_US);
-    }
+    //     // Retry
+    //     //printf("WARNING: wait_for_prec_avail() found written=%lu == read=%lu i=%lu retrying...\n", written, read, i);
+    //     usleep(CONTROL_RETRY_DELAY_US);
+    // }
 
-    // Check if some data is available
-    if (written == read)
-    {
-        printf("ERROR: wait_for_prec_avail() found written=%lu == read=%lu\n", written, read);
-        fflush(stdout);
-        fflush(stderr);
-        exit(-1);
-    }
+    // // Check if some data is available
+    // if (written == read)
+    // {
+    //     printf("ERROR: wait_for_prec_avail() found written=%lu == read=%lu\n", written, read);
+    //     fflush(stdout);
+    //     fflush(stderr);
+    //     exit(-1);
+    // }
 
     return 0;
 }
