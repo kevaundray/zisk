@@ -105,6 +105,10 @@ impl ZiskVerifyConstraints {
 
         let hints_stream = StreamSource::from_uri(self.hints.as_deref())?;
 
+        if matches!(hints_stream, StreamSource::Quic(_)) {
+            return Err(anyhow::anyhow!("QUIC hints source is not supported for execution."));
+        }
+
         let emulator = if cfg!(target_os = "macos") {
             if !self.emulator {
                 warn!("Emulator mode is forced on macOS due to lack of ASM support.");
