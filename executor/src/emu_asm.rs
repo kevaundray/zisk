@@ -59,7 +59,7 @@ impl EmulatorAsm {
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         zisk_rom: Arc<ZiskRom>,
-        asm_path: Option<PathBuf>,
+        _asm_path: Option<PathBuf>,
         world_rank: i32,
         local_rank: i32,
         base_port: Option<u16>,
@@ -67,7 +67,11 @@ impl EmulatorAsm {
         chunk_size: u64,
         rom_sm: Option<Arc<RomSM>>,
     ) -> Self {
-        let (asm_shmem_mt, asm_shmem_mo) = if asm_path.is_some() {
+        #[cfg(not(all(target_os = "linux", target_arch = "x86_64")))]
+        let (asm_shmem_mt, asm_shmem_mo) = (None, None);
+
+        #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
+        let (asm_shmem_mt, asm_shmem_mo) = if _asm_path.is_some() {
             let mt = PreloadedMT::new(local_rank, base_port, unlock_mapped_memory)
                 .expect("Failed to create PreloadedMT");
             let mo = PreloadedMO::new(local_rank, base_port, unlock_mapped_memory)
