@@ -89,6 +89,8 @@ impl<F: PrimeField64> WitnessLibrary<F> for WitnessLib<F> {
     /// # Panics
     /// Panics if the `Riscv2zisk` conversion fails or if required paths cannot be resolved.
     fn register_witness(&mut self, wcm: &WitnessManager<F>) -> ProofmanResult<()> {
+        assert_eq!(self.asm_mt_path.is_some(), self.asm_rh_path.is_some());
+
         let world_rank = wcm.get_world_rank();
         let local_rank = wcm.get_local_rank();
 
@@ -165,8 +167,6 @@ impl<F: PrimeField64> WitnessLibrary<F> for WitnessLib<F> {
                 ),
             ],
         );
-
-        assert_eq!(self.asm_mt_path.is_some(), self.asm_rh_path.is_some());
 
         let is_asm_emulator = self.asm_mt_path.is_some();
         let emulator = if is_asm_emulator {
