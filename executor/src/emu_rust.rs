@@ -37,14 +37,22 @@ impl EmulatorRust {
         Self { zisk_rom, chunk_size }
     }
 
-    /// Computes minimal traces by processing the ZisK ROM with given public inputs.
+    /// Computes minimal traces by processing the ZisK ROM with the given public inputs.
     ///
     /// # Arguments
-    /// * `input_data` - Input data for the ROM execution.
-    /// * `num_threads` - Number of threads to use for parallel execution.
+    /// * `stdin` - Shared standard input source used to feed data into the emulator.
+    /// * `_pctx` - Proof context carrying field-parameterized configuration for execution.
+    /// * `sm_bundle` - Static state machine bundle used for counting device metrics.
+    /// * `_stats` - Handle to executor statistics collection.
+    /// * `_caller_stats_id` - Identifier used to associate collected statistics with the caller.
     ///
     /// # Returns
-    /// A vector of `EmuTrace` instances representing minimal traces.
+    /// A tuple containing:
+    /// * `MinimalTraces` - The minimal traces produced by the emulator.
+    /// * `DeviceMetricsList` - Metrics for primary devices.
+    /// * `NestedDeviceMetricsList` - Metrics for secondary/nested devices.
+    /// * `None`.
+    /// * `ZiskExecutionResult` - Summary of the emulator execution, including the total number of steps.
     pub fn execute<F: PrimeField64>(
         &self,
         stdin: &Mutex<ZiskStdin>,

@@ -99,11 +99,19 @@ impl EmulatorAsm {
     /// Computes minimal traces by processing the ZisK ROM with given public inputs.
     ///
     /// # Arguments
-    /// * `input_data` - Input data for the ROM execution.
-    /// * `num_threads` - Number of threads to use for parallel execution.
+    /// * `stdin` - Shared mutable access to the ZiskStdin providing public inputs.
+    /// * `pctx` - Proof context used during execution.
+    /// * `sm_bundle` - Static shared-memory bundle used by the executor.
+    /// * `stats` - Handle for collecting executor statistics.
+    /// * `_caller_stats_id` - Identifier used to attribute collected statistics to the caller.
     ///
     /// # Returns
-    /// A vector of `EmuTrace` instances representing minimal traces.
+    /// A tuple containing:
+    /// * `MinimalTraces` - The computed minimal traces.
+    /// * `DeviceMetricsList` - Flat device metrics collected during execution.
+    /// * `NestedDeviceMetricsList` - Hierarchical device metrics collected during execution.
+    /// * `Option<JoinHandle<AsmRunnerMO>>` - Optional join handle for the memory-only ASM runner.
+    /// * `ZiskExecutionResult` - The result of executing the ZisK ROM.
     #[allow(clippy::type_complexity)]
     pub fn execute<F: PrimeField64>(
         &self,
