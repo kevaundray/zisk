@@ -5,7 +5,9 @@ use std::{
     thread::JoinHandle,
 };
 
-use crate::{DeviceMetricsByChunk, DummyCounter, StaticSMBundle, ZiskExecutor};
+use crate::{
+    DeviceMetricsList, DummyCounter, NestedDeviceMetricsList, StaticSMBundle, ZiskExecutor,
+};
 use asm_runner::{
     write_input, AsmMTHeader, AsmRunnerMO, AsmRunnerMT, AsmRunnerRH, AsmServices, AsmSharedMemory,
     MinimalTraces, PreloadedMO, PreloadedMT, PreloadedRH, SharedMemoryWriter, Task, TaskFactory,
@@ -21,9 +23,6 @@ use zisk_common::{
 };
 use zisk_core::{ZiskRom, MAX_INPUT_SIZE};
 use ziskemu::ZiskEmulator;
-
-pub type DeviceMetricsList = Vec<DeviceMetricsByChunk>;
-pub type NestedDeviceMetricsList = HashMap<usize, DeviceMetricsList>;
 
 pub struct EmulatorAsm {
     /// ZisK ROM, a binary file containing the ZisK program to be executed.
@@ -392,9 +391,5 @@ impl<F: PrimeField64> crate::Emulator<F> for EmulatorAsm {
         ZiskExecutionResult,
     ) {
         self.execute(stdin, pctx, sm_bundle, stats, caller_stats_id)
-    }
-
-    fn is_asm_emulator(&self) -> bool {
-        true
     }
 }

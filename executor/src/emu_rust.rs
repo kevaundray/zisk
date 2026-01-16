@@ -18,8 +18,7 @@ use zisk_core::ZiskRom;
 use ziskemu::{EmuOptions, ZiskEmulator};
 
 use crate::{
-    emu_asm::{DeviceMetricsList, NestedDeviceMetricsList},
-    DummyCounter, StaticSMBundle, ZiskExecutor,
+    DeviceMetricsList, DummyCounter, NestedDeviceMetricsList, StaticSMBundle, ZiskExecutor,
 };
 
 pub struct EmulatorRust {
@@ -191,9 +190,5 @@ impl<F: PrimeField64> crate::Emulator<F> for EmulatorRust {
         ZiskExecutionResult,
     ) {
         self.execute(stdin, pctx, sm_bundle, stats, caller_stats_id)
-    }
-
-    fn is_asm_emulator(&self) -> bool {
-        false
     }
 }

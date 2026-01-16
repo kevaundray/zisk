@@ -24,13 +24,11 @@ use fields::PrimeField64;
 use pil_std_lib::Std;
 use proofman_common::{create_pool, BufferPool, ProofCtx, ProofmanResult, SetupCtx};
 use proofman_util::{timer_start_info, timer_stop_and_log_info};
-use sm_rom::{RomInstance, RomSM};
+use sm_rom::RomInstance;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use witness::WitnessComponent;
 use zisk_common::io::ZiskStdin;
 
-use crate::emu_asm::EmulatorAsm;
-use crate::emu_rust::EmulatorRust;
 use data_bus::DataBusTrait;
 use sm_main::{MainInstance, MainPlanner, MainSM};
 use zisk_common::ChunkId;
@@ -46,7 +44,6 @@ use zisk_pil::{
 use std::time::Instant;
 use std::{
     collections::HashMap,
-    path::PathBuf,
     sync::{Arc, Mutex, RwLock},
 };
 #[cfg(feature = "stats")]
@@ -58,7 +55,7 @@ use zisk_common::EmuTrace;
 use zisk_core::ZiskRom;
 use ziskemu::ZiskEmulator;
 
-use crate::{Emulator, StaticSMBundle};
+use crate::{Emulator, EmulatorKind, StaticSMBundle};
 
 pub type DeviceMetricsByChunk = (ChunkId, Box<dyn BusDeviceMetrics>); // (chunk_id, metrics)
 
@@ -71,7 +68,14 @@ enum MinimalTraceExecutionMode {
 /// The `ZiskExecutor` struct orchestrates the execution of the ZisK ROM program, managing state
 /// machines, planning, and witness computation.
 pub struct ZiskExecutor<F: PrimeField64> {
+    /// Standard input for the ZisK program execution.
     stdin: Mutex<ZiskStdin>,
+
+    /// The emulator backend used for execution.
+    emulator: EmulatorKind,
+
+    /// Chunk size for processing.
+    chunk_size: u64,
 
     /// ZisK ROM, a binary file containing the ZisK program to be executed.
     zisk_rom: Arc<ZiskRom>,
@@ -104,10 +108,6 @@ pub struct ZiskExecutor<F: PrimeField64> {
 
     /// Statistics collected during the execution, including time taken for collection and witness computation.
     stats: ExecutorStatsHandle,
-
-    chunk_size: u64,
-
-    emulator: Box<dyn Emulator<F>>,
 }
 
 impl<F: PrimeField64> ZiskExecutor<F> {
@@ -120,39 +120,16 @@ impl<F: PrimeField64> ZiskExecutor<F> {
     /// * `zisk_rom` - An `Arc`-wrapped ZisK ROM instance.
     #[allow(clippy::too_many_arguments)]
     pub fn new(
-        asm_mt_path: Option<PathBuf>,
-        asm_rh_path: Option<PathBuf>,
         zisk_rom: Arc<ZiskRom>,
         std: Arc<Std<F>>,
         sm_bundle: StaticSMBundle<F>,
-        rom_sm: Option<Arc<RomSM>>,
         chunk_size: u64,
-        world_rank: i32,
-        local_rank: i32,
-        base_port: Option<u16>,
-        unlock_mapped_memory: bool,
+        emulator: EmulatorKind,
     ) -> Self {
-        assert_eq!(asm_mt_path.is_some(), asm_rh_path.is_some());
-
-        let is_asm_emulator = asm_mt_path.is_some();
-
-        let emulator: Box<dyn Emulator<F>> = if is_asm_emulator {
-            Box::new(EmulatorAsm::new(
-                zisk_rom.clone(),
-                asm_mt_path.clone(),
-                world_rank,
-                local_rank,
-                base_port,
-                unlock_mapped_memory,
-                chunk_size,
-                rom_sm.clone(),
-            ))
-        } else {
-            Box::new(EmulatorRust::new(zisk_rom.clone(), chunk_size))
-        };
-
         Self {
             stdin: Mutex::new(ZiskStdin::null()),
+            emulator,
+            chunk_size,
             zisk_rom,
             min_traces: Arc::new(RwLock::new(MinimalTraces::None)),
             secn_planning: RwLock::new(Vec::new()),
@@ -163,8 +140,6 @@ impl<F: PrimeField64> ZiskExecutor<F> {
             execution_result: Mutex::new(ZiskExecutionResult::default()),
             sm_bundle,
             stats: ExecutorStatsHandle::new(),
-            chunk_size,
-            emulator,
         }
     }
 
