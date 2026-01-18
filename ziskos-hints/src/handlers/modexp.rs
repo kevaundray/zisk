@@ -1,18 +1,13 @@
-use crate::{handlers::validate_hint_length, zisklib};
+use crate::{
+    handlers::{read_field, validate_hint_length},
+    zisklib,
+};
 
-/// Read a length-prefixed field from hint data
-#[inline]
-fn read_field<'a>(data: &'a [u64], pos: &mut usize) -> Result<&'a [u64], String> {
-    let len = *data.get(*pos).ok_or("MODEXP hint data too short")? as usize;
-    *pos += 1;
-    let field = data.get(*pos..*pos + len).ok_or("MODEXP hint data too short")?;
-    *pos += len;
-    Ok(field)
-}
+use anyhow::Result;
 
-// Processes a MODEXP hint.
+// Processes a `MODEXP` hint.
 #[inline]
-pub fn modexp_hint(data: &[u64]) -> Result<Vec<u64>, String> {
+pub fn modexp_hint(data: &[u64]) -> Result<Vec<u64>> {
     let mut pos = 0;
     let base = read_field(data, &mut pos)?;
     let exp = read_field(data, &mut pos)?;

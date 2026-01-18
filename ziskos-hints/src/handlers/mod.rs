@@ -1,14 +1,8 @@
-mod bigint256;
-mod bls318;
-mod bn254;
-mod modexp;
-mod secp256k1;
-
-pub use bigint256::*;
-pub use bls318::*;
-pub use bn254::*;
-pub use modexp::*;
-pub use secp256k1::*;
+pub mod bigint256;
+pub mod bls318;
+pub mod bn254;
+pub mod modexp;
+pub mod secp256k1;
 
 /// Macro to generate size, offset, and expected length constants for hint data fields.
 ///
@@ -54,6 +48,20 @@ macro_rules! hint_fields {
     };
 }
 
+/// Read a length-prefixed field from hint data
+#[inline]
+fn read_field<'a>(data: &'a [u64], pos: &mut usize) -> anyhow::Result<&'a [u64]> {
+    let len =
+        *data.get(*pos).ok_or("MODEXP hint data too short").map_err(anyhow::Error::msg)? as usize;
+    *pos += 1;
+    let field = data
+        .get(*pos..*pos + len)
+        .ok_or("MODEXP hint data too short")
+        .map_err(anyhow::Error::msg)?;
+    *pos += len;
+    Ok(field)
+}
+
 /// Validates that the hint data has the expected length.
 ///
 /// # Arguments
@@ -65,16 +73,16 @@ macro_rules! hint_fields {
 /// # Returns
 ///
 /// * `Ok(())` - If the length is correct
-/// * `Err(String)` - If the length is incorrect
+/// * `Err(anyhow::Error)` - If the length is incorrect
 #[inline]
-fn validate_hint_length(data: &[u64], expected_len: usize, hint_name: &str) -> Result<(), String> {
+fn validate_hint_length(data: &[u64], expected_len: usize, hint_name: &str) -> anyhow::Result<()> {
     if data.len() != expected_len {
-        return Err(format!(
+        anyhow::bail!(
             "Invalid {} hint length: expected {}, got {}",
             hint_name,
             expected_len,
-            data.len()
-        ));
+            data.len(),
+        );
     }
     Ok(())
 }

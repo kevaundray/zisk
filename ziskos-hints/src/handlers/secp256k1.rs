@@ -2,9 +2,11 @@ use crate::handlers::validate_hint_length;
 use crate::hint_fields;
 use crate::zisklib;
 
-// Processes a SECP256K1_FN_REDUCE hint.
+use anyhow::Result;
+
+// Processes a `SECP256K1_FN_REDUCE`` hint.
 #[inline]
-pub fn secp256k1_fn_reduce_hint(data: &[u64]) -> Result<Vec<u64>, String> {
+pub fn secp256k1_fn_reduce_hint(data: &[u64]) -> Result<Vec<u64>> {
     hint_fields![X: 4];
 
     validate_hint_length(data, EXPECTED_LEN, "SECP256K1_FN_REDUCE")?;
@@ -17,9 +19,9 @@ pub fn secp256k1_fn_reduce_hint(data: &[u64]) -> Result<Vec<u64>, String> {
     Ok(hints)
 }
 
-// Processes a SECP256K1_FN_ADD hint.
+// Processes a `SECP256K1_FN_ADD` hint.
 #[inline]
-pub fn secp256k1_fn_add_hint(data: &[u64]) -> Result<Vec<u64>, String> {
+pub fn secp256k1_fn_add_hint(data: &[u64]) -> Result<Vec<u64>> {
     hint_fields![X: 4, Y: 4];
 
     validate_hint_length(data, EXPECTED_LEN, "SECP256K1_FN_ADD")?;
@@ -33,9 +35,9 @@ pub fn secp256k1_fn_add_hint(data: &[u64]) -> Result<Vec<u64>, String> {
     Ok(hints)
 }
 
-// Processes a SECP256K1_FN_NEG hint.
+// Processes a `SECP256K1_FN_NEG`` hint.
 #[inline]
-pub fn secp256k1_fn_neg_hint(data: &[u64]) -> Result<Vec<u64>, String> {
+pub fn secp256k1_fn_neg_hint(data: &[u64]) -> Result<Vec<u64>> {
     hint_fields![X: 4];
 
     validate_hint_length(data, EXPECTED_LEN, "SECP256K1_FN_NEG")?;
@@ -48,9 +50,9 @@ pub fn secp256k1_fn_neg_hint(data: &[u64]) -> Result<Vec<u64>, String> {
     Ok(hints)
 }
 
-// Processes a SECP256K1_FN_SUB hint.
+// Processes a `SECP256K1_FN_SUB`` hint.
 #[inline]
-pub fn secp256k1_fn_sub_hint(data: &[u64]) -> Result<Vec<u64>, String> {
+pub fn secp256k1_fn_sub_hint(data: &[u64]) -> Result<Vec<u64>> {
     hint_fields![X: 4, Y: 4];
 
     validate_hint_length(data, EXPECTED_LEN, "SECP256K1_FN_SUB")?;
@@ -64,9 +66,9 @@ pub fn secp256k1_fn_sub_hint(data: &[u64]) -> Result<Vec<u64>, String> {
     Ok(hints)
 }
 
-// Processes a SECP256K1_FN_MUL hint.
+// Processes a `SECP256K1_FN_MUL`` hint.
 #[inline]
-pub fn secp256k1_fn_mul_hint(data: &[u64]) -> Result<Vec<u64>, String> {
+pub fn secp256k1_fn_mul_hint(data: &[u64]) -> Result<Vec<u64>> {
     hint_fields![X: 4, Y: 4];
 
     validate_hint_length(data, EXPECTED_LEN, "SECP256K1_FN_MUL")?;
@@ -80,9 +82,9 @@ pub fn secp256k1_fn_mul_hint(data: &[u64]) -> Result<Vec<u64>, String> {
     Ok(hints)
 }
 
-// Processes a SECP256K1_FN_INV hint.
+// Processes a `SECP256K1_FN_INV`` hint.
 #[inline]
-pub fn secp256k1_fn_inv_hint(data: &[u64]) -> Result<Vec<u64>, String> {
+pub fn secp256k1_fn_inv_hint(data: &[u64]) -> Result<Vec<u64>> {
     hint_fields![X: 4];
 
     validate_hint_length(data, EXPECTED_LEN, "SECP256K1_FN_INV")?;
@@ -95,9 +97,9 @@ pub fn secp256k1_fn_inv_hint(data: &[u64]) -> Result<Vec<u64>, String> {
     Ok(hints)
 }
 
-// Processes a SECP256K1_FP_REDUCE hint.
+// Processes a `SECP256K1_FP_REDUCE`` hint.
 #[inline]
-pub fn secp256k1_fp_reduce_hint(data: &[u64]) -> Result<Vec<u64>, String> {
+pub fn secp256k1_fp_reduce_hint(data: &[u64]) -> Result<Vec<u64>> {
     hint_fields![X: 4];
 
     validate_hint_length(data, EXPECTED_LEN, "SECP256K1_FP_REDUCE")?;
@@ -110,9 +112,9 @@ pub fn secp256k1_fp_reduce_hint(data: &[u64]) -> Result<Vec<u64>, String> {
     Ok(hints)
 }
 
-// Processes a SECP256K1_FP_ADD hint.
+// Processes a `SECP256K1_FP_ADD` hint.
 #[inline]
-pub fn secp256k1_fp_add_hint(data: &[u64]) -> Result<Vec<u64>, String> {
+pub fn secp256k1_fp_add_hint(data: &[u64]) -> Result<Vec<u64>> {
     hint_fields![X: 4, Y: 4];
 
     validate_hint_length(data, EXPECTED_LEN, "SECP256K1_FP_ADD")?;
@@ -126,9 +128,9 @@ pub fn secp256k1_fp_add_hint(data: &[u64]) -> Result<Vec<u64>, String> {
     Ok(hints)
 }
 
-// Processes a SECP256K1_FP_NEGATE hint.
+// Processes a `SECP256K1_FP_NEGATE` hint.
 #[inline]
-pub fn secp256k1_fp_negate_hint(data: &[u64]) -> Result<Vec<u64>, String> {
+pub fn secp256k1_fp_negate_hint(data: &[u64]) -> Result<Vec<u64>> {
     hint_fields![X: 4];
 
     validate_hint_length(data, EXPECTED_LEN, "SECP256K1_FP_NEGATE")?;
@@ -141,9 +143,9 @@ pub fn secp256k1_fp_negate_hint(data: &[u64]) -> Result<Vec<u64>, String> {
     Ok(hints)
 }
 
-// Processes a SECP256K1_FP_MUL hint.
+// Processes a `SECP256K1_FP_MUL`` hint.
 #[inline]
-pub fn secp256k1_fp_mul_hint(data: &[u64]) -> Result<Vec<u64>, String> {
+pub fn secp256k1_fp_mul_hint(data: &[u64]) -> Result<Vec<u64>> {
     hint_fields![X: 4, Y: 4];
 
     validate_hint_length(data, EXPECTED_LEN, "SECP256K1_FP_MUL")?;
@@ -157,9 +159,9 @@ pub fn secp256k1_fp_mul_hint(data: &[u64]) -> Result<Vec<u64>, String> {
     Ok(hints)
 }
 
-// Processes a SECP256K1_FP_MUL_SCALAR hint.
+// Processes a `SECP256K1_FP_MUL_SCALAR` hint.
 #[inline]
-pub fn secp256k1_fp_mul_scalar_hint(data: &[u64]) -> Result<Vec<u64>, String> {
+pub fn secp256k1_fp_mul_scalar_hint(data: &[u64]) -> Result<Vec<u64>> {
     hint_fields![X: 4, SCALAR: 1];
 
     validate_hint_length(data, EXPECTED_LEN, "SECP256K1_FP_MUL_SCALAR")?;
@@ -173,9 +175,9 @@ pub fn secp256k1_fp_mul_scalar_hint(data: &[u64]) -> Result<Vec<u64>, String> {
     Ok(hints)
 }
 
-// Processes a SECP256K1_TO_AFFINE hint.
+// Processes a `SECP256K1_TO_AFFINE` hint.
 #[inline]
-pub fn secp256k1_to_affine_hint(data: &[u64]) -> Result<Vec<u64>, String> {
+pub fn secp256k1_to_affine_hint(data: &[u64]) -> Result<Vec<u64>> {
     hint_fields![P: 12];
 
     validate_hint_length(data, EXPECTED_LEN, "SECP256K1_TO_AFFINE")?;
@@ -188,9 +190,9 @@ pub fn secp256k1_to_affine_hint(data: &[u64]) -> Result<Vec<u64>, String> {
     Ok(hints)
 }
 
-// Processes a SECP256K1_DECOMPRESS hint.
+// Processes a `SECP256K1_DECOMPRESS` hint.
 #[inline]
-pub fn secp256k1_decompress_hint(data: &[u64]) -> Result<Vec<u64>, String> {
+pub fn secp256k1_decompress_hint(data: &[u64]) -> Result<Vec<u64>> {
     hint_fields![X_BYTES: 4, Y_IS_ODD: 1];
 
     validate_hint_length(data, EXPECTED_LEN, "SECP256K1_DECOMPRESS")?;
@@ -200,15 +202,14 @@ pub fn secp256k1_decompress_hint(data: &[u64]) -> Result<Vec<u64>, String> {
     let y_is_odd = (data[Y_IS_ODD_OFFSET] >> 56) != 0;
 
     let mut hints = Vec::new();
-    zisklib::secp256k1_decompress(x, y_is_odd, &mut hints)
-        .map_err(|e| format!("secp256k1_decompress failed: {}", e))?;
+    zisklib::secp256k1_decompress(x, y_is_odd, &mut hints).map_err(anyhow::Error::msg)?;
 
     Ok(hints)
 }
 
-// Processes a SECP256K1_DOUBLE_SCALAR_MUL_WITH_G hint.
+// Processes a `SECP256K1_DOUBLE_SCALAR_MUL_WITH_G` hint.
 #[inline]
-pub fn secp256k1_double_scalar_mul_with_g_hint(data: &[u64]) -> Result<Vec<u64>, String> {
+pub fn secp256k1_double_scalar_mul_with_g_hint(data: &[u64]) -> Result<Vec<u64>> {
     hint_fields![K1: 4, K2: 4, P: 8];
 
     validate_hint_length(data, EXPECTED_LEN, "SECP256K1_DOUBLE_SCALAR_MUL_WITH_G")?;
@@ -223,9 +224,9 @@ pub fn secp256k1_double_scalar_mul_with_g_hint(data: &[u64]) -> Result<Vec<u64>,
     Ok(hints)
 }
 
-/// Processes an ECDSA_VERIFY hint.
+/// Processes an `SECP256K1_ECDSA_VERIFY` hint.
 #[inline]
-pub fn secp256k1_ecdsa_verify_hint(data: &[u64]) -> Result<Vec<u64>, String> {
+pub fn secp256k1_ecdsa_verify_hint(data: &[u64]) -> Result<Vec<u64>> {
     hint_fields![PK: 8, Z: 4, R: 4, S: 4];
 
     validate_hint_length(data, EXPECTED_LEN, "SECP256K1_ECDSA_VERIFY")?;

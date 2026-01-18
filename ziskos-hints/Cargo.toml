@@ -33,8 +33,10 @@ serde = { workspace = true, features = ["derive"] }
 bincode = "2.0"
 paste = "1.0"
 
+# zisk-os specific dependencies
 elliptic-curve = "0.13.8"
 k256 = "0.13.4"
+anyhow = { workspace = true }
 
 [features]
 default = ["hints"]

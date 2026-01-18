@@ -6223,6 +6223,7 @@ dependencies = [
 name = "ziskos-hints"
 version = "0.16.0"
 dependencies = [
+ "anyhow",
  "bincode",
  "cfg-if",
  "elliptic-curve",
