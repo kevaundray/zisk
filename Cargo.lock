@@ -1332,6 +1332,7 @@ dependencies = [
 name = "executor"
 version = "0.16.0"
 dependencies = [
+ "anyhow",
  "asm-runner",
  "crossbeam",
  "data-bus",
@@ -4026,6 +4027,7 @@ dependencies = [
 name = "sm-rom"
 version = "0.16.0"
 dependencies = [
+ "anyhow",
  "asm-runner",
  "fields",
  "itertools 0.14.0",
