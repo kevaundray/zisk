@@ -52,6 +52,7 @@ pub use shmem_reader::*;
 pub use shmem_utils::*;
 pub use shmem_writer::*;
 
+#[cfg(all(target_os = "linux", target_arch = "x86_64"))]
 const SEM_CHUNK_DONE_WAIT_DURATION: std::time::Duration = std::time::Duration::from_secs(10);
 
 fn build_name(
