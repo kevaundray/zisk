@@ -74,7 +74,7 @@ impl ZiskStream {
     ///
     /// # Arguments
     /// * `stream` - The new StreamSource source for reading hints.
-    pub fn set_hints_stream(&mut self, mut stream: StreamSource) -> Result<()> {
+    pub fn set_hints_stream_src(&mut self, mut stream: StreamSource) -> Result<()> {
         if !stream.is_active() {
             // Stop the existing thread if running
             self.stop_thread();

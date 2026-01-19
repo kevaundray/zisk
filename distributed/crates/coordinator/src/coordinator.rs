@@ -765,7 +765,7 @@ impl Coordinator {
                 job.job_id, e
             ))
         })?;
-        stream.set_hints_stream(stream_reader).map_err(|e| {
+        stream.set_hints_stream_src(stream_reader).map_err(|e| {
             CoordinatorError::Internal(format!(
                 "Failed to set hints stream for job {}: {}",
                 job.job_id, e

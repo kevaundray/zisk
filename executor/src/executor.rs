@@ -156,9 +156,9 @@ impl<F: PrimeField64> ZiskExecutor<F> {
         *guard = stdin;
     }
 
-    pub fn set_hints_stream(&self, stream: StreamSource) -> Result<()> {
+    pub fn set_hints_stream_src(&self, stream: StreamSource) -> Result<()> {
         if let Some(hints_stream) = self.hints_stream.lock().unwrap().as_mut() {
-            hints_stream.set_hints_stream(stream)
+            hints_stream.set_hints_stream_src(stream)
         } else {
             Err(anyhow::anyhow!("No hints stream configured"))
         }
