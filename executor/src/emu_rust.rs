@@ -54,7 +54,7 @@ impl EmulatorRust {
     /// * `None`.
     /// * `ZiskExecutionResult` - Summary of the emulator execution, including the total number of steps.
     pub fn execute<F: PrimeField64>(
-        &self,
+        &mut self,
         stdin: &Mutex<ZiskStdin>,
         _pctx: &ProofCtx<F>,
         sm_bundle: &StaticSMBundle<F>,
@@ -184,7 +184,7 @@ impl EmulatorRust {
 
 impl<F: PrimeField64> crate::Emulator<F> for EmulatorRust {
     fn execute(
-        &self,
+        &mut self,
         stdin: &Mutex<ZiskStdin>,
         pctx: &ProofCtx<F>,
         sm_bundle: &StaticSMBundle<F>,

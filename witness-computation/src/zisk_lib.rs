@@ -23,6 +23,7 @@ use sm_binary::BinarySM;
 use sm_mem::Mem;
 use sm_rom::RomSM;
 use std::{collections::HashMap, path::PathBuf, sync::Arc};
+use tracing::debug;
 use witness::{WitnessLibrary, WitnessManager};
 use zisk_common::{
     io::{ZiskStdin, ZiskStream},
@@ -177,9 +178,10 @@ impl<F: PrimeField64> WitnessLibrary<F> for WitnessLib<F> {
 
         let is_asm_emulator = self.asm_mt_path.is_some();
         let emulator = if is_asm_emulator {
+            debug!("Using ASM emulator");
             EmulatorKind::Asm(EmulatorAsm::new(
                 zisk_rom.clone(),
-                self.asm_mt_path.clone(),
+                self.asm_mt_path.as_ref().unwrap().clone(),
                 world_rank,
                 local_rank,
                 self.base_port,
@@ -188,6 +190,7 @@ impl<F: PrimeField64> WitnessLibrary<F> for WitnessLib<F> {
                 Some(rom_sm.clone()),
             ))
         } else {
+            debug!("Using Rust emulator");
             EmulatorKind::Rust(EmulatorRust::new(zisk_rom.clone(), self.chunk_size))
         };
 

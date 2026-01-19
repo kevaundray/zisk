@@ -78,7 +78,7 @@ pub struct ZiskExecutor<F: PrimeField64> {
     stdin: Mutex<ZiskStdin>,
 
     /// The emulator backend used for execution.
-    emulator: EmulatorKind,
+    emulator: Mutex<EmulatorKind>,
 
     /// Chunk size for processing.
     chunk_size: u64,
@@ -138,7 +138,7 @@ impl<F: PrimeField64> ZiskExecutor<F> {
     ) -> Self {
         Self {
             stdin: Mutex::new(ZiskStdin::null()),
-            emulator,
+            emulator: Mutex::new(emulator),
             chunk_size,
             hints_stream: Mutex::new(hints_stream),
             zisk_rom,
@@ -757,7 +757,7 @@ impl<F: PrimeField64> WitnessComponent<F> for ZiskExecutor<F> {
         timer_start_info!(COMPUTE_MINIMAL_TRACE);
 
         let (min_traces, main_count, mut secn_count, handle_mo, execution_result) =
-            self.emulator.execute(
+            self.emulator.lock().unwrap().execute(
                 &self.stdin,
                 &pctx,
                 &self.sm_bundle,
@@ -961,6 +961,8 @@ impl<F: PrimeField64> WitnessComponent<F> for ZiskExecutor<F> {
         #[cfg(feature = "stats")]
         self.stats.add_stat(0, parent_stats_id, "CALCULATE_WITNESS", 0, ExecutorStatsEvent::Begin);
 
+        let is_asm_emulator = self.emulator.lock().unwrap().is_asm_emulator();
+
         let pool = create_pool(n_cores);
         pool.install(|| -> ProofmanResult<()> {
             for &global_id in global_ids {
@@ -986,7 +988,7 @@ impl<F: PrimeField64> WitnessComponent<F> for ZiskExecutor<F> {
                         InstanceType::Instance => {
                             if !self.collectors_by_instance.read().unwrap().contains_key(&global_id)
                             {
-                                if air_id == ROM_AIR_IDS[0] && self.emulator.is_asm_emulator() {
+                                if air_id == ROM_AIR_IDS[0] && is_asm_emulator {
                                     let stats = Stats {
                                         airgroup_id,
                                         air_id,
@@ -1069,6 +1071,8 @@ impl<F: PrimeField64> WitnessComponent<F> for ZiskExecutor<F> {
         }
         let secn_instances_guard = self.secn_instances.read().unwrap();
 
+        let is_asm_emulator = self.emulator.lock().unwrap().is_asm_emulator();
+
         let mut secn_instances = HashMap::new();
         for &global_id in global_ids {
             let (airgroup_id, air_id) =
@@ -1076,7 +1080,7 @@ impl<F: PrimeField64> WitnessComponent<F> for ZiskExecutor<F> {
             if MAIN_AIR_IDS.contains(&air_id) {
                 pctx.set_witness_ready(global_id, false);
             } else if air_id == ROM_AIR_IDS[0] {
-                if self.emulator.is_asm_emulator() {
+                if is_asm_emulator {
                     pctx.set_witness_ready(global_id, false);
                 } else {
                     let secn_instance = &secn_instances_guard[&global_id];

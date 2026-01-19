@@ -49,11 +49,15 @@ pub struct EmulatorAsm {
     /// Optional ROM state machine, used for assembly ROM execution.
     rom_sm: Option<Arc<RomSM>>,
 
-    asm_shmem_mt: Arc<Mutex<Option<PreloadedMT>>>,
-    asm_shmem_mo: Arc<Mutex<Option<PreloadedMO>>>,
+    #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
+    asm_shmem_mt: Arc<Mutex<PreloadedMT>>,
+    #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
+    asm_shmem_mo: Arc<Mutex<PreloadedMO>>,
+    #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
     asm_shmem_rh: Arc<Mutex<Option<PreloadedRH>>>,
 
     /// Shared memory writers for each assembly service.
+    #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
     shmem_input_writer: [Arc<Mutex<Option<SharedMemoryWriter>>>; AsmServices::SERVICES.len()],
 }
 
@@ -69,9 +73,6 @@ impl EmulatorAsm {
         chunk_size: u64,
         rom_sm: Option<Arc<RomSM>>,
     ) -> Self {
-        #[cfg(not(all(target_os = "linux", target_arch = "x86_64")))]
-        let (asm_shmem_mt, asm_shmem_mo) = (None, None);
-
         #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
         let asm_shmem_mt = PreloadedMT::new(local_rank, base_port, unlock_mapped_memory)
             .expect("Failed to create PreloadedMT");
@@ -87,9 +88,13 @@ impl EmulatorAsm {
             unlock_mapped_memory,
             chunk_size,
             rom_sm,
-            asm_shmem_mt: Arc::new(Mutex::new(Some(asm_shmem_mt))),
-            asm_shmem_mo: Arc::new(Mutex::new(Some(asm_shmem_mo))),
+            #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
+            asm_shmem_mt: Arc::new(Mutex::new(asm_shmem_mt)),
+            #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
+            asm_shmem_mo: Arc::new(Mutex::new(asm_shmem_mo)),
+            #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
             asm_shmem_rh: Arc::new(Mutex::new(None)),
+            #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
             shmem_input_writer: std::array::from_fn(|_| Arc::new(Mutex::new(None))),
         }
     }
@@ -112,7 +117,7 @@ impl EmulatorAsm {
     /// * `ZiskExecutionResult` - The result of executing the ZisK ROM.
     #[allow(clippy::type_complexity)]
     pub fn execute<F: PrimeField64>(
-        &self,
+        &mut self,
         stdin: &Mutex<ZiskStdin>,
         pctx: &ProofCtx<F>,
         sm_bundle: &StaticSMBundle<F>,
@@ -198,7 +203,7 @@ impl EmulatorAsm {
             let asm_shmem_mo = self.asm_shmem_mo.clone();
             move || {
                 AsmRunnerMO::run(
-                    asm_shmem_mo.lock().unwrap().as_mut().unwrap(),
+                    &mut asm_shmem_mo.lock().unwrap(),
                     ZiskExecutor::<F>::MAX_NUM_STEPS,
                     chunk_size,
                     world_rank,
@@ -339,7 +344,7 @@ impl EmulatorAsm {
             });
 
         let (asm_runner_mt, mut data_buses) = AsmRunnerMT::run_and_count(
-            self.asm_shmem_mt.lock().unwrap().as_mut().unwrap(),
+            &mut self.asm_shmem_mt.lock().unwrap(),
             ZiskExecutor::<F>::MAX_NUM_STEPS,
             self.chunk_size,
             task_factory,
@@ -381,7 +386,7 @@ impl EmulatorAsm {
 
 impl<F: PrimeField64> crate::Emulator<F> for EmulatorAsm {
     fn execute(
-        &self,
+        &mut self,
         stdin: &Mutex<ZiskStdin>,
         pctx: &ProofCtx<F>,
         sm_bundle: &StaticSMBundle<F>,
