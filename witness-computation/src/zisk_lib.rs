@@ -46,7 +46,7 @@ pub struct WitnessLib<F: PrimeField64> {
     elf_path: PathBuf,
     asm_mt_path: Option<PathBuf>,
     asm_rh_path: Option<PathBuf>,
-    executor: Option<Arc<ZiskExecutor<F>>>,
+    executor: Option<Arc<ZiskExecutor<F, HintsShmem>>>,
     chunk_size: u64,
     base_port: Option<u16>,
     unlock_mapped_memory: bool,

@@ -7,7 +7,7 @@ use std::thread::{self, JoinHandle};
 
 use crate::io::{StreamRead, StreamSource};
 
-pub trait StreamProcessor {
+pub trait StreamProcessor: Send + Sync + 'static {
     /// Process data and return the processed result along with a flag indicating if CTRL_END was encountered.
     ///
     /// # Returns
@@ -25,7 +25,7 @@ pub trait StreamProcessor {
 /// # Returns
 /// * `Ok(())` - If hints were successfully submitted
 /// * `Err` - If submission fails
-pub trait StreamSink {
+pub trait StreamSink: Send + Sync + 'static {
     fn submit(&self, processed: Vec<u64>) -> anyhow::Result<()>;
 }
 
@@ -35,7 +35,7 @@ enum ThreadCommand {
 }
 
 /// ZiskStream struct manages the processing of precompile hints and writing them to shared memory.
-pub struct ZiskStream<HP: StreamProcessor + Send + Sync + 'static> {
+pub struct ZiskStream<HP: StreamProcessor> {
     /// The hints processor used to process hints before writing.
     hints_processor: Arc<HP>,
 
@@ -46,7 +46,7 @@ pub struct ZiskStream<HP: StreamProcessor + Send + Sync + 'static> {
     thread_handle: Option<JoinHandle<()>>,
 }
 
-impl<HP: StreamProcessor + Send + Sync + 'static> ZiskStream<HP> {
+impl<HP: StreamProcessor> ZiskStream<HP> {
     /// Create a new ZiskStream with the given processor.
     ///
     /// # Arguments
@@ -154,7 +154,7 @@ impl<HP: StreamProcessor + Send + Sync + 'static> ZiskStream<HP> {
     }
 }
 
-impl<HP: StreamProcessor + Send + Sync> Drop for ZiskStream<HP> {
+impl<HP: StreamProcessor> Drop for ZiskStream<HP> {
     fn drop(&mut self) {
         self.stop_thread();
     }

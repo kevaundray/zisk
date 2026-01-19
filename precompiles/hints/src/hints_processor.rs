@@ -59,14 +59,14 @@ impl HintProcessorState {
 pub type CustomHintHandler = Arc<dyn Fn(&[u64]) -> Result<Vec<u64>> + Send + Sync>;
 
 /// Builder for configuring and constructing a [`HintsProcessor`].
-pub struct HintsProcessorBuilder<HS: StreamSink + Send + Sync + 'static> {
+pub struct HintsProcessorBuilder<HS: StreamSink> {
     hints_sink: HS,
     num_threads: usize,
     enable_stats: bool,
     custom_handlers: HashMap<u32, CustomHintHandler>,
 }
 
-impl<HS: StreamSink + Send + Sync + 'static> HintsProcessorBuilder<HS> {
+impl<HS: StreamSink> HintsProcessorBuilder<HS> {
     /// Sets the number of worker threads in the thread pool.
     pub fn num_threads(mut self, num_threads: usize) -> Self {
         self.num_threads = num_threads;
@@ -143,7 +143,7 @@ impl<HS: StreamSink + Send + Sync + 'static> HintsProcessorBuilder<HS> {
 /// This struct provides methods to parse and process a stream of concatenated
 /// hints, using a dedicated Rayon thread pool for parallel processing while
 /// preserving the original order of results.
-pub struct HintsProcessor<HS: StreamSink + Send + Sync + 'static> {
+pub struct HintsProcessor<HS: StreamSink> {
     /// The thread pool used for parallel hint processing.
     pool: ThreadPool,
 
@@ -166,7 +166,7 @@ pub struct HintsProcessor<HS: StreamSink + Send + Sync + 'static> {
     custom_handlers: Arc<HashMap<u32, CustomHintHandler>>,
 }
 
-impl<HS: StreamSink + Send + Sync + 'static> HintsProcessor<HS> {
+impl<HS: StreamSink> HintsProcessor<HS> {
     const DEFAULT_NUM_THREADS: usize = 1;
 
     /// Creates a builder for configuring a [`HintsProcessor`].
@@ -636,7 +636,7 @@ impl<HS: StreamSink + Send + Sync + 'static> HintsProcessor<HS> {
     }
 }
 
-impl<HS: StreamSink + Send + Sync + 'static> Drop for HintsProcessor<HS> {
+impl<HS: StreamSink> Drop for HintsProcessor<HS> {
     fn drop(&mut self) {
         // Signal drainer thread to shut down
         self.state.shutdown.store(true, Ordering::Release);
@@ -651,7 +651,7 @@ impl<HS: StreamSink + Send + Sync + 'static> Drop for HintsProcessor<HS> {
     }
 }
 
-impl<HS: StreamSink + Send + Sync + 'static> StreamProcessor for HintsProcessor<HS> {
+impl<HS: StreamSink> StreamProcessor for HintsProcessor<HS> {
     fn process(&self, data: &[u64], first_batch: bool) -> Result<bool> {
         self.process_hints(data, first_batch)
     }

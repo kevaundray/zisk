@@ -28,7 +28,7 @@ use proofman_util::{timer_start_info, timer_stop_and_log_info};
 use sm_rom::RomInstance;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use witness::WitnessComponent;
-use zisk_common::io::{StreamSource, ZiskStdin, ZiskStream};
+use zisk_common::io::{StreamSink, StreamSource, ZiskStdin, ZiskStream};
 
 use data_bus::DataBusTrait;
 use sm_main::{MainInstance, MainPlanner, MainSM};
@@ -71,9 +71,12 @@ enum MinimalTraceExecutionMode {
 pub type StreamHintsShmem = ZiskStream<HintsProcessor<HintsShmem>>;
 pub type StreamHintsFile = ZiskStream<HintsProcessor<HintsFile>>;
 
+/// The maximum number of steps to execute in the emulator or assembly runner.
+pub const MAX_NUM_STEPS: u64 = 1 << 32;
+
 /// The `ZiskExecutor` struct orchestrates the execution of the ZisK ROM program, managing state
 /// machines, planning, and witness computation.
-pub struct ZiskExecutor<F: PrimeField64> {
+pub struct ZiskExecutor<F: PrimeField64, HS: StreamSink> {
     /// Standard input for the ZisK program execution.
     stdin: Mutex<ZiskStdin>,
 
@@ -84,7 +87,7 @@ pub struct ZiskExecutor<F: PrimeField64> {
     chunk_size: u64,
 
     /// Pipeline for handling precompile hints.
-    hints_stream: Mutex<StreamHintsShmem>,
+    hints_stream: Mutex<ZiskStream<HintsProcessor<HS>>>,
     // hints_stream: Mutex<StreamHintsFile>,
     /// ZisK ROM, a binary file containing the ZisK program to be executed.
     zisk_rom: Arc<ZiskRom>,
@@ -119,10 +122,7 @@ pub struct ZiskExecutor<F: PrimeField64> {
     stats: ExecutorStatsHandle,
 }
 
-impl<F: PrimeField64> ZiskExecutor<F> {
-    /// The maximum number of steps to execute in the emulator or assembly runner.
-    pub const MAX_NUM_STEPS: u64 = 1 << 32;
-
+impl<F: PrimeField64, HS: StreamSink> ZiskExecutor<F, HS> {
     /// Creates a new instance of the `ZiskExecutor`.
     ///
     /// # Arguments
@@ -134,7 +134,7 @@ impl<F: PrimeField64> ZiskExecutor<F> {
         sm_bundle: StaticSMBundle<F>,
         chunk_size: u64,
         emulator: EmulatorKind,
-        hints_stream: StreamHintsShmem,
+        hints_stream: ZiskStream<HintsProcessor<HS>>,
     ) -> Self {
         Self {
             stdin: Mutex::new(ZiskStdin::null()),
@@ -725,7 +725,7 @@ impl<F: PrimeField64> ZiskExecutor<F> {
     }
 }
 
-impl<F: PrimeField64> WitnessComponent<F> for ZiskExecutor<F> {
+impl<F: PrimeField64, HS: StreamSink> WitnessComponent<F> for ZiskExecutor<F, HS> {
     /// Executes the ZisK ROM program and calculate the plans for main and secondary state machines.
     ///
     /// # Arguments

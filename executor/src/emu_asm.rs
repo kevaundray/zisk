@@ -6,7 +6,7 @@ use std::{
 };
 
 use crate::{
-    DeviceMetricsList, DummyCounter, NestedDeviceMetricsList, StaticSMBundle, ZiskExecutor,
+    DeviceMetricsList, DummyCounter, NestedDeviceMetricsList, StaticSMBundle, MAX_NUM_STEPS,
 };
 use asm_runner::{
     write_input, AsmMTHeader, AsmRunnerMO, AsmRunnerMT, AsmRunnerRH, AsmServices, AsmSharedMemory,
@@ -204,7 +204,7 @@ impl EmulatorAsm {
             move || {
                 AsmRunnerMO::run(
                     &mut asm_shmem_mo.lock().unwrap(),
-                    ZiskExecutor::<F>::MAX_NUM_STEPS,
+                    MAX_NUM_STEPS,
                     chunk_size,
                     world_rank,
                     local_rank,
@@ -226,7 +226,7 @@ impl EmulatorAsm {
             std::thread::spawn(move || {
                 AsmRunnerRH::run(
                     &mut asm_shmem_rh.lock().unwrap(),
-                    ZiskExecutor::<F>::MAX_NUM_STEPS,
+                    MAX_NUM_STEPS,
                     world_rank,
                     local_rank,
                     base_port,
@@ -345,7 +345,7 @@ impl EmulatorAsm {
 
         let (asm_runner_mt, mut data_buses) = AsmRunnerMT::run_and_count(
             &mut self.asm_shmem_mt.lock().unwrap(),
-            ZiskExecutor::<F>::MAX_NUM_STEPS,
+            MAX_NUM_STEPS,
             self.chunk_size,
             task_factory,
             self.world_rank,
