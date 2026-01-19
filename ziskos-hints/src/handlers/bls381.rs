@@ -1,8 +1,10 @@
 use crate::{handlers::validate_hint_length, hint_fields, zisklib};
 
-/// Processes an MUL_FP12_BLS12_381 hint.
+use anyhow::Result;
+
+/// Processes an `MUL_FP12_BLS12_381` hint.
 #[inline]
-pub fn mul_fp12_bls12_381_hint(data: &[u64]) -> Result<Vec<u64>, String> {
+pub fn mul_fp12_bls12_381_hint(data: &[u64]) -> Result<Vec<u64>> {
     hint_fields![A: 72, B: 72];
 
     validate_hint_length(data, EXPECTED_LEN, "MUL_FP12_BLS12_381")?;
@@ -18,9 +20,9 @@ pub fn mul_fp12_bls12_381_hint(data: &[u64]) -> Result<Vec<u64>, String> {
     Ok(processed_hints)
 }
 
-/// Processes a DECOMPRESS_BLS12_381 hint.
+/// Processes a `DECOMPRESS_BLS12_381` hint.
 #[inline]
-pub fn decompress_bls12_381_hint(data: &[u64]) -> Result<Vec<u64>, String> {
+pub fn decompress_bls12_381_hint(data: &[u64]) -> Result<Vec<u64>> {
     hint_fields![INPUT: 6];
 
     validate_hint_length(data, EXPECTED_LEN, "DECOMPRESS_BLS12_381")?;
@@ -33,14 +35,14 @@ pub fn decompress_bls12_381_hint(data: &[u64]) -> Result<Vec<u64>, String> {
 
     let mut processed_hints = Vec::new();
 
-    zisklib::decompress_bls12_381(input, &mut processed_hints)?;
+    zisklib::decompress_bls12_381(input, &mut processed_hints).map_err(anyhow::Error::msg)?;
 
     Ok(processed_hints)
 }
 
-/// Processes an IS_ON_CURVE_BLS12_381 hint.
+/// Processes an `IS_ON_CURVE_BLS12_381` hint.
 #[inline]
-pub fn is_on_curve_bls12_381_hint(data: &[u64]) -> Result<Vec<u64>, String> {
+pub fn is_on_curve_bls12_381_hint(data: &[u64]) -> Result<Vec<u64>> {
     hint_fields![P: 12];
 
     validate_hint_length(data, EXPECTED_LEN, "IS_ON_CURVE_BLS12_381")?;
@@ -55,9 +57,9 @@ pub fn is_on_curve_bls12_381_hint(data: &[u64]) -> Result<Vec<u64>, String> {
     Ok(processed_hints)
 }
 
-/// Processes an IS_ON_SUBGROUP_BLS12_381 hint.
+/// Processes an `IS_ON_SUBGROUP_BLS12_381` hint.
 #[inline]
-pub fn is_on_subgroup_bls12_381_hint(data: &[u64]) -> Result<Vec<u64>, String> {
+pub fn is_on_subgroup_bls12_381_hint(data: &[u64]) -> Result<Vec<u64>> {
     hint_fields![P: 12];
 
     validate_hint_length(data, EXPECTED_LEN, "IS_ON_SUBGROUP_BLS12_381")?;
@@ -72,9 +74,9 @@ pub fn is_on_subgroup_bls12_381_hint(data: &[u64]) -> Result<Vec<u64>, String> {
     Ok(processed_hints)
 }
 
-/// Processes an ADD_BLS12_381 hint.
+/// Processes an `ADD_BLS12_381` hint.
 #[inline]
-pub fn add_bls12_381_hint(data: &[u64]) -> Result<Vec<u64>, String> {
+pub fn add_bls12_381_hint(data: &[u64]) -> Result<Vec<u64>> {
     hint_fields![P1: 12, P2: 12];
 
     validate_hint_length(data, EXPECTED_LEN, "ADD_BLS12_381")?;
@@ -90,9 +92,9 @@ pub fn add_bls12_381_hint(data: &[u64]) -> Result<Vec<u64>, String> {
     Ok(processed_hints)
 }
 
-/// Processes a SCALAR_MUL_BLS12_381 hint.
+/// Processes a `SCALAR_MUL_BLS12_381` hint.
 #[inline]
-pub fn scalar_mul_bls12_381_hint(data: &[u64]) -> Result<Vec<u64>, String> {
+pub fn scalar_mul_bls12_381_hint(data: &[u64]) -> Result<Vec<u64>> {
     hint_fields![P: 12, K: 6];
 
     validate_hint_length(data, EXPECTED_LEN, "SCALAR_MUL_BLS12_381")?;
@@ -108,9 +110,9 @@ pub fn scalar_mul_bls12_381_hint(data: &[u64]) -> Result<Vec<u64>, String> {
     Ok(processed_hints)
 }
 
-/// Processes a DECOMPRESS_TWIST_BLS12_381 hint.
+/// Processes a `DECOMPRESS_TWIST_BLS12_381` hint.
 #[inline]
-pub fn decompress_twist_bls12_381_hint(data: &[u64]) -> Result<Vec<u64>, String> {
+pub fn decompress_twist_bls12_381_hint(data: &[u64]) -> Result<Vec<u64>> {
     hint_fields![INPUT: 12];
 
     validate_hint_length(data, EXPECTED_LEN, "DECOMPRESS_TWIST_BLS12_381")?;
@@ -123,14 +125,14 @@ pub fn decompress_twist_bls12_381_hint(data: &[u64]) -> Result<Vec<u64>, String>
 
     let mut processed_hints = Vec::new();
 
-    zisklib::decompress_twist_bls12_381(input, &mut processed_hints)?;
+    zisklib::decompress_twist_bls12_381(input, &mut processed_hints).map_err(anyhow::Error::msg)?;
 
     Ok(processed_hints)
 }
 
-/// Processes an IS_ON_CURVE_TWIST_BLS12_381 hint.
+/// Processes an `IS_ON_CURVE_TWIST_BLS12_381` hint.
 #[inline]
-pub fn is_on_curve_twist_bls12_381_hint(data: &[u64]) -> Result<Vec<u64>, String> {
+pub fn is_on_curve_twist_bls12_381_hint(data: &[u64]) -> Result<Vec<u64>> {
     hint_fields![P: 24];
 
     validate_hint_length(data, EXPECTED_LEN, "IS_ON_CURVE_TWIST_BLS12_381")?;
@@ -145,9 +147,9 @@ pub fn is_on_curve_twist_bls12_381_hint(data: &[u64]) -> Result<Vec<u64>, String
     Ok(processed_hints)
 }
 
-/// Processes an IS_ON_SUBGROUP_TWIST_BLS12_381 hint.
+/// Processes an `IS_ON_SUBGROUP_TWIST_BLS12_381` hint.
 #[inline]
-pub fn is_on_subgroup_twist_bls12_381_hint(data: &[u64]) -> Result<Vec<u64>, String> {
+pub fn is_on_subgroup_twist_bls12_381_hint(data: &[u64]) -> Result<Vec<u64>> {
     hint_fields![P: 24];
 
     validate_hint_length(data, EXPECTED_LEN, "IS_ON_SUBGROUP_TWIST_BLS12_381")?;
@@ -162,9 +164,9 @@ pub fn is_on_subgroup_twist_bls12_381_hint(data: &[u64]) -> Result<Vec<u64>, Str
     Ok(processed_hints)
 }
 
-/// Processes an ADD_TWIST_BLS12_381 hint.
+/// Processes an `ADD_TWIST_BLS12_381` hint.
 #[inline]
-pub fn add_twist_bls12_381_hint(data: &[u64]) -> Result<Vec<u64>, String> {
+pub fn add_twist_bls12_381_hint(data: &[u64]) -> Result<Vec<u64>> {
     hint_fields![P1: 24, P2: 24];
 
     validate_hint_length(data, EXPECTED_LEN, "ADD_TWIST_BLS12_381")?;
@@ -180,9 +182,9 @@ pub fn add_twist_bls12_381_hint(data: &[u64]) -> Result<Vec<u64>, String> {
     Ok(processed_hints)
 }
 
-/// Processes a SCALAR_MUL_TWIST_BLS12_381 hint.
+/// Processes a `SCALAR_MUL_TWIST_BLS12_381` hint.
 #[inline]
-pub fn scalar_mul_twist_bls12_381_hint(data: &[u64]) -> Result<Vec<u64>, String> {
+pub fn scalar_mul_twist_bls12_381_hint(data: &[u64]) -> Result<Vec<u64>> {
     hint_fields![P: 24, K: 6];
 
     validate_hint_length(data, EXPECTED_LEN, "SCALAR_MUL_TWIST_BLS12_381")?;
@@ -198,9 +200,9 @@ pub fn scalar_mul_twist_bls12_381_hint(data: &[u64]) -> Result<Vec<u64>, String>
     Ok(processed_hints)
 }
 
-/// Processes a MILLER_LOOP_BLS12_381 hint.
+/// Processes a `MILLER_LOOP_BLS12_381` hint.
 #[inline]
-pub fn miller_loop_bls12_381_hint(data: &[u64]) -> Result<Vec<u64>, String> {
+pub fn miller_loop_bls12_381_hint(data: &[u64]) -> Result<Vec<u64>> {
     hint_fields![P: 12, Q: 24];
 
     validate_hint_length(data, EXPECTED_LEN, "MILLER_LOOP_BLS12_381")?;
@@ -216,9 +218,9 @@ pub fn miller_loop_bls12_381_hint(data: &[u64]) -> Result<Vec<u64>, String> {
     Ok(processed_hints)
 }
 
-/// Processes a FINAL_EXP_BLS12_381 hint.
+/// Processes a `FINAL_EXP_BLS12_381` hint.
 #[inline]
-pub fn final_exp_bls12_381_hint(data: &[u64]) -> Result<Vec<u64>, String> {
+pub fn final_exp_bls12_381_hint(data: &[u64]) -> Result<Vec<u64>> {
     hint_fields![F: 72];
 
     validate_hint_length(data, EXPECTED_LEN, "FINAL_EXP_BLS12_381")?;

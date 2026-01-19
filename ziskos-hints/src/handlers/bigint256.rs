@@ -2,9 +2,11 @@ use crate::handlers::validate_hint_length;
 use crate::hint_fields;
 use crate::zisklib;
 
-/// Processes a REDMOD256 hint.
+use anyhow::Result;
+
+/// Processes a `REDMOD256`` hint.
 #[inline]
-pub fn redmod256_hint(data: &[u64]) -> Result<Vec<u64>, String> {
+pub fn redmod256_hint(data: &[u64]) -> Result<Vec<u64>> {
     hint_fields![A: 4, M: 4];
 
     validate_hint_length(data, EXPECTED_LEN, "REDMOD256")?;
@@ -24,9 +26,9 @@ pub fn redmod256_hint(data: &[u64]) -> Result<Vec<u64>, String> {
     Ok(processed_hints)
 }
 
-/// Processes an ADDMOD256 hint.
+/// Processes an `ADDMOD256` hint.
 #[inline]
-pub fn addmod256_hint(data: &[u64]) -> Result<Vec<u64>, String> {
+pub fn addmod256_hint(data: &[u64]) -> Result<Vec<u64>> {
     hint_fields![A: 4, B: 4, M: 4];
 
     validate_hint_length(data, EXPECTED_LEN, "ADDMOD256")?;
@@ -47,9 +49,9 @@ pub fn addmod256_hint(data: &[u64]) -> Result<Vec<u64>, String> {
     Ok(processed_hints)
 }
 
-/// Processes a MULMOD256 hint.
+/// Processes a `MULMOD256` hint.
 #[inline]
-pub fn mulmod256_hint(data: &[u64]) -> Result<Vec<u64>, String> {
+pub fn mulmod256_hint(data: &[u64]) -> Result<Vec<u64>> {
     hint_fields![A: 4, B: 4, M: 4];
 
     validate_hint_length(data, EXPECTED_LEN, "MULMOD256")?;
@@ -70,9 +72,9 @@ pub fn mulmod256_hint(data: &[u64]) -> Result<Vec<u64>, String> {
     Ok(processed_hints)
 }
 
-/// Processes a DIVREM256 hint.
+/// Processes a `DIVREM256` hint.
 #[inline]
-pub fn divrem256_hint(data: &[u64]) -> Result<Vec<u64>, String> {
+pub fn divrem256_hint(data: &[u64]) -> Result<Vec<u64>> {
     hint_fields![A: 4, B: 4];
 
     validate_hint_length(data, EXPECTED_LEN, "DIVREM256")?;
@@ -95,9 +97,9 @@ pub fn divrem256_hint(data: &[u64]) -> Result<Vec<u64>, String> {
     Ok(processed_hints)
 }
 
-/// Processes a WPOW256 hint.
+/// Processes a `WPOW256` hint.
 #[inline]
-pub fn wpow256_hint(data: &[u64]) -> Result<Vec<u64>, String> {
+pub fn wpow256_hint(data: &[u64]) -> Result<Vec<u64>> {
     hint_fields![A: 4, EXP: 4];
 
     validate_hint_length(data, EXPECTED_LEN, "WPOW256")?;
@@ -117,9 +119,9 @@ pub fn wpow256_hint(data: &[u64]) -> Result<Vec<u64>, String> {
     Ok(processed_hints)
 }
 
-/// Processes an OMUL256 hint.
+/// Processes an `OMUL256` hint.
 #[inline]
-pub fn omul256_hint(data: &[u64]) -> Result<Vec<u64>, String> {
+pub fn omul256_hint(data: &[u64]) -> Result<Vec<u64>> {
     hint_fields![A: 4, B: 4];
 
     validate_hint_length(data, EXPECTED_LEN, "OMUL256")?;
@@ -134,9 +136,9 @@ pub fn omul256_hint(data: &[u64]) -> Result<Vec<u64>, String> {
     Ok(processed_hints)
 }
 
-/// Processes a WMUL256 hint.
+/// Processes a `WMUL256` hint.
 #[inline]
-pub fn wmul256_hint(data: &[u64]) -> Result<Vec<u64>, String> {
+pub fn wmul256_hint(data: &[u64]) -> Result<Vec<u64>> {
     hint_fields![A: 4, B: 4];
 
     validate_hint_length(data, EXPECTED_LEN, "WMUL256")?;

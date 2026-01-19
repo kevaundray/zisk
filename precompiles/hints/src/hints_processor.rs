@@ -13,6 +13,7 @@ use std::sync::{Arc, Condvar, Mutex};
 use tracing::debug;
 use zisk_common::io::{StreamProcessor, StreamSink};
 use zisk_common::{BuiltInHint, CtrlHint, HintCode, PrecompileHint};
+use ziskos_hints::handlers::{bigint256::*, bls381::*, bn254::*, modexp::*, secp256k1::*};
 
 /// Ordered result buffer with drain state.
 ///
@@ -58,14 +59,14 @@ impl HintProcessorState {
 pub type CustomHintHandler = Arc<dyn Fn(&[u64]) -> Result<Vec<u64>> + Send + Sync>;
 
 /// Builder for configuring and constructing a [`HintsProcessor`].
-pub struct HintsProcessorBuilder<HS: StreamSink + Send + Sync + 'static> {
-    hints_sink: HS,
+pub struct HintsProcessorBuilder {
+    hints_sink: Arc<dyn StreamSink>,
     num_threads: usize,
     enable_stats: bool,
     custom_handlers: HashMap<u32, CustomHintHandler>,
 }
 
-impl<HS: StreamSink + Send + Sync + 'static> HintsProcessorBuilder<HS> {
+impl HintsProcessorBuilder {
     /// Sets the number of worker threads in the thread pool.
     pub fn num_threads(mut self, num_threads: usize) -> Self {
         self.num_threads = num_threads;
@@ -109,14 +110,14 @@ impl<HS: StreamSink + Send + Sync + 'static> HintsProcessorBuilder<HS> {
     ///
     /// * `Ok(HintsProcessor)` - Successfully constructed processor
     /// * `Err` - If the thread pool fails to initialize
-    pub fn build(self) -> Result<HintsProcessor<HS>> {
+    pub fn build(self) -> Result<HintsProcessor> {
         let pool = ThreadPoolBuilder::new()
             .num_threads(self.num_threads)
             .build()
             .map_err(|e| anyhow::anyhow!("Failed to create thread pool: {}", e))?;
 
         let state = Arc::new(HintProcessorState::new());
-        let hints_sink = Arc::new(self.hints_sink);
+        let hints_sink = self.hints_sink;
 
         // Spawn drainer thread
         let drainer_state = Arc::clone(&state);
@@ -142,7 +143,7 @@ impl<HS: StreamSink + Send + Sync + 'static> HintsProcessorBuilder<HS> {
 /// This struct provides methods to parse and process a stream of concatenated
 /// hints, using a dedicated Rayon thread pool for parallel processing while
 /// preserving the original order of results.
-pub struct HintsProcessor<HS: StreamSink + Send + Sync + 'static> {
+pub struct HintsProcessor {
     /// The thread pool used for parallel hint processing.
     pool: ThreadPool,
 
@@ -156,7 +157,7 @@ pub struct HintsProcessor<HS: StreamSink + Send + Sync + 'static> {
 
     /// The hints sink used to submit processed hints (kept for ownership).
     #[allow(dead_code)]
-    hints_sink: Arc<HS>,
+    hints_sink: Arc<dyn StreamSink>,
 
     /// Handle to the drainer thread (wrapped in ManuallyDrop to join in Drop)
     drainer_thread: ManuallyDrop<std::thread::JoinHandle<()>>,
@@ -165,14 +166,14 @@ pub struct HintsProcessor<HS: StreamSink + Send + Sync + 'static> {
     custom_handlers: Arc<HashMap<u32, CustomHintHandler>>,
 }
 
-impl<HS: StreamSink + Send + Sync + 'static> HintsProcessor<HS> {
+impl HintsProcessor {
     const DEFAULT_NUM_THREADS: usize = 1;
 
     /// Creates a builder for configuring a [`HintsProcessor`].
     ///
     /// # Arguments
     ///
-    /// * `hints_sink` - The sink used to submit processed hints
+    /// * `hints_sink` - The sink used to submit processed hints (any type implementing StreamSink)
     ///
     /// # Examples
     ///
@@ -182,9 +183,9 @@ impl<HS: StreamSink + Send + Sync + 'static> HintsProcessor<HS> {
     ///     .enable_stats(false)
     ///     .build()?;
     /// ```
-    pub fn builder(hints_sink: HS) -> HintsProcessorBuilder<HS> {
+    pub fn builder(hints_sink: impl StreamSink) -> HintsProcessorBuilder {
         HintsProcessorBuilder {
-            hints_sink,
+            hints_sink: Arc::new(hints_sink),
             num_threads: Self::DEFAULT_NUM_THREADS,
             enable_stats: false,
             custom_handlers: HashMap::new(),
@@ -375,7 +376,7 @@ impl<HS: StreamSink + Send + Sync + 'static> HintsProcessor<HS> {
             return;
         }
 
-        println!("Hint processed {:?}:", hint);
+        // println!("Hint processed {:?}:", hint);
 
         // Check if we should stop due to error - but still need to fill the slot
         let result = if state.error_flag.load(Ordering::Acquire) {
@@ -428,7 +429,7 @@ impl<HS: StreamSink + Send + Sync + 'static> HintsProcessor<HS> {
     }
 
     /// Drainer thread that waits for hints to complete and drains ready results from queue.
-    fn drainer_thread(state: Arc<HintProcessorState>, hints_sink: Arc<HS>) {
+    fn drainer_thread(state: Arc<HintProcessorState>, hints_sink: Arc<dyn StreamSink>) {
         loop {
             let mut queue = state.queue.lock().unwrap();
 
@@ -559,264 +560,83 @@ impl<HS: StreamSink + Send + Sync + 'static> HintsProcessor<HS> {
         custom_handlers: Arc<HashMap<u32, CustomHintHandler>>,
     ) -> Result<Vec<u64>> {
         match hint.hint_code {
-            // EcRecover Hint
-            HintCode::BuiltIn(BuiltInHint::EcRecover) => Self::process_hint_ecrecover(&hint),
-
-            // Big Integer Arithmetic Hints
-            HintCode::BuiltIn(BuiltInHint::RedMod256) => Self::process_hint_redmod256(&hint),
-            HintCode::BuiltIn(BuiltInHint::AddMod256) => Self::process_hint_addmod256(&hint),
-            HintCode::BuiltIn(BuiltInHint::MulMod256) => Self::process_hint_mulmod256(&hint),
-            HintCode::BuiltIn(BuiltInHint::DivRem256) => Self::process_hint_divrem256(&hint),
-            HintCode::BuiltIn(BuiltInHint::WPow256) => Self::process_hint_wpow256(&hint),
-            HintCode::BuiltIn(BuiltInHint::OMul256) => Self::process_hint_omul256(&hint),
-            HintCode::BuiltIn(BuiltInHint::WMul256) => Self::process_hint_wmul256(&hint),
-
-            // Modular Exponentiation Hint
-            HintCode::BuiltIn(BuiltInHint::ModExp) => Self::process_hint_modexp(&hint),
-
-            // BN254 hints
-            HintCode::BuiltIn(BuiltInHint::IsOnCurveBn254) => {
-                Self::process_hint_is_on_curve_bn254(&hint)
-            }
-            HintCode::BuiltIn(BuiltInHint::ToAffineBn254) => {
-                Self::process_hint_to_affine_bn254(&hint)
-            }
-            HintCode::BuiltIn(BuiltInHint::AddBn254) => Self::process_hint_add_bn254(&hint),
-            HintCode::BuiltIn(BuiltInHint::MulBn254) => Self::process_hint_mul_bn254(&hint),
-            HintCode::BuiltIn(BuiltInHint::ToAffineTwistBn254) => {
-                Self::process_hint_to_affine_twist_bn254(&hint)
-            }
-            HintCode::BuiltIn(BuiltInHint::IsOnCurveTwistBn254) => {
-                Self::process_hint_is_on_curve_twist_bn254(&hint)
-            }
-            HintCode::BuiltIn(BuiltInHint::IsOnSubgroupTwistBn254) => {
-                Self::process_hint_is_on_subgroup_twist_bn254(&hint)
-            }
-            HintCode::BuiltIn(BuiltInHint::PairingBatchBn254) => {
-                Self::process_hint_pairing_batch_bn254(&hint)
-            }
-
-            // BLS12-381 hints
-            HintCode::BuiltIn(BuiltInHint::MulFp12Bls12_381) => {
-                Self::process_hint_mul_fp_bls12_381(&hint)
-            }
-            HintCode::BuiltIn(BuiltInHint::DecompressBls12_381) => {
-                Self::process_hint_decompress_bls12_381(&hint)
-            }
-            HintCode::BuiltIn(BuiltInHint::IsOnCurveBls12_381) => {
-                Self::process_hint_is_on_curve_bls12_381(&hint)
-            }
-            HintCode::BuiltIn(BuiltInHint::IsOnSubgroupBls12_381) => {
-                Self::process_hint_is_on_subgroup_bls12_381(&hint)
-            }
-            HintCode::BuiltIn(BuiltInHint::AddBls12_381) => Self::process_hint_add_bls12_381(&hint),
-            HintCode::BuiltIn(BuiltInHint::ScalarMulBls12_381) => {
-                Self::process_hint_scalar_mul_bls12_381(&hint)
-            }
-            HintCode::BuiltIn(BuiltInHint::DecompressTwistBls12_381) => {
-                Self::process_hint_decompress_twist_bls12_381(&hint)
-            }
-            HintCode::BuiltIn(BuiltInHint::IsOnCurveTwistBls12_381) => {
-                Self::process_hint_is_on_curve_twist_bls12_381(&hint)
-            }
-            HintCode::BuiltIn(BuiltInHint::IsOnSubgroupTwistBls12_381) => {
-                Self::process_hint_is_on_subgroup_twist_bls12_381(&hint)
-            }
-            HintCode::BuiltIn(BuiltInHint::AddTwistBls12_381) => {
-                Self::process_hint_add_twist_bls12_381(&hint)
-            }
-            HintCode::BuiltIn(BuiltInHint::ScalarMulTwistBls12_381) => {
-                Self::process_hint_scalar_mul_twist_bls12_381(&hint)
-            }
-            HintCode::BuiltIn(BuiltInHint::MillerLoopBls12_381) => {
-                Self::process_hint_miller_loop_bls12_381(&hint)
-            }
-            HintCode::BuiltIn(BuiltInHint::FinalExpBls12_381) => {
-                Self::process_hint_final_exp_bls12_381(&hint)
-            }
-
-            // Custom hints
-            HintCode::Custom(code) => {
-                if let Some(handler) = custom_handlers.get(&code) {
-                    handler(&hint.data)
-                } else {
-                    Err(anyhow::anyhow!("Unknown custom hint code: {:#x}", code))
-                }
-            }
-
-            // Control codes and Noop are handled before dispatch
-            _ => Err(anyhow::anyhow!("Unexpected hint code: {:#x}", hint.hint_code.to_u32())),
+            HintCode::BuiltIn(builtin) => Self::dispatch_builtin_hint(builtin, hint.data),
+            HintCode::Custom(code) => custom_handlers
+                .get(&code)
+                .map(|handler| handler(&hint.data))
+                .unwrap_or_else(|| Err(anyhow::anyhow!("Unknown custom hint"))),
+            _ => unreachable!("Control hints handled before dispatch"),
         }
     }
 
-    /// Processes a [`ECRECOVER`] hint.
     #[inline]
-    fn process_hint_ecrecover(hint: &PrecompileHint) -> Result<Vec<u64>> {
-        ziskos_hints::handlers::secp256k1_ecdsa_verify_hint(&hint.data)
-            .map_err(|e| anyhow::anyhow!(e))
-    }
+    fn dispatch_builtin_hint(hint: BuiltInHint, data: Vec<u64>) -> Result<Vec<u64>> {
+        match hint {
+            // Secp256K1 Hint
+            BuiltInHint::Secp256K1FnReduce => secp256k1_fn_reduce_hint(&data),
+            BuiltInHint::Secp256K1FnAdd => secp256k1_fn_add_hint(&data),
+            BuiltInHint::Secp256K1FnNeg => secp256k1_fn_neg_hint(&data),
+            BuiltInHint::Secp256K1FnSub => secp256k1_fn_sub_hint(&data),
+            BuiltInHint::Secp256K1FnMul => secp256k1_fn_mul_hint(&data),
+            BuiltInHint::Secp256K1FnInv => secp256k1_fn_inv_hint(&data),
+            // Secp256k1 Field Hint Codes
+            BuiltInHint::Secp256K1FpReduce => secp256k1_fp_reduce_hint(&data),
+            BuiltInHint::Secp256K1FpAdd => secp256k1_fp_add_hint(&data),
+            BuiltInHint::Secp256K1FpNegate => secp256k1_fp_negate_hint(&data),
+            BuiltInHint::Secp256K1FpMul => secp256k1_fp_mul_hint(&data),
+            BuiltInHint::Secp256K1FpMulScalar => secp256k1_fp_mul_scalar_hint(&data),
+            // Secp256k1 Curve Hint Codes
+            BuiltInHint::Secp256K1ToAffine => secp256k1_to_affine_hint(&data),
+            BuiltInHint::Secp256K1Decompress => secp256k1_decompress_hint(&data),
+            BuiltInHint::Secp256K1DoubleScalarMulWithG => {
+                secp256k1_double_scalar_mul_with_g_hint(&data)
+            }
+            BuiltInHint::Secp256K1EcdsaVerify => secp256k1_ecdsa_verify_hint(&data),
 
-    /// Processes a [`REDMOD256`] hint.
-    #[inline]
-    fn process_hint_redmod256(hint: &PrecompileHint) -> Result<Vec<u64>> {
-        ziskos_hints::handlers::redmod256_hint(&hint.data).map_err(|e| anyhow::anyhow!(e))
-    }
-    /// Processes a [`ADDMOD256`] hint.
-    #[inline]
-    fn process_hint_addmod256(hint: &PrecompileHint) -> Result<Vec<u64>> {
-        ziskos_hints::handlers::addmod256_hint(&hint.data).map_err(|e| anyhow::anyhow!(e))
-    }
-    /// Processes a [`MULMOD256`] hint.
-    #[inline]
-    fn process_hint_mulmod256(hint: &PrecompileHint) -> Result<Vec<u64>> {
-        ziskos_hints::handlers::mulmod256_hint(&hint.data).map_err(|e| anyhow::anyhow!(e))
-    }
-    /// Processes a [`DIVREM256`] hint.
-    #[inline]
-    fn process_hint_divrem256(hint: &PrecompileHint) -> Result<Vec<u64>> {
-        ziskos_hints::handlers::divrem256_hint(&hint.data).map_err(|e| anyhow::anyhow!(e))
-    }
-    /// Processes a [`WPOW256`] hint.
-    #[inline]
-    fn process_hint_wpow256(hint: &PrecompileHint) -> Result<Vec<u64>> {
-        ziskos_hints::handlers::wpow256_hint(&hint.data).map_err(|e| anyhow::anyhow!(e))
-    }
-    /// Processes a [`OMUL256`] hint.
-    #[inline]
-    fn process_hint_omul256(hint: &PrecompileHint) -> Result<Vec<u64>> {
-        ziskos_hints::handlers::omul256_hint(&hint.data).map_err(|e| anyhow::anyhow!(e))
-    }
-    /// Processes a [`WMUL256`] hint.
-    #[inline]
-    fn process_hint_wmul256(hint: &PrecompileHint) -> Result<Vec<u64>> {
-        ziskos_hints::handlers::wmul256_hint(&hint.data).map_err(|e| anyhow::anyhow!(e))
-    }
+            // Big Integer Arithmetic Hints
+            BuiltInHint::RedMod256 => redmod256_hint(&data),
+            BuiltInHint::AddMod256 => addmod256_hint(&data),
+            BuiltInHint::MulMod256 => mulmod256_hint(&data),
+            BuiltInHint::DivRem256 => divrem256_hint(&data),
+            BuiltInHint::WPow256 => wpow256_hint(&data),
+            BuiltInHint::OMul256 => omul256_hint(&data),
+            BuiltInHint::WMul256 => wmul256_hint(&data),
 
-    /// Processes a [`MODEXP`] hint.
-    #[inline]
-    fn process_hint_modexp(hint: &PrecompileHint) -> Result<Vec<u64>> {
-        ziskos_hints::handlers::modexp_hint(&hint.data).map_err(|e| anyhow::anyhow!(e))
-    }
+            // Modular Exponentiation Hint
+            BuiltInHint::ModExp => modexp_hint(&data),
 
-    #[inline]
-    fn process_hint_is_on_curve_bn254(hint: &PrecompileHint) -> Result<Vec<u64>> {
-        ziskos_hints::handlers::is_on_curve_bn254_hint(&hint.data).map_err(|e| anyhow::anyhow!(e))
-    }
+            // BN254 hints
+            BuiltInHint::IsOnCurveBn254 => is_on_curve_bn254_hint(&data),
+            BuiltInHint::ToAffineBn254 => to_affine_bn254_hint(&data),
+            BuiltInHint::AddBn254 => add_bn254_hint(&data),
+            BuiltInHint::MulBn254 => mul_bn254_hint(&data),
+            BuiltInHint::ToAffineTwistBn254 => to_affine_twist_bn254_hint(&data),
+            BuiltInHint::IsOnCurveTwistBn254 => is_on_curve_twist_bn254_hint(&data),
+            BuiltInHint::IsOnSubgroupTwistBn254 => is_on_subgroup_twist_bn254_hint(&data),
+            BuiltInHint::PairingBatchBn254 => pairing_batch_bn254_hint(&data),
 
-    #[inline]
-    fn process_hint_to_affine_bn254(hint: &PrecompileHint) -> Result<Vec<u64>> {
-        ziskos_hints::handlers::to_affine_bn254_hint(&hint.data).map_err(|e| anyhow::anyhow!(e))
-    }
+            // BLS12-381 hints
+            BuiltInHint::MulFp12Bls12_381 => mul_fp12_bls12_381_hint(&data),
+            BuiltInHint::DecompressBls12_381 => decompress_bls12_381_hint(&data),
+            BuiltInHint::IsOnCurveBls12_381 => is_on_curve_bls12_381_hint(&data),
+            BuiltInHint::IsOnSubgroupBls12_381 => is_on_subgroup_bls12_381_hint(&data),
+            BuiltInHint::AddBls12_381 => add_bls12_381_hint(&data),
+            BuiltInHint::ScalarMulBls12_381 => scalar_mul_bls12_381_hint(&data),
+            BuiltInHint::DecompressTwistBls12_381 => decompress_twist_bls12_381_hint(&data),
+            BuiltInHint::IsOnCurveTwistBls12_381 => is_on_curve_twist_bls12_381_hint(&data),
+            BuiltInHint::IsOnSubgroupTwistBls12_381 => is_on_subgroup_twist_bls12_381_hint(&data),
+            BuiltInHint::AddTwistBls12_381 => add_twist_bls12_381_hint(&data),
+            BuiltInHint::ScalarMulTwistBls12_381 => scalar_mul_twist_bls12_381_hint(&data),
+            BuiltInHint::MillerLoopBls12_381 => miller_loop_bls12_381_hint(&data),
+            BuiltInHint::FinalExpBls12_381 => final_exp_bls12_381_hint(&data),
 
-    #[inline]
-    fn process_hint_add_bn254(hint: &PrecompileHint) -> Result<Vec<u64>> {
-        ziskos_hints::handlers::add_bn254_hint(&hint.data).map_err(|e| anyhow::anyhow!(e))
-    }
-
-    #[inline]
-    fn process_hint_mul_bn254(hint: &PrecompileHint) -> Result<Vec<u64>> {
-        ziskos_hints::handlers::mul_bn254_hint(&hint.data).map_err(|e| anyhow::anyhow!(e))
-    }
-
-    #[inline]
-    fn process_hint_to_affine_twist_bn254(hint: &PrecompileHint) -> Result<Vec<u64>> {
-        ziskos_hints::handlers::to_affine_twist_bn254_hint(&hint.data)
-            .map_err(|e| anyhow::anyhow!(e))
-    }
-
-    #[inline]
-    fn process_hint_is_on_curve_twist_bn254(hint: &PrecompileHint) -> Result<Vec<u64>> {
-        ziskos_hints::handlers::is_on_curve_twist_bn254_hint(&hint.data)
-            .map_err(|e| anyhow::anyhow!(e))
-    }
-
-    #[inline]
-    fn process_hint_is_on_subgroup_twist_bn254(hint: &PrecompileHint) -> Result<Vec<u64>> {
-        ziskos_hints::handlers::is_on_subgroup_twist_bn254_hint(&hint.data)
-            .map_err(|e| anyhow::anyhow!(e))
-    }
-
-    #[inline]
-    fn process_hint_pairing_batch_bn254(hint: &PrecompileHint) -> Result<Vec<u64>> {
-        ziskos_hints::handlers::pairing_batch_bn254_hint(&hint.data).map_err(|e| anyhow::anyhow!(e))
-    }
-
-    #[inline]
-    fn process_hint_mul_fp_bls12_381(hint: &PrecompileHint) -> Result<Vec<u64>> {
-        ziskos_hints::handlers::mul_fp12_bls12_381_hint(&hint.data).map_err(|e| anyhow::anyhow!(e))
-    }
-
-    #[inline]
-    fn process_hint_decompress_bls12_381(hint: &PrecompileHint) -> Result<Vec<u64>> {
-        ziskos_hints::handlers::decompress_bls12_381_hint(&hint.data)
-            .map_err(|e| anyhow::anyhow!(e))
-    }
-
-    #[inline]
-    fn process_hint_is_on_curve_bls12_381(hint: &PrecompileHint) -> Result<Vec<u64>> {
-        ziskos_hints::handlers::is_on_curve_bls12_381_hint(&hint.data)
-            .map_err(|e| anyhow::anyhow!(e))
-    }
-
-    #[inline]
-    fn process_hint_is_on_subgroup_bls12_381(hint: &PrecompileHint) -> Result<Vec<u64>> {
-        ziskos_hints::handlers::is_on_subgroup_bls12_381_hint(&hint.data)
-            .map_err(|e| anyhow::anyhow!(e))
-    }
-
-    #[inline]
-    fn process_hint_add_bls12_381(hint: &PrecompileHint) -> Result<Vec<u64>> {
-        ziskos_hints::handlers::add_bls12_381_hint(&hint.data).map_err(|e| anyhow::anyhow!(e))
-    }
-
-    #[inline]
-    fn process_hint_scalar_mul_bls12_381(hint: &PrecompileHint) -> Result<Vec<u64>> {
-        ziskos_hints::handlers::scalar_mul_bls12_381_hint(&hint.data)
-            .map_err(|e| anyhow::anyhow!(e))
-    }
-
-    #[inline]
-    fn process_hint_decompress_twist_bls12_381(hint: &PrecompileHint) -> Result<Vec<u64>> {
-        ziskos_hints::handlers::decompress_twist_bls12_381_hint(&hint.data)
-            .map_err(|e| anyhow::anyhow!(e))
-    }
-
-    #[inline]
-    fn process_hint_is_on_curve_twist_bls12_381(hint: &PrecompileHint) -> Result<Vec<u64>> {
-        ziskos_hints::handlers::is_on_curve_twist_bls12_381_hint(&hint.data)
-            .map_err(|e| anyhow::anyhow!(e))
-    }
-
-    #[inline]
-    fn process_hint_is_on_subgroup_twist_bls12_381(hint: &PrecompileHint) -> Result<Vec<u64>> {
-        ziskos_hints::handlers::is_on_subgroup_twist_bls12_381_hint(&hint.data)
-            .map_err(|e| anyhow::anyhow!(e))
-    }
-
-    #[inline]
-    fn process_hint_add_twist_bls12_381(hint: &PrecompileHint) -> Result<Vec<u64>> {
-        ziskos_hints::handlers::add_twist_bls12_381_hint(&hint.data).map_err(|e| anyhow::anyhow!(e))
-    }
-
-    #[inline]
-    fn process_hint_scalar_mul_twist_bls12_381(hint: &PrecompileHint) -> Result<Vec<u64>> {
-        ziskos_hints::handlers::scalar_mul_twist_bls12_381_hint(&hint.data)
-            .map_err(|e| anyhow::anyhow!(e))
-    }
-
-    #[inline]
-    fn process_hint_miller_loop_bls12_381(hint: &PrecompileHint) -> Result<Vec<u64>> {
-        ziskos_hints::handlers::miller_loop_bls12_381_hint(&hint.data)
-            .map_err(|e| anyhow::anyhow!(e))
-    }
-
-    #[inline]
-    fn process_hint_final_exp_bls12_381(hint: &PrecompileHint) -> Result<Vec<u64>> {
-        ziskos_hints::handlers::final_exp_bls12_381_hint(&hint.data).map_err(|e| anyhow::anyhow!(e))
+            // Control codes and Noop are handled before dispatch
+            _ => Err(anyhow::anyhow!("Unexpected builtin hint: {:?}", hint)),
+        }
     }
 }
 
-impl<HS: StreamSink + Send + Sync + 'static> Drop for HintsProcessor<HS> {
+impl Drop for HintsProcessor {
     fn drop(&mut self) {
         // Signal drainer thread to shut down
         self.state.shutdown.store(true, Ordering::Release);
@@ -831,7 +651,7 @@ impl<HS: StreamSink + Send + Sync + 'static> Drop for HintsProcessor<HS> {
     }
 }
 
-impl<HS: StreamSink + Send + Sync + 'static> StreamProcessor for HintsProcessor<HS> {
+impl StreamProcessor for HintsProcessor {
     fn process(&self, data: &[u64], first_batch: bool) -> Result<bool> {
         self.process_hints(data, first_batch)
     }
@@ -859,7 +679,7 @@ mod tests {
         make_header(ctrl, length)
     }
 
-    fn processor() -> HintsProcessor<NullHints> {
+    fn processor() -> HintsProcessor {
         HintsProcessor::builder(NullHints).num_threads(2).build().unwrap()
     }
 
