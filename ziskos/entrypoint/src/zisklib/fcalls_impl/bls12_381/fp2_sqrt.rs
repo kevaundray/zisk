@@ -77,7 +77,7 @@ pub fn bls12_381_fp2_sqrt_13(a: &[u64; 12]) -> [u64; 13] {
     } else {
         results[1..13].copy_from_slice(&sqrt);
     }
-    13
+    results
 }
 
 /// Algorithm 9 from https://eprint.iacr.org/2012/685.pdf
