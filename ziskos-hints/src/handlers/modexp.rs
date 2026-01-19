@@ -15,8 +15,8 @@ pub fn modexp_hint(data: &[u64]) -> Result<Vec<u64>> {
 
     validate_hint_length(data, pos, "MODEXP")?;
 
-    let mut processed_hints = Vec::new();
-    zisklib::modexp_u64(base, exp, modulus, &mut processed_hints);
+    let mut hints = Vec::new();
+    zisklib::modexp_u64(base, exp, modulus, &mut hints);
 
-    Ok(processed_hints)
+    Ok(hints)
 }

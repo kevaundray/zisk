@@ -9,16 +9,12 @@ pub fn is_on_curve_bn254_hint(data: &[u64]) -> Result<Vec<u64>> {
 
     validate_hint_length(data, EXPECTED_LEN, "IS_ON_CURVE_BN254")?;
 
-    // Safe to unwrap due to prior length validation.
     let p: &[u64; P_SIZE] = data[P_OFFSET..P_OFFSET + P_SIZE].try_into().unwrap();
 
-    let mut processed_hints = Vec::new();
+    let mut hints = Vec::new();
+    zisklib::is_on_curve_bn254(p, &mut hints);
 
-    zisklib::is_on_curve_bn254(p, &mut processed_hints);
-
-    //println!("is_on_curve_bn254_hint() processed_hints len={:x}", processed_hints.len());
-
-    Ok(processed_hints)
+    Ok(hints)
 }
 
 /// Processes a `TO_AFFINE_BN254` hint.
@@ -28,16 +24,12 @@ pub fn to_affine_bn254_hint(data: &[u64]) -> Result<Vec<u64>> {
 
     validate_hint_length(data, EXPECTED_LEN, "TO_AFFINE_BN254")?;
 
-    // Safe to unwrap due to prior length validation.
     let p: &[u64; P_SIZE] = data[P_OFFSET..P_OFFSET + P_SIZE].try_into().unwrap();
 
-    let mut processed_hints = Vec::new();
+    let mut hints = Vec::new();
+    zisklib::to_affine_bn254(p, &mut hints);
 
-    zisklib::to_affine_bn254(p, &mut processed_hints);
-
-    //println!("to_affine_bn254_hint() processed_hints len={:x}", processed_hints.len());
-
-    Ok(processed_hints)
+    Ok(hints)
 }
 
 /// Processes an `ADD_BN254` hint.
@@ -47,17 +39,13 @@ pub fn add_bn254_hint(data: &[u64]) -> Result<Vec<u64>> {
 
     validate_hint_length(data, EXPECTED_LEN, "ADD_BN254")?;
 
-    // Safe to unwrap due to prior length validation.
     let p1: &[u64; P1_SIZE] = data[P1_OFFSET..P1_OFFSET + P1_SIZE].try_into().unwrap();
     let p2: &[u64; P2_SIZE] = data[P2_OFFSET..P2_OFFSET + P2_SIZE].try_into().unwrap();
 
-    let mut processed_hints = Vec::new();
+    let mut hints = Vec::new();
+    zisklib::add_bn254(p1, p2, &mut hints);
 
-    zisklib::add_bn254(p1, p2, &mut processed_hints);
-
-    //println!("add_bn254_hint() processed_hints len={:x}", processed_hints.len());
-
-    Ok(processed_hints)
+    Ok(hints)
 }
 
 /// Processes a `MUL_BN254` hint.
@@ -67,17 +55,13 @@ pub fn mul_bn254_hint(data: &[u64]) -> Result<Vec<u64>> {
 
     validate_hint_length(data, EXPECTED_LEN, "MUL_BN254")?;
 
-    // Safe to unwrap due to prior length validation.
     let p: &[u64; P_SIZE] = data[P_OFFSET..P_OFFSET + P_SIZE].try_into().unwrap();
     let k: &[u64; K_SIZE] = data[K_OFFSET..K_OFFSET + K_SIZE].try_into().unwrap();
 
-    let mut processed_hints = Vec::new();
+    let mut hints = Vec::new();
+    zisklib::mul_bn254(p, k, &mut hints);
 
-    zisklib::mul_bn254(p, k, &mut processed_hints);
-
-    //println!("mul_bn254_hint() processed_hints len={:x}", processed_hints.len());
-
-    Ok(processed_hints)
+    Ok(hints)
 }
 
 /// Processes a `TO_AFFINE_TWIST_BN254` hint.
@@ -87,16 +71,12 @@ pub fn to_affine_twist_bn254_hint(data: &[u64]) -> Result<Vec<u64>> {
 
     validate_hint_length(data, EXPECTED_LEN, "TO_AFFINE_TWIST_BN254")?;
 
-    // Safe to unwrap due to prior length validation.
     let p: &[u64; P_SIZE] = data[P_OFFSET..P_OFFSET + P_SIZE].try_into().unwrap();
 
-    let mut processed_hints = Vec::new();
+    let mut hints = Vec::new();
+    zisklib::to_affine_twist_bn254(p, &mut hints);
 
-    zisklib::to_affine_twist_bn254(p, &mut processed_hints);
-
-    //println!("to_affine_twist_bn254_hint() processed_hints len={:x}", processed_hints.len());
-
-    Ok(processed_hints)
+    Ok(hints)
 }
 
 /// Processes an `IS_ON_CURVE_TWIST_BN254` hint.
@@ -106,16 +86,12 @@ pub fn is_on_curve_twist_bn254_hint(data: &[u64]) -> Result<Vec<u64>> {
 
     validate_hint_length(data, EXPECTED_LEN, "IS_ON_CURVE_TWIST_BN254")?;
 
-    // Safe to unwrap due to prior length validation.
     let p: &[u64; P_SIZE] = data[P_OFFSET..P_OFFSET + P_SIZE].try_into().unwrap();
 
-    let mut processed_hints = Vec::new();
+    let mut hints = Vec::new();
+    zisklib::is_on_curve_twist_bn254(p, &mut hints);
 
-    zisklib::is_on_curve_twist_bn254(p, &mut processed_hints);
-
-    //println!("is_on_curve_twist_bn254_hint() processed_hints len={:x}", processed_hints.len());
-
-    Ok(processed_hints)
+    Ok(hints)
 }
 
 /// Processes an `IS_ON_SUBGROUP_TWIST_BN254` hint.
@@ -125,16 +101,12 @@ pub fn is_on_subgroup_twist_bn254_hint(data: &[u64]) -> Result<Vec<u64>> {
 
     validate_hint_length(data, EXPECTED_LEN, "IS_ON_SUBGROUP_TWIST_BN254")?;
 
-    // Safe to unwrap due to prior length validation.
     let p: &[u64; P_SIZE] = data[P_OFFSET..P_OFFSET + P_SIZE].try_into().unwrap();
 
-    let mut processed_hints = Vec::new();
+    let mut hints = Vec::new();
+    zisklib::is_on_subgroup_twist_bn254(p, &mut hints);
 
-    zisklib::is_on_subgroup_twist_bn254(p, &mut processed_hints);
-
-    //println!("is_on_subgroup_twist_bn254_hint() processed_hints len={:x}", processed_hints.len());
-
-    Ok(processed_hints)
+    Ok(hints)
 }
 
 /// Processes a `PAIRING_BATCH_BN254` hint.
@@ -181,11 +153,8 @@ pub fn pairing_batch_bn254_hint(data: &[u64]) -> Result<Vec<u64>> {
         )
     };
 
-    let mut processed_hints = Vec::new();
+    let mut hints = Vec::new();
+    zisklib::pairing_batch_bn254(g1_points, g2_points, &mut hints);
 
-    zisklib::pairing_batch_bn254(g1_points, g2_points, &mut processed_hints);
-
-    //println!("pairing_batch_bn254_hint() processed_hints len={:x}", processed_hints.len());
-
-    Ok(processed_hints)
+    Ok(hints)
 }
