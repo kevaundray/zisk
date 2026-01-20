@@ -15,8 +15,8 @@ pub async fn handle(
     input_path: Option<PathBuf>,
     direct_inputs: bool,
     compute_capacity: u32,
-    simulated_node: Option<u32>,
     minimal_compute_capacity: Option<u32>,
+    simulated_node: Option<u32>,
 ) -> Result<()> {
     // Initialize tracing - keep guard alive for application lifetime
     let _log_guard = zisk_distributed_common::tracing::init(None, None)?;
@@ -51,6 +51,16 @@ pub async fn handle(
     } else {
         uuid::Uuid::new_v4().to_string()
     };
+
+    // Check compute capacity
+    let minimal_compute_capacity = minimal_compute_capacity.unwrap_or(compute_capacity);
+    if minimal_compute_capacity > compute_capacity {
+        return Err(anyhow::anyhow!(
+            "Minimal compute capacity ({}) cannot be greater than compute capacity ({})",
+            minimal_compute_capacity,
+            compute_capacity
+        ));
+    }
 
     let launch_proof_request = LaunchProofRequest {
         data_id,

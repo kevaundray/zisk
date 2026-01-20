@@ -107,8 +107,8 @@ async fn main() -> Result<()> {
                 input,
                 direct_inputs,
                 compute_capacity,
-                simulated_node,
                 minimal_compute_capacity,
+                simulated_node,
             )
             .await
         }

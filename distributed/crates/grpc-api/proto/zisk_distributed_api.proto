@@ -55,9 +55,9 @@ message WorkersListRequest {
 message LaunchProofRequest {
   string data_id = 1;
   uint32 compute_capacity = 2;
-  InputMode input_mode = 3;
-  optional string input_path = 4;
-  optional uint32 minimal_compute_capacity = 5;
+  uint32 minimal_compute_capacity = 3;
+  InputMode input_mode = 4;
+  optional string input_path = 5;
   optional uint32 simulated_node = 6; // If set, indicates this is a simulated worker
 }
 

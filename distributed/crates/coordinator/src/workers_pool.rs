@@ -427,7 +427,7 @@ impl WorkersPool {
     pub async fn partition_and_allocate_by_capacity(
         &self,
         required_compute_capacity: ComputeCapacity,
-        minimal_compute_capacity: Option<ComputeCapacity>,
+        minimal_compute_capacity: ComputeCapacity,
         execution_mode: JobExecutionMode,
     ) -> CoordinatorResult<(Vec<WorkerId>, Vec<Vec<u32>>)> {
         // Simulation mode requires exactly one worker
@@ -446,12 +446,10 @@ impl WorkersPool {
             ));
         }
 
-        if let Some(min_cc) = minimal_compute_capacity {
-            if min_cc.compute_units > required_compute_capacity.compute_units {
-                return Err(CoordinatorError::InvalidArgument(
-                    "Minimal compute capacity cannot exceed required capacity".to_string(),
-                ));
-            }
+        if minimal_compute_capacity.compute_units > required_compute_capacity.compute_units {
+            return Err(CoordinatorError::InvalidArgument(
+                "Minimal compute capacity cannot exceed required capacity".to_string(),
+            ));
         }
 
         let workers = self.workers.write().await;
@@ -479,14 +477,7 @@ impl WorkersPool {
             available_workers.iter().map(|(_, p)| p.compute_capacity.compute_units).sum();
 
         // Check if we have enough total capacity
-
-        let compute_capacity_needed = if let Some(min_cc) = minimal_compute_capacity {
-            min_cc.compute_units
-        } else {
-            required_compute_capacity.compute_units
-        };
-
-        if compute_capacity_needed > available_capacity {
+        if minimal_compute_capacity.compute_units > available_capacity {
             return Err(CoordinatorError::InsufficientCapacity);
         }
 

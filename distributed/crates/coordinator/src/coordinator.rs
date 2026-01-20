@@ -284,13 +284,11 @@ impl Coordinator {
             ));
         }
 
-        if let Some(minimal_compute_capacity) = request.minimal_compute_capacity {
-            if minimal_compute_capacity > request.compute_capacity {
-                error!("Invalid requested minimal compute capacity");
-                return Err(CoordinatorError::InvalidArgument(
-                    "Minimal compute capacity must not exceed compute capacity".to_string(),
-                ));
-            }
+        if request.minimal_compute_capacity > request.compute_capacity {
+            error!("Invalid requested minimal compute capacity");
+            return Err(CoordinatorError::InvalidArgument(
+                "Minimal compute capacity must not exceed compute capacity".to_string(),
+            ));
         }
 
         // Check if we have enough capacity to compute the proof is already checked
@@ -337,12 +335,7 @@ impl Coordinator {
         self.pre_launch_proof(&request)?;
 
         let required_compute_capacity = ComputeCapacity::from(request.compute_capacity);
-
-        let minimal_compute_capacity = if request.minimal_compute_capacity.is_some() {
-            request.minimal_compute_capacity.map(ComputeCapacity::from)
-        } else {
-            None
-        };
+        let minimal_compute_capacity = ComputeCapacity::from(request.minimal_compute_capacity);
 
         // Create and configure a new job
         let mut job = self
@@ -543,7 +536,7 @@ impl Coordinator {
         &self,
         data_id: DataId,
         required_compute_capacity: ComputeCapacity,
-        minimal_compute_capacity: Option<ComputeCapacity>,
+        minimal_compute_capacity: ComputeCapacity,
         input_mode: InputModeDto,
         simulated_node: Option<u32>,
     ) -> CoordinatorResult<Job> {
