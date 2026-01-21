@@ -169,8 +169,6 @@ pub fn wpow256(a: &[u64; 4], exp: &[u64; 4]) -> [u64; 4] {
     result
 }
 
-// ========== Pointer-based API ==========
-
 /// Modular reduction of a 256-bit integer
 ///
 /// # Safety
