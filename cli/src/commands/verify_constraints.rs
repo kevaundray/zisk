@@ -1,7 +1,4 @@
-use crate::{
-    commands::cli_fail_if_gpu_mode,
-    ux::{print_banner, print_banner_field},
-};
+use crate::ux::{print_banner, print_banner_field};
 use anyhow::Result;
 
 use clap::Parser;
@@ -84,8 +81,6 @@ pub struct ZiskVerifyConstraints {
 
 impl ZiskVerifyConstraints {
     pub fn run(&mut self) -> Result<()> {
-        cli_fail_if_gpu_mode()?;
-
         // Check if the deprecated alias was used
         if std::env::args().any(|arg| arg == "--input") {
             eprintln!("{}", "Warning: --input is deprecated, use --inputs instead".yellow().bold());

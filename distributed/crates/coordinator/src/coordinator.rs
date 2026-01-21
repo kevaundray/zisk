@@ -1777,7 +1777,7 @@ impl Coordinator {
                 verify_constraints: true,
                 aggregation: true,
                 rma: true,
-                final_snark: false,
+                compressed: true,
                 verify_proofs: true,
                 save_proofs: false,
                 test_mode: false,

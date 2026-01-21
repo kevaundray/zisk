@@ -6,10 +6,7 @@ use tracing::{info, warn};
 use zisk_build::ZISK_VERSION_MESSAGE;
 use zisk_sdk::{ProverClient, ZiskExecuteResult};
 
-use crate::{
-    commands::cli_fail_if_gpu_mode,
-    ux::{print_banner, print_banner_field},
-};
+use crate::ux::{print_banner, print_banner_field};
 use zisk_common::io::{StreamSource, ZiskStdin};
 
 #[derive(Parser)]
@@ -79,8 +76,6 @@ pub struct ZiskExecute {
 
 impl ZiskExecute {
     pub fn run(&mut self) -> Result<()> {
-        cli_fail_if_gpu_mode()?;
-
         // Check if the deprecated alias was used
         if std::env::args().any(|arg| arg == "--input") {
             eprintln!("{}", "Warning: --input is deprecated, use --inputs instead".yellow().bold());
