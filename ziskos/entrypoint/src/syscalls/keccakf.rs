@@ -6,6 +6,9 @@ use core::arch::asm;
 #[cfg(all(target_os = "zkvm", target_vendor = "zisk"))]
 use crate::ziskos_syscall;
 
+#[cfg(not(all(target_os = "zkvm", target_vendor = "zisk")))]
+use tiny_keccak::keccakf;
+
 /// Executes the Keccak256 permutation on the given state.
 ///
 /// The `Keccak` system call executes a CSR set on a custom port. When transpiling from RISC-V to Zisk,
@@ -27,5 +30,14 @@ pub extern "C" fn syscall_keccak_f(
     #[cfg(all(target_os = "zkvm", target_vendor = "zisk"))]
     ziskos_syscall!(0x800, state);
     #[cfg(not(all(target_os = "zkvm", target_vendor = "zisk")))]
-    unreachable!()
+    {
+        // Call keccakf
+        keccakf(unsafe { &mut *state });
+
+        // Store results in hints vector
+        #[cfg(feature = "hints")]
+        {
+            hints.extend_from_slice(unsafe { &*state });
+        }
+    }
 }
