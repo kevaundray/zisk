@@ -6,7 +6,7 @@ use std::{collections::VecDeque, ops::Add};
 
 use zisk_common::MemCollectorInfo;
 use zisk_common::{
-    BusDevice, BusDeviceMode, BusId, Counter, Metrics, A, B, OPERATION_BUS_ID, OP_TYPE,
+    BusDevice, BusDeviceMode, BusId, Counter, Metrics, B, OPERATION_BUS_ID, OP_TYPE, STEP,
 };
 use zisk_core::ZiskOperationType;
 
@@ -105,7 +105,8 @@ impl BusDevice<u64> for Add256CounterInputGen {
         &mut self,
         bus_id: &BusId,
         data: &[u64],
-        pending: &mut VecDeque<(BusId, Vec<u64>)>,
+        _data_ext: &[u64],
+        pending: &mut VecDeque<(BusId, Vec<u64>, Vec<u64>)>,
         mem_collector_info: Option<&[MemCollectorInfo]>,
     ) -> bool {
         debug_assert!(*bus_id == OPERATION_BUS_ID);
@@ -120,7 +121,7 @@ impl BusDevice<u64> for Add256CounterInputGen {
             }
         }
 
-        let step_main = data[A];
+        let step_main = data[STEP];
         let addr_main = data[B] as u32;
 
         let only_counters = self.mode == BusDeviceMode::Counter;

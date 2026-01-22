@@ -12,6 +12,7 @@ use pil_std_lib::Std;
 use precomp_arith_eq::ArithEqManager;
 use precomp_arith_eq_384::ArithEq384Manager;
 use precomp_big_int::Add256Manager;
+use precomp_dma::DmaManager;
 use precomp_keccakf::KeccakfManager;
 use precomp_poseidon2::Poseidon2Manager;
 use precomp_sha256f::Sha256fManager;
@@ -29,7 +30,8 @@ use zisk_core::{Riscv2zisk, CHUNK_SIZE};
 use zisk_pil::PACKED_INFO;
 use zisk_pil::{
     ADD_256_AIR_IDS, ARITH_AIR_IDS, ARITH_EQ_384_AIR_IDS, ARITH_EQ_AIR_IDS, BINARY_ADD_AIR_IDS,
-    BINARY_AIR_IDS, BINARY_EXTENSION_AIR_IDS, INPUT_DATA_AIR_IDS, KECCAKF_AIR_IDS, MEM_AIR_IDS,
+    BINARY_AIR_IDS, BINARY_EXTENSION_AIR_IDS, DMA_64_ALIGNED_AIR_IDS, DMA_AIR_IDS,
+    DMA_PRE_POST_AIR_IDS, DMA_UNALIGNED_AIR_IDS, INPUT_DATA_AIR_IDS, KECCAKF_AIR_IDS, MEM_AIR_IDS,
     MEM_ALIGN_AIR_IDS, MEM_ALIGN_BYTE_AIR_IDS, MEM_ALIGN_READ_BYTE_AIR_IDS,
     MEM_ALIGN_WRITE_BYTE_AIR_IDS, POSEIDON_2_AIR_IDS, ROM_AIR_IDS, ROM_DATA_AIR_IDS,
     SHA_256_F_AIR_IDS, ZISK_AIRGROUP_ID,
@@ -119,6 +121,7 @@ impl<F: PrimeField64> WitnessLibrary<F> for WitnessLib<F> {
         let arith_eq_sm = ArithEqManager::new(std.clone());
         let arith_eq_384_sm = ArithEq384Manager::new(std.clone());
         let add256_sm = Add256Manager::new(std.clone());
+        let dma_sm = DmaManager::new(std.clone());
 
         let mem_instances = vec![
             (ZISK_AIRGROUP_ID, MEM_AIR_IDS[0]),
@@ -134,6 +137,13 @@ impl<F: PrimeField64> WitnessLibrary<F> for WitnessLib<F> {
             (ZISK_AIRGROUP_ID, BINARY_AIR_IDS[0]),
             (ZISK_AIRGROUP_ID, BINARY_ADD_AIR_IDS[0]),
             (ZISK_AIRGROUP_ID, BINARY_EXTENSION_AIR_IDS[0]),
+        ];
+
+        let dma_instances = vec![
+            (ZISK_AIRGROUP_ID, DMA_AIR_IDS[0]),
+            (ZISK_AIRGROUP_ID, DMA_PRE_POST_AIR_IDS[0]),
+            (ZISK_AIRGROUP_ID, DMA_64_ALIGNED_AIR_IDS[0]),
+            (ZISK_AIRGROUP_ID, DMA_UNALIGNED_AIR_IDS[0]),
         ];
 
         let sm_bundle = StaticSMBundle::new(
@@ -171,6 +181,7 @@ impl<F: PrimeField64> WitnessLibrary<F> for WitnessLib<F> {
                     vec![(ZISK_AIRGROUP_ID, ADD_256_AIR_IDS[0])],
                     StateMachines::Add256Manager(add256_sm.clone()),
                 ),
+                (dma_instances, StateMachines::DmaManager(dma_sm.clone())),
             ],
         );
 

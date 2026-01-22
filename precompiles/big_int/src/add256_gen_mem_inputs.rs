@@ -4,7 +4,7 @@ use crate::add256_constants::*;
 use precompiles_common::MemBusHelpers;
 use std::collections::VecDeque;
 use zisk_common::MemCollectorInfo;
-use zisk_common::{BusId, OPERATION_BUS_DATA_SIZE};
+use zisk_common::{BusId, OPERATION_PRECOMPILED_BUS_DATA_SIZE};
 
 #[derive(Debug)]
 pub struct Add256MemInputConfig {
@@ -20,21 +20,21 @@ pub fn generate_add256_mem_inputs(
     step_main: u64,
     data: &[u64],
     only_counters: bool,
-    pending: &mut VecDeque<(BusId, Vec<u64>)>,
+    pending: &mut VecDeque<(BusId, Vec<u64>, Vec<u64>)>,
 ) {
     // Start by generating the params (indirection read, direct, indirection write)
     for iparam in 0..PARAMS {
         MemBusHelpers::mem_aligned_load(
             addr_main + iparam as u32 * 8,
             step_main,
-            data[OPERATION_BUS_DATA_SIZE + iparam],
+            data[OPERATION_PRECOMPILED_BUS_DATA_SIZE + iparam],
             pending,
         );
     }
 
     // generate load params
     for iparam in 0..READ_PARAMS {
-        let param_addr = data[OPERATION_BUS_DATA_SIZE + iparam] as u32;
+        let param_addr = data[OPERATION_PRECOMPILED_BUS_DATA_SIZE + iparam] as u32;
         for ichunk in 0..PARAM_CHUNKS {
             MemBusHelpers::mem_aligned_load(
                 param_addr + ichunk as u32 * 8,
@@ -53,11 +53,11 @@ pub fn generate_add256_mem_inputs(
             [START_READ_PARAMS + PARAM_CHUNKS..START_READ_PARAMS + 2 * PARAM_CHUNKS]
             .try_into()
             .unwrap();
-        add256(&a, &b, data[OPERATION_BUS_DATA_SIZE + READ_PARAMS], &mut write_data);
+        add256(&a, &b, data[OPERATION_PRECOMPILED_BUS_DATA_SIZE + READ_PARAMS], &mut write_data);
     }
 
     // verify write param
-    let write_addr = data[OPERATION_BUS_DATA_SIZE + WRITE_ADDR_PARAM] as u32;
+    let write_addr = data[OPERATION_PRECOMPILED_BUS_DATA_SIZE + WRITE_ADDR_PARAM] as u32;
     for (ichunk, write_data) in write_data.iter().enumerate().take(PARAM_CHUNKS) {
         let param_addr = write_addr + ichunk as u32 * 8;
         MemBusHelpers::mem_aligned_write(param_addr, step_main, *write_data, pending);
@@ -85,7 +85,7 @@ pub fn skip_add256_mem_inputs(
 
     // verify read params
     for iparam in 0..READ_PARAMS {
-        let param_addr = data[OPERATION_BUS_DATA_SIZE + iparam] as u32;
+        let param_addr = data[OPERATION_PRECOMPILED_BUS_DATA_SIZE + iparam] as u32;
         for ichunk in 0..PARAM_CHUNKS {
             let addr = param_addr + ichunk as u32 * 8;
             for mem_collector in mem_collectors_info {
@@ -97,7 +97,7 @@ pub fn skip_add256_mem_inputs(
     }
 
     // verify write param
-    let write_addr = data[OPERATION_BUS_DATA_SIZE + WRITE_ADDR_PARAM] as u32;
+    let write_addr = data[OPERATION_PRECOMPILED_BUS_DATA_SIZE + WRITE_ADDR_PARAM] as u32;
     for ichunk in 0..PARAM_CHUNKS {
         let addr = write_addr + ichunk as u32 * 8;
         for mem_collector in mem_collectors_info {

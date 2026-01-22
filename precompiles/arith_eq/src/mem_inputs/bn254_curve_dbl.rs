@@ -3,6 +3,7 @@ use crate::executors::Bn254Curve;
 use std::collections::VecDeque;
 use zisk_common::BusId;
 use zisk_common::MemCollectorInfo;
+use zisk_common::OPERATION_PRECOMPILED_BUS_DATA_SIZE;
 
 pub const BN254_CURVE_DBL_MEM_CONFIG: ArithEqMemInputConfig = ArithEqMemInputConfig {
     indirect_params: 0,
@@ -17,10 +18,13 @@ pub fn generate_bn254_curve_dbl_mem_inputs(
     step_main: u64,
     data: &[u64],
     only_counters: bool,
-    pending: &mut VecDeque<(BusId, Vec<u64>)>,
+    pending: &mut VecDeque<(BusId, Vec<u64>, Vec<u64>)>,
 ) {
     // op,op_type,a,b,addr[2],...
-    let p1: &[u64; 8] = &data[4..12].try_into().unwrap();
+    let p1: &[u64; 8] = &data
+        [OPERATION_PRECOMPILED_BUS_DATA_SIZE..OPERATION_PRECOMPILED_BUS_DATA_SIZE + 8]
+        .try_into()
+        .unwrap();
     let mut p3 = [0u64; 8];
 
     Bn254Curve::calculate_dbl(p1, &mut p3);

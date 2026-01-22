@@ -1,7 +1,7 @@
 use precompiles_common::MemBusHelpers;
 use std::collections::VecDeque;
 use zisk_common::MemCollectorInfo;
-use zisk_common::{BusId, OPERATION_BUS_DATA_SIZE};
+use zisk_common::{BusId, OPERATION_PRECOMPILED_BUS_DATA_SIZE};
 use zisk_core::sha256f;
 
 #[derive(Debug)]
@@ -18,12 +18,12 @@ pub fn generate_sha256f_mem_inputs(
     step_main: u64,
     data: &[u64],
     only_counters: bool,
-    pending: &mut VecDeque<(BusId, Vec<u64>)>,
+    pending: &mut VecDeque<(BusId, Vec<u64>, Vec<u64>)>,
 ) {
     // Get the basic data from the input
     // op,op_type,a,b,addr[2],...
-    let state: &mut [u64; 4] = &mut data[6..10].try_into().unwrap();
-    let input: &[u64; 8] = &data[10..18].try_into().unwrap();
+    let state: &mut [u64; 4] = &mut data[7..11].try_into().unwrap();
+    let input: &[u64; 8] = &data[11..19].try_into().unwrap();
 
     // Apply the sha256f function and get the output
     sha256f(state, input);
@@ -36,7 +36,7 @@ pub fn generate_sha256f_mem_inputs(
         MemBusHelpers::mem_aligned_load(
             addr_main + iparam as u32 * 8,
             step_main,
-            data[OPERATION_BUS_DATA_SIZE + iparam],
+            data[OPERATION_PRECOMPILED_BUS_DATA_SIZE + iparam],
             pending,
         );
     }
@@ -46,12 +46,12 @@ pub fn generate_sha256f_mem_inputs(
     let write_params = 1;
     let chunks_per_param = [4usize, 8, 4];
     let params_count = read_params + write_params;
-    let params_offset = OPERATION_BUS_DATA_SIZE + indirect_params;
+    let params_offset = OPERATION_PRECOMPILED_BUS_DATA_SIZE + indirect_params;
     let mut read_chunks = 0;
     for (iparam, &chunks) in chunks_per_param.iter().enumerate().take(params_count) {
         let is_write = iparam >= read_params;
         let param_index = if is_write { iparam - read_params } else { iparam };
-        let param_addr = data[OPERATION_BUS_DATA_SIZE + param_index] as u32;
+        let param_addr = data[OPERATION_PRECOMPILED_BUS_DATA_SIZE + param_index] as u32;
         // read/write all chunks of the iparam parameter
         let current_param_offset = if is_write {
             // if write calculate index over write_data
@@ -103,7 +103,7 @@ pub fn skip_sha256f_mem_inputs(
     for (iparam, &chunks) in chunks_per_param.iter().enumerate().take(read_params + write_params) {
         let is_write = iparam >= read_params;
         let param_index = if is_write { iparam - read_params } else { iparam };
-        let param_addr = data[OPERATION_BUS_DATA_SIZE + param_index] as u32;
+        let param_addr = data[OPERATION_PRECOMPILED_BUS_DATA_SIZE + param_index] as u32;
 
         for ichunk in 0..chunks {
             let addr = param_addr + ichunk as u32 * 8;

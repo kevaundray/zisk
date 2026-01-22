@@ -17,11 +17,11 @@ pub fn generate_bn254_complex_mul_mem_inputs(
     step_main: u64,
     data: &[u64],
     only_counters: bool,
-    pending: &mut VecDeque<(BusId, Vec<u64>)>,
+    pending: &mut VecDeque<(BusId, Vec<u64>, Vec<u64>)>,
 ) {
     // op,op_type,a,b,addr[2],...
-    let f1: &[u64; 8] = &data[6..14].try_into().unwrap();
-    let f2: &[u64; 8] = &data[14..22].try_into().unwrap();
+    let f1: &[u64; 8] = &data[7..15].try_into().unwrap();
+    let f2: &[u64; 8] = &data[15..23].try_into().unwrap();
     let mut f3 = [0u64; 8];
 
     Bn254Complex::calculate_mul(f1, f2, &mut f3);

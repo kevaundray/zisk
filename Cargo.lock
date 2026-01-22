@@ -1343,6 +1343,7 @@ dependencies = [
  "precomp-arith-eq",
  "precomp-arith-eq-384",
  "precomp-big-int",
+ "precomp-dma",
  "precomp-keccakf",
  "precomp-poseidon2",
  "precomp-sha256f",
@@ -2946,6 +2947,29 @@ dependencies = [
  "mem-common",
  "pil-std-lib",
  "precompiles-common",
+ "proofman",
+ "proofman-common",
+ "proofman-macros",
+ "proofman-util",
+ "rayon",
+ "sm-mem",
+ "tracing",
+ "zisk-common",
+ "zisk-core",
+ "zisk-pil",
+]
+
+[[package]]
+name = "precomp-dma"
+version = "0.16.0"
+dependencies = [
+ "fields",
+ "generic-array",
+ "lib-c",
+ "mem-common",
+ "pil-std-lib",
+ "precompiles-common",
+ "precompiles-helpers",
  "proofman",
  "proofman-common",
  "proofman-macros",
@@ -5604,6 +5628,7 @@ dependencies = [
  "indexmap",
  "json",
  "lib-c",
+ "paste",
  "precompiles-helpers",
  "rayon",
  "riscv",
@@ -5771,6 +5796,7 @@ dependencies = [
  "precomp-arith-eq",
  "precomp-arith-eq-384",
  "precomp-big-int",
+ "precomp-dma",
  "precomp-keccakf",
  "precomp-poseidon2",
  "precomp-sha256f",

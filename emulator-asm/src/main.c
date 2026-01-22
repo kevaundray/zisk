@@ -43,10 +43,13 @@ uint64_t get_gen_method(void);
 #define OUTPUT_ADDR (SYS_ADDR + SYS_SIZE)
 
 #define TRACE_ADDR         (uint64_t)0xc0000000
-#define INITIAL_TRACE_SIZE (uint64_t)0x100000000 // 4GB
+#define INITIAL_TRACE_SIZE (uint64_t)0x180000000 // 6GB
+#define DELTA_TRACE_SIZE   (uint64_t)0x080000000 // 2GB
 
 #define REG_ADDR (uint64_t)0x70000000
 #define REG_SIZE (uint64_t)0x1000 // 4kB
+
+#define MAX_STEPS (1ULL << 36)
 
 uint8_t * pInput = (uint8_t *)INPUT_ADDR;
 uint8_t * pInputLast = (uint8_t *)(INPUT_ADDR + 10440504 - 64);
@@ -195,10 +198,15 @@ uint64_t trace_address = TRACE_ADDR;
 uint64_t trace_size = INITIAL_TRACE_SIZE;
 uint64_t trace_used_size = 0;
 
-// Worst case: every chunk instruction is a keccak operation, with an input data of 200 bytes
-#define MAX_CHUNK_TRACE_SIZE (INITIAL_CHUNK_SIZE * 200) + (44 * 8) + 32
-uint64_t trace_address_threshold = TRACE_ADDR + INITIAL_TRACE_SIZE - MAX_CHUNK_TRACE_SIZE;
+// Worst case: every chunk instruction is a keccak operation, with an input data of 256 bytes
 
+#define MAX_MTRACE_REGS_ACCESS_SIZE ((2 + 2 + 3) * 8)
+#define MAX_TRACE_CHUNK_INFO ((44*8) + 32)
+#define MAX_BYTES_DIRECT_MTRACE 256
+#define MAX_BYTES_MTRACE_STEP (MAX_BYTES_DIRECT_MTRACE + MAX_MTRACE_REGS_ACCESS_SIZE)
+#define MAX_CHUNK_TRACE_SIZE ((INITIAL_CHUNK_SIZE * MAX_BYTES_MTRACE_STEP) + MAX_TRACE_CHUNK_INFO)
+
+uint64_t trace_address_threshold = TRACE_ADDR + INITIAL_TRACE_SIZE - MAX_CHUNK_TRACE_SIZE;
 uint64_t print_pc_counter = 0;
 
 int map_locked_flag = MAP_LOCKED;
@@ -218,7 +226,7 @@ void set_chunk_size (uint64_t new_chunk_size)
     }
     chunk_size = new_chunk_size;
     chunk_size_mask = chunk_size - 1;
-    trace_address_threshold = TRACE_ADDR + trace_size - ((chunk_size*200) + (44*8) + 32);
+    trace_address_threshold = TRACE_ADDR + trace_size - MAX_CHUNK_TRACE_SIZE;
 }
 
 void set_trace_size (uint64_t new_trace_size)
@@ -1741,7 +1749,7 @@ void client_run (void)
 
                 // Prepare message to send
                 request[0] = TYPE_MT_REQUEST;
-                request[1] = 1ULL << 32; // max_steps
+                request[1] = MAX_STEPS;
                 request[2] = 1ULL << 18; // chunk_len
                 request[3] = 0;
                 request[4] = 0;
@@ -1802,7 +1810,7 @@ void client_run (void)
 
                 // Prepare message to send
                 request[0] = TYPE_RH_REQUEST;
-                request[1] = 1ULL << 32; // max_steps
+                request[1] = MAX_STEPS;
                 request[2] = 0;
                 request[3] = 0;
                 request[4] = 0;
@@ -1863,7 +1871,7 @@ void client_run (void)
 
                 // Prepare message to send
                 request[0] = TYPE_MO_REQUEST;
-                request[1] = 1ULL << 32; // max_steps
+                request[1] = MAX_STEPS;
                 request[2] = 1ULL << 18; // chunk_len
                 request[3] = 0;
                 request[4] = 0;
@@ -1924,7 +1932,7 @@ void client_run (void)
 
                 // Prepare message to send
                 request[0] = TYPE_MA_REQUEST;
-                request[1] = 1ULL << 32; // max_steps
+                request[1] = MAX_STEPS;
                 request[2] = 1ULL << 18; // chunk_len
                 request[3] = 0;
                 request[4] = 0;
@@ -1987,7 +1995,7 @@ void client_run (void)
 
                     // Prepare message to send
                     request[0] = TYPE_CM_REQUEST;
-                    request[1] = 1ULL << 32; // max_steps
+                    request[1] = MAX_STEPS;
                     request[2] = 1ULL << 18; // chunk_len
                     request[3] = chunk_player_address;
                     request[4] = 0;
@@ -2061,7 +2069,7 @@ void client_run (void)
     
                         // Prepare message to send
                         request[0] = TYPE_CM_REQUEST;
-                        request[1] = 1ULL << 32; // max_steps
+                        request[1] = MAX_STEPS;
                         request[2] = 1ULL << 18; // chunk_len
                         request[3] = chunk_player_address;
                         request[4] = 0;
@@ -2122,7 +2130,7 @@ void client_run (void)
 
                 // Prepare message to send
                 request[0] = TYPE_FA_REQUEST;
-                request[1] = 1ULL << 32; // max_steps
+                request[1] = MAX_STEPS;
                 request[2] = 1ULL << 18; // chunk_len
                 request[3] = 0;
                 request[4] = 0;
@@ -2183,7 +2191,7 @@ void client_run (void)
 
                 // Prepare message to send
                 request[0] = TYPE_MR_REQUEST;
-                request[1] = 1ULL << 32; // max_steps
+                request[1] = MAX_STEPS;
                 request[2] = 1ULL << 18; // chunk_len
                 request[3] = 0;
                 request[4] = 0;
@@ -2246,7 +2254,7 @@ void client_run (void)
 
                     // Prepare message to send
                     request[0] = TYPE_CA_REQUEST;
-                    request[1] = 1ULL << 32; // max_steps
+                    request[1] = MAX_STEPS;
                     request[2] = 1ULL << 18; // chunk_len
                     request[3] = chunk_player_address;
                     request[4] = 0;
@@ -2320,7 +2328,7 @@ void client_run (void)
     
                         // Prepare message to send
                         request[0] = TYPE_CA_REQUEST;
-                        request[1] = 1ULL << 32; // max_steps
+                        request[1] = MAX_STEPS;
                         request[2] = 1ULL << 18; // chunk_len
                         request[3] = chunk_player_address;
                         request[4] = 0;
@@ -3207,7 +3215,7 @@ extern void _realloc_trace (void)
     realloc_counter++;
 
     // Calculate new trace size
-    uint64_t new_trace_size = trace_size * 2;
+    uint64_t new_trace_size = trace_size + DELTA_TRACE_SIZE;
 
     // Extend the underlying file to the new size
     int result = ftruncate(shmem_output_fd, new_trace_size);

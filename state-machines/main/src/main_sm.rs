@@ -16,7 +16,7 @@ use pil_std_lib::Std;
 use proofman_common::{AirInstance, FromTrace, ProofCtx, ProofmanResult, SetupCtx};
 use rayon::prelude::*;
 use zisk_common::{BusDeviceMetrics, EmuTrace, InstanceCtx, SegmentId};
-use zisk_core::{ZiskRom, REGS_IN_MAIN, REGS_IN_MAIN_FROM, REGS_IN_MAIN_TO};
+use zisk_core::{ZiskRom, DEFAULT_MAX_STEPS, REGS_IN_MAIN, REGS_IN_MAIN_FROM, REGS_IN_MAIN_TO};
 use zisk_pil::MainAirValues;
 use ziskemu::{Emu, EmuRegTrace};
 
@@ -45,7 +45,8 @@ pub struct MainInstance<F: PrimeField64> {
 }
 
 impl<F: PrimeField64> MainInstance<F> {
-    const MAX_SEGMENT_ID: usize = ((1 << 32) / MainTraceType::<F>::NUM_ROWS) - 1;
+    const MAX_SEGMENT_ID: usize =
+        ((DEFAULT_MAX_STEPS + 1) as usize / MainTraceType::<F>::NUM_ROWS) - 1;
 
     /// Creates a new `MainInstance`.
     ///
