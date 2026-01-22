@@ -5,7 +5,7 @@ use anyhow::Result;
 /// Processes an `HINT_SHA256` hint.
 #[inline]
 pub fn sha256_hint(data: &[u64], data_len_bytes: usize) -> Result<Vec<u64>> {
-    let data_len_u64 = (data_len_bytes + 7) / 8;
+    let data_len_u64 = data_len_bytes.div_ceil(8);
 
     validate_hint_min_length(data, data_len_u64, "HINT_SHA256")?;
 
