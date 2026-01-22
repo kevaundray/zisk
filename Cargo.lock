@@ -6325,6 +6325,7 @@ dependencies = [
  "precompiles-helpers",
  "rand 0.8.5",
  "serde",
+ "sha2",
  "static_assertions",
  "tiny-keccak",
 ]
@@ -6348,6 +6349,7 @@ dependencies = [
  "precompiles-helpers",
  "rand 0.8.5",
  "serde",
+ "sha2",
  "static_assertions",
  "tiny-keccak",
 ]
