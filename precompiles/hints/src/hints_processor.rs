@@ -239,8 +239,8 @@ impl HintsProcessor {
             if self.state.error_flag.load(Ordering::Acquire) {
                 return Err(anyhow::anyhow!("Processing stopped due to previous error"));
             }
-
             let hint = PrecompileHint::from_u64_slice(hints, idx, true)?;
+
             self.num_hint.fetch_add(1, Ordering::Relaxed);
 
             // Check if custom handler is registered for custom hints (skip pass-through)
@@ -388,7 +388,7 @@ impl HintsProcessor {
             return;
         }
 
-        println!("Processing Hint => {:?}:", hint);
+        // println!("Processing Hint => {:?}:", hint);
 
         // Check if we should stop due to error - but still need to fill the slot
         let result = if state.error_flag.load(Ordering::Acquire) {

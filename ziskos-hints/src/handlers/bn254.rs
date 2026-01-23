@@ -79,8 +79,6 @@ pub fn bn254_pairing_check_hint(data: &[u64]) -> Result<Vec<u64>> {
         anyhow::bail!("BN254_PAIRING_CHECK: num_pairs is zero");
     }
 
-    println!("num_pairs: {}", num_pairs);
-
     let expected_len = 1 + num_pairs * (G1_WORDS + G2_WORDS);
 
     validate_hint_length(data, expected_len, "PAIRING_BATCH_BN254")?;

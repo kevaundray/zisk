@@ -5,7 +5,7 @@ use anyhow::Result;
 /// Processes an `HINT_VERIFY_KZG_PROOF` hint.
 #[inline]
 pub fn verify_kzg_proof_hint(data: &[u64]) -> Result<Vec<u64>> {
-    hint_fields![Z: 32, Y: 32, COMMITMENT: 48, PROOF: 48];
+    hint_fields![Z: 4, Y: 4, COMMITMENT: 6, PROOF: 6];
 
     validate_hint_min_length(data, EXPECTED_LEN, "HINT_VERIFY_KZG_PROOF")?;
 

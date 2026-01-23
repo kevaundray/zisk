@@ -376,7 +376,8 @@ impl PrecompileHint {
 
         anyhow::ensure!(
             slice.len() >= idx + 1 + num_u64s,
-            "Slice too short for hint data: expected {} u64s, got {}",
+            "Slice too short for hint data {}: expected {} u64s, got {}",
+            (header >> 32) as u32,
             num_u64s,
             slice.len() - idx - 1
         );

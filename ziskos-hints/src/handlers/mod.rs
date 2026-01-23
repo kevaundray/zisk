@@ -66,6 +66,36 @@ fn read_field<'a>(data: &'a [u64], pos: &mut usize) -> anyhow::Result<&'a [u64]>
     Ok(field)
 }
 
+#[inline]
+fn read_field_bytes<'a>(data: &'a [u64], pos: &mut usize) -> anyhow::Result<(&'a [u8], usize)> {
+    // Treat the entire u64 slice as bytes
+    let byte_data: &[u8] = unsafe {
+        std::slice::from_raw_parts(data.as_ptr() as *const u8, data.len() * size_of::<u64>())
+    };
+
+    // Make sure we have at least 8 bytes for the length header
+    if *pos + 8 > byte_data.len() {
+        anyhow::bail!("MODEXP hint data too short to read length");
+    }
+
+    // Read length as native-endian u64
+    let len_bytes =
+        u64::from_ne_bytes(byte_data[*pos..*pos + 8].try_into().expect("slice length checked"))
+            as usize;
+    *pos += 8;
+
+    // Ensure there are enough bytes for the field
+    if *pos + len_bytes > byte_data.len() {
+        anyhow::bail!("MODEXP hint data too short for field");
+    }
+
+    // Get the slice
+    let field = &byte_data[*pos..*pos + len_bytes];
+    *pos += len_bytes;
+
+    Ok((field, len_bytes))
+}
+
 /// Validates that the hint data has the expected length.
 ///
 /// # Arguments
