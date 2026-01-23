@@ -52,19 +52,6 @@ pub fn bn254_g1_mul_hint(data: &[u64]) -> Result<Vec<u64>> {
 /// Processes an `HINT_BN254_PAIRING_CHECK` hint.
 #[inline]
 pub fn bn254_pairing_check_hint(data: &[u64]) -> Result<Vec<u64>> {
-    // ---------------------------------------------------------------------
-    // Input format (INTERLEAVED):
-    //
-    // data[0]                = num_pairs
-    // data[1 ..]             = Interleaved pairs: [G1[0], G2[0], G1[1], G2[1], ...]
-    //
-    // Each G1 point:  8 u64  = 64 bytes
-    // Each G2 point: 16 u64  = 128 bytes
-    // Each pair:     24 u64  = 192 bytes
-    //
-    // All data is interpreted in *native-endian* u64 layout.
-    // ---------------------------------------------------------------------
-
     const G1_WORDS: usize = 8;
     const G2_WORDS: usize = 16;
     const PAIR_WORDS: usize = G1_WORDS + G2_WORDS;
@@ -84,65 +71,12 @@ pub fn bn254_pairing_check_hint(data: &[u64]) -> Result<Vec<u64>> {
 
     validate_hint_length(data, expected_len, "PAIRING_BATCH_BN254")?;
 
-    // Extract interleaved pairs
-    // ---------------------------------------------------------------------
-    // SAFETY INVARIANTS:
-    // - Length has been validated exactly
-    // - &[u64] memory is contiguous
-    // - We only create immutable views
-    // - Alignment is safe (u8 alignment = 1)
-    // - Endianness is intentionally native
-    // ---------------------------------------------------------------------
-
     let pairs_data = &data[1..];
-    let mut g1_points = Vec::with_capacity(num_pairs);
-    let mut g2_points = Vec::with_capacity(num_pairs);
-
-    for i in 0..num_pairs {
-        let pair_start = i * PAIR_WORDS;
-        let g1_start = pair_start;
-        let g2_start = pair_start + G1_WORDS;
-
-        let g1_words = &pairs_data[g1_start..g1_start + G1_WORDS];
-        let g2_words = &pairs_data[g2_start..g2_start + G2_WORDS];
-
-        let g1_bytes =
-            unsafe { std::slice::from_raw_parts(g1_words.as_ptr() as *const u8, G1_WORDS * 8) };
-        let g2_bytes =
-            unsafe { std::slice::from_raw_parts(g2_words.as_ptr() as *const u8, G2_WORDS * 8) };
-
-        g1_points.push(g1_bytes);
-        g2_points.push(g2_bytes);
-    }
-
-    for i in 0..num_pairs {
-        println!("[{}] G1 Point: {:x?}\n    G2 Point: {:x?}", i, g1_points[i], g2_points[i]);
-    }
-
-    // Build arrays of raw pointers for the FFI call
-    let g1_ptrs: Vec<*const u8> = g1_points.iter().map(|p| p.as_ptr()).collect();
-    let g2_ptrs: Vec<*const u8> = g2_points.iter().map(|p| p.as_ptr()).collect();
 
     let mut hints = Vec::new();
     unsafe {
-        let result = zisklib::bn254_pairing_check_c(
-            g1_ptrs.as_ptr(),
-            g2_ptrs.as_ptr(),
-            num_pairs,
-            &mut hints,
-        );
-
-        println!("BN254_PAIRING_CHECK: result = {}", result);
+        zisklib::bn254_pairing_check_c(pairs_data.as_ptr() as *const u8, num_pairs, &mut hints);
     }
 
     Ok(hints)
-}
-
-#[inline]
-unsafe fn reinterpret_u64_as_bytes<const BYTES: usize>(
-    slice: &[u64],
-    count: usize,
-) -> &[[u8; BYTES]] {
-    debug_assert_eq!(slice.len(), count * (BYTES / 8));
-    std::slice::from_raw_parts(slice.as_ptr().cast(), count)
 }
