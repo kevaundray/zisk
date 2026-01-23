@@ -121,12 +121,7 @@ pub fn bn254_pairing_check_hint(data: &[u64]) -> Result<Vec<u64>> {
 
     let mut hints = Vec::new();
     unsafe {
-        let result = zisklib::bn254_pairing_check_c(
-            g1_ptrs.as_ptr(),
-            g2_ptrs.as_ptr(),
-            num_pairs,
-            &mut hints,
-        );
+        zisklib::bn254_pairing_check_c(g1_ptrs.as_ptr(), g2_ptrs.as_ptr(), num_pairs, &mut hints);
     }
 
     Ok(hints)
