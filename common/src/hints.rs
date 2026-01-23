@@ -413,4 +413,80 @@ impl PrecompileHint {
 
         Ok(PrecompileHint { hint_code, is_passthrough, data, data_len_bytes: length as usize })
     }
+
+    /// Parses a [`PrecompileHint`] from a slice of `u64` values at the given byte index.
+    ///
+    /// # Arguments
+    ///
+    /// * `slice` - The source slice containing concatenated hints
+    /// * `idx` - The **byte index** where the hint header starts
+    /// * `allow_custom` - If true, unknown codes create Custom variant; if false, return error
+    ///
+    /// # Returns
+    ///
+    /// * `Ok(PrecompileHint)` - Successfully parsed hint
+    /// * `Err` - If the slice is too short or the index is out of bounds
+    #[inline(always)]
+    pub fn from_unaligned_u64_slice(slice: &[u64], idx: usize, allow_custom: bool) -> Result<Self> {
+        const HEADER_SIZE: usize = 8;
+
+        // Convert u64 slice to byte slice
+        let byte_slice =
+            unsafe { std::slice::from_raw_parts(slice.as_ptr() as *const u8, slice.len() * 8) };
+
+        if idx + HEADER_SIZE > byte_slice.len() {
+            return Err(anyhow::anyhow!("Slice too short for header at byte index {}", idx));
+        }
+
+        // Read 8-byte header as u64 (little-endian)
+        let header = u64::from_le_bytes(byte_slice[idx..idx + HEADER_SIZE].try_into().unwrap());
+
+        // Extract length from lower 32 bits (length is in bytes)
+        let length = (header & 0xFFFFFFFF) as usize;
+
+        // Calculate how many u64s are needed to hold length bytes
+        let num_u64s = length.div_ceil(8);
+        println!("Header: {:#x}, Length: {}, Num u64s: {}", header, length, num_u64s);
+        anyhow::ensure!(
+            idx + HEADER_SIZE + length <= byte_slice.len(),
+            "Slice too short for hint data {}: expected {} bytes, got {}",
+            (header >> 32) as u32,
+            length,
+            byte_slice.len() - idx - HEADER_SIZE
+        );
+
+        // Extract hint code from upper 32 bits
+        let hint_code_32 = (header >> 32) as u32;
+        // Extract pass-through flag from bit 31 (MSB) - shift is faster than mask
+        let is_passthrough = hint_code_32 >> 31 != 0;
+        // Extract the actual hint code from bits 0-30 - mask is optimal
+        let hint_code_value = hint_code_32 & 0x7FFFFFFF;
+
+        let hint_code = if allow_custom {
+            HintCode::try_from(hint_code_value).unwrap_or(HintCode::Custom(hint_code_value))
+        } else {
+            HintCode::try_from(hint_code_value)?
+        };
+
+        // Extract data bytes and convert to u64 with optimal performance
+        let data_bytes = &byte_slice[idx + HEADER_SIZE..idx + HEADER_SIZE + length];
+        let mut data = Vec::with_capacity(num_u64s);
+
+        let mut offset = 0;
+        // Process full u64s with direct unaligned reads
+        while offset + 8 <= data_bytes.len() {
+            let value = unsafe { (data_bytes.as_ptr().add(offset) as *const u64).read_unaligned() };
+            data.push(u64::from_le(value));
+            offset += 8;
+        }
+
+        // Handle last partial u64 if any
+        if offset < data_bytes.len() {
+            let mut bytes = [0u8; 8];
+            bytes[..data_bytes.len() - offset].copy_from_slice(&data_bytes[offset..]);
+            data.push(u64::from_le_bytes(bytes));
+        }
+
+        Ok(PrecompileHint { hint_code, is_passthrough, data, data_len_bytes: length })
+    }
 }
