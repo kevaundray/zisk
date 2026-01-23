@@ -106,7 +106,7 @@ impl ZiskStream {
     ) {
         while let Ok(ThreadCommand::Process) = rx.recv() {
             if let Err(e) = Self::process_stream(&mut stream, &*hints_processor) {
-                tracing::error!("Error processing hints in background thread: {:?}", e);
+                panic!("Error processing hints in background thread: {:?}", e);
             }
         }
         // Loop exits when Shutdown is received or channel is closed

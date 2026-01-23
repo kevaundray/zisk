@@ -93,17 +93,25 @@ pub fn init_tracing(log_path: &str) {
 /// # Type Parameters
 /// * `T` - Source element type
 /// * `U` - Destination element type
-pub fn reinterpret_vec<T, U>(v: Vec<T>) -> anyhow::Result<Vec<U>> {
+pub fn reinterpret_vec<T: Default + Clone, U>(mut v: Vec<T>) -> anyhow::Result<Vec<U>> {
     let size_t = std::mem::size_of::<T>();
     let size_u = std::mem::size_of::<U>();
 
-    // Check that total byte size is compatible
-    if (v.len() * size_t) % size_u != 0 {
-        return Err(anyhow::anyhow!(
-            "Total byte size {} is not divisible by target type size {}",
-            v.len() * size_t,
-            size_u
-        ));
+    // Total bytes in Vec<T>
+    let total_bytes = v.len() * size_t;
+
+    // Compute remainder to see if we need padding
+    let rem = total_bytes % size_u;
+
+    // If remainder exists, pad with zeroed T elements
+    if rem != 0 {
+        // Number of extra bytes needed
+        let pad_bytes = size_u - rem;
+
+        // Number of T elements to pad (round up)
+        let pad_t = (pad_bytes + size_t - 1) / size_t;
+
+        v.extend(std::iter::repeat(T::default()).take(pad_t));
     }
 
     // Check that the pointer is properly aligned for U

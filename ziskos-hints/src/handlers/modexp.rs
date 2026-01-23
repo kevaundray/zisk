@@ -1,7 +1,4 @@
-use crate::{
-    handlers::{read_field, validate_hint_length},
-    zisklib,
-};
+use crate::{handlers::read_field_bytes, zisklib};
 
 use anyhow::Result;
 
@@ -9,14 +6,26 @@ use anyhow::Result;
 #[inline]
 pub fn modexp_hint(data: &[u64]) -> Result<Vec<u64>> {
     let mut pos = 0;
-    let base = read_field(data, &mut pos)?;
-    let exp = read_field(data, &mut pos)?;
-    let modulus = read_field(data, &mut pos)?;
+    let (base, base_len) = read_field_bytes(data, &mut pos)?;
+    let (exp, exp_len) = read_field_bytes(data, &mut pos)?;
+    let (modulus, modulus_len) = read_field_bytes(data, &mut pos)?;
 
-    validate_hint_length(data, pos, "MODEXP")?;
+    // validate_hint_length(data, pos, "MODEXP")?;
 
     let mut hints = Vec::new();
-    zisklib::modexp_u64(base, exp, modulus, &mut hints);
+    let mut result = vec![0u8; modulus_len];
+    unsafe {
+        zisklib::modexp_bytes_c(
+            base.as_ptr(),
+            base_len,
+            exp.as_ptr(),
+            exp_len,
+            modulus.as_ptr(),
+            modulus_len,
+            result.as_mut_ptr(),
+            &mut hints,
+        );
+    }
 
     Ok(hints)
 }
