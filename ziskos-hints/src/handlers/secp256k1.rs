@@ -7,7 +7,7 @@ use anyhow::Result;
 /// Processes an `HINT_SECP256K1_ECRECOVER` hint.
 #[inline]
 pub fn secp256k1_ecrecover_hint(data: &[u64]) -> Result<Vec<u64>> {
-    hint_fields![SIG: 64, RECID: 8, MSG: 32];
+    hint_fields![SIG: 64, RECID: 8, MSG: 32, LO_S: 1];
 
     let bytes = unsafe { std::slice::from_raw_parts(data.as_ptr() as *const u8, data.len() * 8) };
 
@@ -18,6 +18,8 @@ pub fn secp256k1_ecrecover_hint(data: &[u64]) -> Result<Vec<u64>> {
         bytes[RECID_OFFSET..RECID_OFFSET + RECID_SIZE].try_into().unwrap();
     let recid: u8 = u64::from_le_bytes(*recid) as u8;
     let msg: &[u8; MSG_SIZE] = bytes[MSG_OFFSET..MSG_OFFSET + MSG_SIZE].try_into().unwrap();
+    let low_s: bool =
+        u64::from_le_bytes(bytes[LO_S_OFFSET..LO_S_OFFSET + LO_S_SIZE].try_into().unwrap()) != 0;
 
     let mut hints = Vec::new();
     let result: &mut [u8; 32] = &mut [0u8; 32];
@@ -27,6 +29,7 @@ pub fn secp256k1_ecrecover_hint(data: &[u64]) -> Result<Vec<u64>> {
             recid,
             msg.as_ptr(),
             result.as_mut_ptr(),
+            low_s,
             &mut hints,
         );
     }
