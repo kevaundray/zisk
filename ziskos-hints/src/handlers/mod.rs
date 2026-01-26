@@ -28,6 +28,7 @@ macro_rules! hint_fields {
 
         hint_fields!(@offsets 0, $($name: $size),+);
 
+        #[allow(unused)]
         const EXPECTED_LEN: usize = hint_fields!(@sum $($size),+);
     };
 
