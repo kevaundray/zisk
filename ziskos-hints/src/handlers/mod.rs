@@ -28,10 +28,7 @@ macro_rules! hint_fields {
 
         hint_fields!(@offsets 0, $($name: $size),+);
 
-        #[allow(dead_code)]
         const EXPECTED_LEN: usize = hint_fields!(@sum $($size),+);
-        #[allow(dead_code)]
-        const EXPECTED_LEN_U64: usize = EXPECTED_LEN.div_ceil(8);
     };
 
     (@offsets $offset:expr, $name:ident: $size:expr) => {
