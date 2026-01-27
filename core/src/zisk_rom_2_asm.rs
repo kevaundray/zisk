@@ -3691,8 +3691,7 @@ impl ZiskRom2Asm {
             }
 
             println!(
-                "ZiskRom2Asm::save_to_asm() {} bytes, {} instructions, {:02} bytes/inst, {} map lines, {} label lines, {} comment lines, {} code lines, {:02} code lines/inst",
-                code.len(),
+                "ZiskRom2Asm::save_to_asm() {} bytes, {} instructions, {:02} bytes/inst, {} map lines, {} label lines, {} comment lines, {} code lines, {:02} code lines/inst, precompile_results={:?}",                code.len(),
                 rom.sorted_pc_list.len(),
                 code.len() as f64 / rom.sorted_pc_list.len() as f64,
                 map_label_lines_counter,
@@ -3700,6 +3699,7 @@ impl ZiskRom2Asm {
                 comment_lines_counter,
                 code_lines_counter,
                 code_lines_counter as f64 / rom.sorted_pc_list.len() as f64,
+                ctx.precompile_results
             );
         }
     }
