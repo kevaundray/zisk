@@ -176,12 +176,19 @@ impl BusDevice<u64> for DmaCounterInputGen {
             }
         }
 
-        let only_counters = self.mode == BusDeviceMode::Counter;
-        if only_counters {
-            self.measure(data);
+        match self.mode {
+            BusDeviceMode::Counter => {
+                self.measure(data);
+                generate_dma_mem_inputs(data, data_ext, true, pending);
+            }
+            BusDeviceMode::CounterAsm => {
+                self.measure(data);
+            }
+            BusDeviceMode::InputGenerator => {
+                generate_dma_mem_inputs(data, data_ext, false, pending);
+            }
         }
 
-        generate_dma_mem_inputs(data, data_ext, only_counters, pending);
         true
     }
 

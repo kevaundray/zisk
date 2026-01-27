@@ -38,8 +38,11 @@ impl<F: PrimeField64> Add256Manager<F> {
         Arc::new(Self { add256_sm })
     }
 
-    pub fn build_add256_counter(&self) -> Add256CounterInputGen {
-        Add256CounterInputGen::new(BusDeviceMode::Counter)
+    pub fn build_add256_counter(&self, asm_execution: bool) -> Add256CounterInputGen {
+        match asm_execution {
+            true => Add256CounterInputGen::new(BusDeviceMode::CounterAsm),
+            false => Add256CounterInputGen::new(BusDeviceMode::Counter),
+        }
     }
 
     pub fn build_add256_input_generator(&self) -> Add256CounterInputGen {

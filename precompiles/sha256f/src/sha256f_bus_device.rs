@@ -124,12 +124,18 @@ impl BusDevice<u64> for Sha256fCounterInputGen {
         let step_main = data[STEP];
         let addr_main = data[B] as u32;
 
-        let only_counters = self.mode == BusDeviceMode::Counter;
-        if only_counters {
-            self.measure(data);
+        match self.mode {
+            BusDeviceMode::Counter => {
+                self.measure(data);
+                generate_sha256f_mem_inputs(addr_main, step_main, data, true, pending);
+            }
+            BusDeviceMode::CounterAsm => {
+                self.measure(data);
+            }
+            BusDeviceMode::InputGenerator => {
+                generate_sha256f_mem_inputs(addr_main, step_main, data, false, pending);
+            }
         }
-
-        generate_sha256f_mem_inputs(addr_main, step_main, data, only_counters, pending);
 
         true
     }

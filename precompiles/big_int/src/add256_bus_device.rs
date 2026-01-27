@@ -124,12 +124,18 @@ impl BusDevice<u64> for Add256CounterInputGen {
         let step_main = data[STEP];
         let addr_main = data[B] as u32;
 
-        let only_counters = self.mode == BusDeviceMode::Counter;
-        if only_counters {
-            self.measure(data);
+        match self.mode {
+            BusDeviceMode::Counter => {
+                self.measure(data);
+                generate_add256_mem_inputs(addr_main, step_main, data, true, pending);
+            }
+            BusDeviceMode::CounterAsm => {
+                self.measure(data);
+            }
+            BusDeviceMode::InputGenerator => {
+                generate_add256_mem_inputs(addr_main, step_main, data, false, pending);
+            }
         }
-
-        generate_add256_mem_inputs(addr_main, step_main, data, only_counters, pending);
 
         true
     }

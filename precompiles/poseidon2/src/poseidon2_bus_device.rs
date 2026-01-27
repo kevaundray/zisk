@@ -124,12 +124,18 @@ impl BusDevice<u64> for Poseidon2CounterInputGen {
         let step_main = data[A];
         let addr_main = data[B] as u32;
 
-        let only_counters = self.mode == BusDeviceMode::Counter;
-        if only_counters {
-            self.measure(data);
+        match self.mode {
+            BusDeviceMode::Counter => {
+                self.measure(data);
+                generate_poseidon2_mem_inputs(addr_main, step_main, data, true, pending);
+            }
+            BusDeviceMode::CounterAsm => {
+                self.measure(data);
+            }
+            BusDeviceMode::InputGenerator => {
+                generate_poseidon2_mem_inputs(addr_main, step_main, data, false, pending);
+            }
         }
-
-        generate_poseidon2_mem_inputs(addr_main, step_main, data, only_counters, pending);
 
         true
     }

@@ -39,8 +39,11 @@ impl<F: PrimeField64> DmaManager<F> {
         Arc::new(Self { dma_sm, dma_pre_post_sm, dma_64_aligned_sm, dma_unaligned_sm })
     }
 
-    pub fn build_dma_counter(&self) -> DmaCounterInputGen {
-        DmaCounterInputGen::new(BusDeviceMode::Counter)
+    pub fn build_dma_counter(&self, asm_execution: bool) -> DmaCounterInputGen {
+        match asm_execution {
+            true => DmaCounterInputGen::new(BusDeviceMode::CounterAsm),
+            false => DmaCounterInputGen::new(BusDeviceMode::Counter),
+        }
     }
 
     pub fn build_dma_input_generator(&self) -> DmaCounterInputGen {

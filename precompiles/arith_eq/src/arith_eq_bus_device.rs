@@ -179,10 +179,17 @@ impl BusDevice<u64> for ArithEqCounterInputGen {
         let step_main = data[STEP];
         let addr_main = data[B] as u32;
 
-        let only_counters = self.mode == BusDeviceMode::Counter;
-        if only_counters {
-            self.measure(data);
-        }
+        let only_counters = match self.mode {
+            BusDeviceMode::Counter => {
+                self.measure(data);
+                true
+            }
+            BusDeviceMode::CounterAsm => {
+                self.measure(data);
+                return true;
+            }
+            BusDeviceMode::InputGenerator => false,
+        };
 
         match op {
             ARITH256_OP => {
