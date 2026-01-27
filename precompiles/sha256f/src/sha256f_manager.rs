@@ -30,8 +30,11 @@ impl<F: PrimeField64> Sha256fManager<F> {
         Arc::new(Self { sha256f_sm })
     }
 
-    pub fn build_sha256f_counter(&self) -> Sha256fCounterInputGen {
-        Sha256fCounterInputGen::new(BusDeviceMode::Counter)
+    pub fn build_sha256f_counter(&self, asm_execution: bool) -> Sha256fCounterInputGen {
+        match asm_execution {
+            true => Sha256fCounterInputGen::new(BusDeviceMode::CounterAsm),
+            false => Sha256fCounterInputGen::new(BusDeviceMode::Counter),
+        }
     }
 
     pub fn build_sha256f_input_generator(&self) -> Sha256fCounterInputGen {

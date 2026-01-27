@@ -31,8 +31,11 @@ impl<F: PrimeField64> KeccakfManager<F> {
         Arc::new(Self { keccakf_sm })
     }
 
-    pub fn build_keccakf_counter(&self) -> KeccakfCounterInputGen {
-        KeccakfCounterInputGen::new(BusDeviceMode::Counter)
+    pub fn build_keccakf_counter(&self, asm_execution: bool) -> KeccakfCounterInputGen {
+        match asm_execution {
+            true => KeccakfCounterInputGen::new(BusDeviceMode::CounterAsm),
+            false => KeccakfCounterInputGen::new(BusDeviceMode::Counter),
+        }
     }
 
     pub fn build_keccakf_input_generator(&self) -> KeccakfCounterInputGen {

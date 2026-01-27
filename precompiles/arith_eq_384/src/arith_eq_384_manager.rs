@@ -31,8 +31,11 @@ impl<F: PrimeField64> ArithEq384Manager<F> {
         Arc::new(Self { arith_eq_384_sm })
     }
 
-    pub fn build_arith_eq_384_counter(&self) -> ArithEq384CounterInputGen {
-        ArithEq384CounterInputGen::new(BusDeviceMode::Counter)
+    pub fn build_arith_eq_384_counter(&self, asm_execution: bool) -> ArithEq384CounterInputGen {
+        match asm_execution {
+            true => ArithEq384CounterInputGen::new(BusDeviceMode::CounterAsm),
+            false => ArithEq384CounterInputGen::new(BusDeviceMode::Counter),
+        }
     }
 
     pub fn build_arith_eq_384_input_generator(&self) -> ArithEq384CounterInputGen {

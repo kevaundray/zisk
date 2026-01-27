@@ -29,8 +29,11 @@ impl<F: PrimeField64> Poseidon2Manager<F> {
         Arc::new(Self { poseidon2_sm })
     }
 
-    pub fn build_poseidon2_counter(&self) -> Poseidon2CounterInputGen {
-        Poseidon2CounterInputGen::new(BusDeviceMode::Counter)
+    pub fn build_poseidon2_counter(&self, asm_execution: bool) -> Poseidon2CounterInputGen {
+        match asm_execution {
+            true => Poseidon2CounterInputGen::new(BusDeviceMode::CounterAsm),
+            false => Poseidon2CounterInputGen::new(BusDeviceMode::Counter),
+        }
     }
 
     pub fn build_poseidon2_input_generator(&self) -> Poseidon2CounterInputGen {

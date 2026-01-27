@@ -12,6 +12,7 @@ use crate::Metrics;
 #[derive(Debug, PartialEq)]
 pub enum BusDeviceMode {
     Counter,
+    CounterAsm,
     InputGenerator,
 }
 
