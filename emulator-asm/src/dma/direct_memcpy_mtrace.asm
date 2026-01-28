@@ -57,7 +57,16 @@
 
 .extern fast_dma_encode
 .extern trace_address_threshold
+.extern trace_resize_request
 
+.ifdef DEBUG
+.section .data
+.align 8
+    dma_check_case:      .quad 0
+    dma_check_step:      .quad 0
+    dma_check_aux:       .quad 0
+    dma_check_threshold: .quad 0
+.endif
 
 .include "dma_constants.inc"
 
@@ -65,7 +74,7 @@
 
 .set R_MT_INDEX,     r13
 .set R_MT_ADDR,      r12
-.set R_STEP,         r15
+.set R_STEP,         r14
 .set R_AUX,          r9
 .set R_AUX2,         rcx  # NOTE: used by rep
 .set R_SRC,          rsi  # NOTE: used by rep
@@ -98,6 +107,10 @@ dma_memcpy_mtrace:
 
     # calculate bytes of mtrace used and verify if throw the limit
 
+.ifdef DEBUG
+    mov     qword ptr [dma_check_case], 1
+.endif
+
     lea     R_AUX, [R_MT_ADDR + 8 * R_MT_INDEX]           # 1 cycle - calculate address mtrace
     lea     R_AUX, [R_AUX + R_COUNT + MAX_DMA_MT_MARGIN]  # 1 cycle - calculate current mtrace bytes usage
     sub     R_AUX, [trace_address_threshold]              # ~4 cycles - bytes over threshold (can be negative)
@@ -106,13 +119,28 @@ dma_memcpy_mtrace:
     # check if bytes over threshold are usual for current situation on inside chunk
     # R_STEP contain number the steps to end of chunk, we need number the steps consumed
 
+.ifdef DEBUG
+    mov     qword ptr [dma_check_case], 2
+    mov     [dma_check_step], R_STEP
+    mov     [dma_check_aux], R_AUX
+.endif
+
     mov     R_AUX2, CHUNK_SIZE                     # 1 cycle - load chunk size constant
     sub     R_AUX2, R_STEP                         # 1 cycle - calculate steps consumed in chunk
     imul    R_AUX2, MAX_BYTES_MTRACE_STEP          # ~3 cycles - bytes expected for consumed steps
     cmp     R_AUX2, R_AUX                          # 1 cycle - compare expected vs actual
     jae     .L_memcpy_mtrace_continue              # 2 cycles (predicted) - expected >= actual, ok
 
+
     # at this point we need to increase trace, registers R_ENCODE, R_AUX no need to save.
+.ifdef DEBUG
+    mov     qword ptr [dma_check_case], 3
+    mov     R_AUX, [trace_address_threshold]
+    mov     [dma_check_threshold], R_AUX
+.endif
+
+    mov     qword ptr [trace_resize_request], R_COUNT
+
     push    R_COUNT                 # ~3 cycles - save general purpose registers
     push    r8                      # ~3 cycles
     push    r10                     # ~3 cycles
@@ -177,8 +205,8 @@ direct_dma_memcpy_mtrace_with_count_check:
     # Parameters already in correct registers: R_DST=dst, R_SRC=src, R_COUNT=count
     # Result will be returned in R_ENCODE (encoded value)
 
-    cmp     R_COUNT, MAX_BYTES_DIRECT_MTRACE # 1 cycle - check if count exceeds direct threshold
-    ja      .L_memcpy_check_mtrace_available # 2 cycles (not taken usually) - large count, check trace space
+    cmp     R_COUNT, MAX_DMA_BYTES_DIRECT_MTRACE # 1 cycle - check if count exceeds direct threshold
+    ja      .L_memcpy_check_mtrace_available     # 2 cycles (not taken usually) - large count, check trace space
 
 .L_memcpy_mtrace_continue:
 direct_dma_memcpy_mtrace:

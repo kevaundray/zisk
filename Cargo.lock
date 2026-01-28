@@ -300,6 +300,7 @@ dependencies = [
  "mem-common",
  "mem-planner-cpp",
  "named-sem",
+ "proofman-common",
  "rayon",
  "thiserror 2.0.18",
  "tracing",

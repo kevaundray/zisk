@@ -36,15 +36,27 @@ uint64_t get_gen_method(void);
 #define INPUT_ADDR (uint64_t)0x90000000
 #define MAX_INPUT_SIZE (uint64_t)0x08000000 // 128MB
 
-#define RAM_ADDR (uint64_t)0xa0000000
+#define RAM_ADDR (uint64_t)0xA0000000
 #define RAM_SIZE (uint64_t)0x20000000 // 512MB
 #define SYS_ADDR RAM_ADDR
 #define SYS_SIZE (uint64_t)0x10000
 #define OUTPUT_ADDR (SYS_ADDR + SYS_SIZE)
 
-#define TRACE_ADDR         (uint64_t)0xc0000000
-#define INITIAL_TRACE_SIZE (uint64_t)0x180000000 // 6GB
-#define DELTA_TRACE_SIZE   (uint64_t)0x080000000 // 2GB
+#ifdef TRACE_TARGET_MO
+    #pragma message "TRACE_TARGET = MO"
+    #define INITIAL_TRACE_SIZE (uint64_t)0x100000000 /* 4GB */
+    #define DELTA_TRACE_SIZE   (uint64_t)0x040000000 /* 1GB */
+#elif defined(TRACE_TARGET_RH)
+    #pragma message "TRACE_TARGET = RH"
+    #define INITIAL_TRACE_SIZE (uint64_t)0x004000000 /* 64MB */
+    #define DELTA_TRACE_SIZE   (uint64_t)0x004000000 /* 64MB */
+#else 
+    #pragma message "TRACE_TARGET = DEFAULT"
+    #define INITIAL_TRACE_SIZE (uint64_t)0x180000000 /* 6GB */
+    #define DELTA_TRACE_SIZE   (uint64_t)0x080000000 /* 2GB */
+#endif
+
+#define TRACE_ADDR (uint64_t)0xC0000000
 
 #define REG_ADDR (uint64_t)0x70000000
 #define REG_SIZE (uint64_t)0x1000 // 4kB
@@ -200,16 +212,28 @@ uint64_t trace_used_size = 0;
 
 // Worst case: every chunk instruction is a keccak operation, with an input data of 256 bytes
 
-#define MAX_MTRACE_REGS_ACCESS_SIZE ((2 + 2 + 3) * 8)
-#define MAX_TRACE_CHUNK_INFO ((44*8) + 32)
-#define MAX_BYTES_DIRECT_MTRACE 256
-#define MAX_BYTES_MTRACE_STEP (MAX_BYTES_DIRECT_MTRACE + MAX_MTRACE_REGS_ACCESS_SIZE)
-#define MAX_CHUNK_TRACE_SIZE ((INITIAL_CHUNK_SIZE * MAX_BYTES_MTRACE_STEP) + MAX_TRACE_CHUNK_INFO)
-
+#if defined(TRACE_TARGET_MO)
+    #define MAX_MTRACE_REGS_ACCESS_SIZE (3 * 8)
+    #define MAX_BYTES_DIRECT_MTRACE 80 // PRE/POST = ((1 PRE + 2 SRC + 1 WR DST) * 2 + BLOCK_READ + BLOCK_WRITE) * 8
+    #define MAX_BYTES_MTRACE_STEP (MAX_BYTES_DIRECT_MTRACE + MAX_MTRACE_REGS_ACCESS_SIZE)
+    #define MAX_CHUNK_TRACE_SIZE (INITIAL_CHUNK_SIZE * MAX_BYTES_MTRACE_STEP)
+#elif defined(TRACE_TARGET_RH)
+    #define MAX_CHUNK_TRACE_SIZE 0
+#else 
+    #define MAX_MTRACE_REGS_ACCESS_SIZE ((2 + 2 + 3) * 8)
+    #define MAX_TRACE_CHUNK_INFO ((44*8) + 32)
+    #define MAX_BYTES_DIRECT_MTRACE 256
+    #define MAX_BYTES_MTRACE_STEP (MAX_BYTES_DIRECT_MTRACE + MAX_MTRACE_REGS_ACCESS_SIZE)
+    #define MAX_CHUNK_TRACE_SIZE ((INITIAL_CHUNK_SIZE * MAX_BYTES_MTRACE_STEP) + MAX_TRACE_CHUNK_INFO)
+#endif
+uint64_t trace_resize_request = 0;
 uint64_t trace_address_threshold = TRACE_ADDR + INITIAL_TRACE_SIZE - MAX_CHUNK_TRACE_SIZE;
 uint64_t print_pc_counter = 0;
 
 int map_locked_flag = MAP_LOCKED;
+
+// Log name
+char log_name[128];
 
 #ifdef ASM_PRECOMPILE_CACHE
 bool precompile_cache_enabled = false;
@@ -232,6 +256,9 @@ void set_chunk_size (uint64_t new_chunk_size)
 void set_trace_size (uint64_t new_trace_size)
 {
     // Update trace global variables
+    printf("%s trace resize (trace_resize_request: %ld):  %ld MB => %ld MB\n", log_name, trace_resize_request, trace_size >> 20, new_trace_size >> 20);
+    
+    trace_resize_request = 0;
     trace_size = new_trace_size;
     trace_address_threshold = TRACE_ADDR + trace_size - MAX_CHUNK_TRACE_SIZE;
     pOutputTrace[2] = trace_size;
@@ -311,9 +338,6 @@ sem_t * sem_shutdown_done = NULL;
 // File lock name
 char file_lock_name[128];
 int file_lock_fd = -1;
-
-// Log name
-char log_name[128];
 
 int process_id = 0;
 
@@ -2687,11 +2711,16 @@ void server_setup (void)
             flags |= MAP_FIXED;
         }
         void * pTrace = mmap(requested_address, trace_size, PROT_READ | PROT_WRITE, flags, shmem_output_fd, 0);
+        
         if (verbose)
         {
             gettimeofday(&stop_time, NULL);
             duration = TimeDiff(start_time, stop_time);
         }
+
+        printf("%s trace mapping on %p with %ld MB\n", log_name, pTrace, trace_size >> 20);
+        fflush(stdout);
+
         if (pTrace == MAP_FAILED)
         {
             printf("ERROR: Failed calling mmap(pTrace) name=%s errno=%d=%s\n", shmem_output_name, errno, strerror(errno));
@@ -2738,6 +2767,8 @@ void server_setup (void)
         gettimeofday(&stop_time, NULL);
         duration = TimeDiff(start_time, stop_time);
 #endif
+        printf("%s trace mapping on %p with %ld MB\n", log_name, pTrace, chunk_player_mt_size >> 20);
+        fflush(stdout);        
         if (pTrace == MAP_FAILED)
         {
             printf("ERROR: Failed calling mmap(MT) errno=%d=%s\n", errno, strerror(errno));

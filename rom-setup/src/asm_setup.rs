@@ -36,12 +36,12 @@ pub fn generate_assembly(
     let bin_mo_file = base_path.with_file_name(bin_mo_file);
 
     [
-        (bin_mt_file, AsmGenerationMethod::AsmMinimalTraces),
-        (bin_rh_file, AsmGenerationMethod::AsmRomHistogram),
-        (bin_mo_file, AsmGenerationMethod::AsmMemOp),
+        (bin_mt_file, AsmGenerationMethod::AsmMinimalTraces, "MT"),
+        (bin_rh_file, AsmGenerationMethod::AsmRomHistogram, "RH"),
+        (bin_mo_file, AsmGenerationMethod::AsmMemOp, "MO"),
     ]
     .iter()
-    .for_each(|(file, gen_method)| {
+    .for_each(|(file, gen_method, trace_target)| {
         let asm_file = file.with_extension("asm");
         // Convert the ELF file to Zisk format and generates an assembly file
         let rv2zk = Riscv2zisk::new(elf_file_path.to_str().unwrap().to_string());
@@ -69,6 +69,7 @@ pub fn generate_assembly(
         let status = Command::new("make")
             .arg(format!("EMU_PATH={}", asm_file.to_str().unwrap()))
             .arg(format!("OUT_PATH={}", file.to_str().unwrap()))
+            .arg(format!("TRACE_TARGET={trace_target}"))
             .current_dir(emulator_asm_path)
             .stdout(if verbose { Stdio::inherit() } else { Stdio::null() })
             .stderr(if verbose { Stdio::inherit() } else { Stdio::null() })

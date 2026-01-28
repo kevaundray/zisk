@@ -1,3 +1,5 @@
+TRACE_TARGET=NONE
+
 # Debug build flags
 ifeq ($(dbg),1)
 	# CFLAGS = -O0 -g -D DEBUG -no-pie -ggdb -fno-inline
@@ -6,6 +8,17 @@ ifeq ($(dbg),1)
 else
 	CFLAGS = -O3 -no-pie
 	ASMFLAGS = --noexecstack
+endif
+
+ifeq ($(TRACE_TARGET),MT)
+    CFLAGS += -DTRACE_TARGET_MT
+    ASMFLAGS += --defsym TRACE_TARGET=1
+else ifeq ($(TRACE_TARGET),MO)
+    CFLAGS += -DTRACE_TARGET_MO
+    ASMFLAGS += --defsym TRACE_TARGET=7
+else ifeq ($(TRACE_TARGET),RH)
+    CFLAGS += -DTRACE_TARGET_RH
+    ASMFLAGS += --defsym TRACE_TARGET=2
 endif
 
 # Default EMU_PATH and OUT_PATH
