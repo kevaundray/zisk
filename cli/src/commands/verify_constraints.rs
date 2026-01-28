@@ -98,16 +98,15 @@ impl ZiskVerifyConstraints {
 
         let stdin = ZiskStdin::from_uri(self.inputs.as_ref())?;
 
-        let hints_stream = if self.hints.is_some() {
-            let hints_stream = StreamSource::from_uri(self.hints.as_ref().unwrap())?;
-
-            if matches!(hints_stream, StreamSource::Quic(_)) {
-                return Err(anyhow::anyhow!("QUIC hints source is not supported for execution."));
+        let hints_stream = match self.hints.as_ref() {
+            Some(uri) => {
+                let stream = StreamSource::from_uri(uri)?;
+                if matches!(stream, StreamSource::Quic(_)) {
+                    anyhow::bail!("QUIC hints source is not supported for execution.");
+                }
+                Some(stream)
             }
-
-            Some(hints_stream)
-        } else {
-            None
+            None => None,
         };
 
         let emulator = if cfg!(target_os = "macos") {

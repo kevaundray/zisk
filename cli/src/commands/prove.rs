@@ -142,11 +142,16 @@ impl ZiskProve {
 
         let stdin = ZiskStdin::from_uri(self.inputs.as_ref())?;
 
-        let hints_stream = StreamSource::from_uri(self.hints.as_ref().unwrap())?;
-
-        if matches!(hints_stream, StreamSource::Quic(_)) {
-            return Err(anyhow::anyhow!("QUIC hints source is not supported for execution."));
-        }
+        let hints_stream = match self.hints.as_ref() {
+            Some(uri) => {
+                let stream = StreamSource::from_uri(uri)?;
+                if matches!(stream, StreamSource::Quic(_)) {
+                    anyhow::bail!("QUIC hints source is not supported for execution.");
+                }
+                Some(stream)
+            }
+            None => None,
+        };
 
         let emulator = if cfg!(target_os = "macos") {
             if !self.emulator {
@@ -160,7 +165,7 @@ impl ZiskProve {
         let (result, world_rank) = if emulator {
             self.run_emu(stdin, gpu_params)?
         } else {
-            self.run_asm(stdin, Some(hints_stream), gpu_params)?
+            self.run_asm(stdin, hints_stream, gpu_params)?
         };
 
         if world_rank == 0 {
@@ -235,6 +240,7 @@ impl ZiskProve {
             .verify_proofs(self.verify_proofs)
             .minimal_memory(self.minimal_memory)
             .gpu(gpu_params)
+            .with_hints(hints_stream.is_some())
             .print_command_info()
             .build()?;
 
