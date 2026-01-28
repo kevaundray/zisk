@@ -572,7 +572,7 @@ impl<T: ZiskBackend + 'static> Worker<T> {
 
         match hints_source {
             HintsSourceDto::HintsPath(hints_uri) => {
-                let hints_stream = StreamSource::from_uri(hints_uri.into())?;
+                let hints_stream = StreamSource::from_uri(hints_uri)?;
                 prover.set_hints_stream(hints_stream)?;
             }
             HintsSourceDto::HintsStream(_hints_uri) => {

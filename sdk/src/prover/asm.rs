@@ -44,6 +44,7 @@ impl AsmProver {
         asm_rh_filename: String,
         base_port: Option<u16>,
         unlock_mapped_memory: bool,
+        with_hints: bool,
         gpu_params: ParamsGPU,
         verify_proofs: bool,
         minimal_memory: bool,
@@ -66,6 +67,7 @@ impl AsmProver {
             asm_rh_filename,
             base_port,
             unlock_mapped_memory,
+            with_hints,
             gpu_params,
             verify_proofs,
             minimal_memory,
@@ -215,6 +217,7 @@ impl AsmCoreProver {
         asm_rh_filename: String,
         base_port: Option<u16>,
         unlock_mapped_memory: bool,
+        with_hints: bool,
         gpu_params: ParamsGPU,
         verify_proofs: bool,
         minimal_memory: bool,
@@ -248,6 +251,7 @@ impl AsmCoreProver {
             asm_rh_path,
             base_port,
             unlock_mapped_memory,
+            with_hints,
         )?;
 
         let proofman = ProofMan::new(

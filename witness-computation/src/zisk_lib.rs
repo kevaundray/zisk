@@ -53,6 +53,7 @@ pub struct WitnessLib<F: PrimeField64> {
     unlock_mapped_memory: bool,
     shared_tables: bool,
     verbose_mode: proofman_common::VerboseMode,
+    with_hints: bool,
 }
 
 #[no_mangle]
@@ -65,6 +66,7 @@ fn init_library(
     base_port: Option<u16>,
     unlock_mapped_memory: bool,
     shared_tables: bool,
+    with_hints: bool,
 ) -> Result<Box<dyn ZiskLib<Goldilocks>>, Box<dyn std::error::Error>> {
     let chunk_size = CHUNK_SIZE;
 
@@ -77,6 +79,7 @@ fn init_library(
         base_port,
         unlock_mapped_memory,
         shared_tables,
+        with_hints,
         verbose_mode,
     });
 
@@ -201,26 +204,32 @@ impl<F: PrimeField64> WitnessLibrary<F> for WitnessLib<F> {
 
         // Create hints pipeline with null hints stream initially.
         // Debug flag: true = HintsShmem (shared memory), false = HintsFile (file output)
-        const USE_SHARED_MEMORY_HINTS: bool = true;
+        let hints_stream = if self.with_hints {
+            println!("Initializing zisk_lib with hints stream.");
+            const USE_SHARED_MEMORY_HINTS: bool = true;
 
-        let hints_processor = if USE_SHARED_MEMORY_HINTS {
-            let hints_shmem =
-                HintsShmem::new(self.base_port, local_rank, self.unlock_mapped_memory)
-                    .expect("zisk_lib: Failed to create HintsShmem");
+            let hints_processor = if USE_SHARED_MEMORY_HINTS {
+                let hints_shmem =
+                    HintsShmem::new(self.base_port, local_rank, self.unlock_mapped_memory)
+                        .expect("zisk_lib: Failed to create HintsShmem");
 
-            HintsProcessor::builder(hints_shmem)
-                .build()
-                .expect("zisk_lib: Failed to create PrecompileHintsProcessor")
+                HintsProcessor::builder(hints_shmem)
+                    .build()
+                    .expect("zisk_lib: Failed to create PrecompileHintsProcessor")
+            } else {
+                let hints_file = HintsFile::new(format!("hints_results_{}.bin", local_rank))
+                    .expect("zisk_lib: Failed to create HintsFile");
+
+                HintsProcessor::builder(hints_file)
+                    .build()
+                    .expect("zisk_lib: Failed to create PrecompileHintsProcessor")
+            };
+
+            Some(ZiskStream::new(hints_processor))
         } else {
-            let hints_file = HintsFile::new(format!("hints_results_{}.bin", local_rank))
-                .expect("zisk_lib: Failed to create HintsFile");
-
-            HintsProcessor::builder(hints_file)
-                .build()
-                .expect("zisk_lib: Failed to create PrecompileHintsProcessor")
+            println!("Initializing zisk_lib without hints stream.");
+            None
         };
-
-        let hints_stream = ZiskStream::new(hints_processor);
 
         let executor = Arc::new(ZiskExecutor::new(
             zisk_rom,
@@ -228,7 +237,7 @@ impl<F: PrimeField64> WitnessLibrary<F> for WitnessLib<F> {
             sm_bundle,
             self.chunk_size,
             emulator,
-            Some(hints_stream),
+            hints_stream,
         ));
 
         // Step 7: Register the executor as a component in the Witness Manager

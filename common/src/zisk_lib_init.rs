@@ -59,4 +59,5 @@ pub type ZiskLibInitFn<F> = fn(
     Option<u16>,     // Base port for the ASM microservices
     bool,            // Unlock_mapped_memory
     bool,            // Shared_tables
+    bool,            // With_hints
 ) -> Result<Box<dyn ZiskLib<F>>, Box<dyn std::error::Error>>;

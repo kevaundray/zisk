@@ -142,7 +142,7 @@ impl ZiskProve {
 
         let stdin = ZiskStdin::from_uri(self.inputs.as_ref())?;
 
-        let hints_stream = StreamSource::from_uri(self.hints.as_deref())?;
+        let hints_stream = StreamSource::from_uri(self.hints.as_ref().unwrap())?;
 
         if matches!(hints_stream, StreamSource::Quic(_)) {
             return Err(anyhow::anyhow!("QUIC hints source is not supported for execution."));

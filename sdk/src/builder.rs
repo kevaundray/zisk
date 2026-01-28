@@ -67,6 +67,7 @@ pub struct ProverClientBuilder<Backend = (), Operation = ()> {
     asm_path: Option<PathBuf>,
     base_port: Option<u16>,
     unlock_mapped_memory: bool,
+    with_hints: bool,
 
     // Prove-specific fields (only available when Operation = Prove)
     save_proofs: bool,
@@ -246,6 +247,12 @@ impl<Operation> ProverClientBuilder<AsmB, Operation> {
     #[must_use]
     pub fn unlock_mapped_memory(mut self, unlock: bool) -> Self {
         self.unlock_mapped_memory = unlock;
+        self
+    }
+
+    #[must_use]
+    pub fn with_hints(mut self, with_hints: bool) -> Self {
+        self.with_hints = with_hints;
         self
     }
 }
@@ -508,6 +515,7 @@ impl<X> ProverClientBuilder<AsmB, X> {
             asm_rh_filename,
             self.base_port,
             self.unlock_mapped_memory,
+            self.with_hints,
             self.gpu_params.filter(|_| !self.verify_constraints).unwrap_or_default(),
             self.verify_proofs,
             self.minimal_memory,
@@ -579,6 +587,7 @@ impl From<ProverClientBuilder<(), ()>> for ProverClientBuilder<EmuB, ()> {
             asm_path: None,
             base_port: None,
             unlock_mapped_memory: false,
+            with_hints: false,
 
             // Reset prove-specific fields (will be set when choosing operation)
             save_proofs: false,
@@ -615,6 +624,7 @@ impl From<ProverClientBuilder<(), ()>> for ProverClientBuilder<AsmB, ()> {
             asm_path: builder.asm_path,
             base_port: builder.base_port,
             unlock_mapped_memory: builder.unlock_mapped_memory,
+            with_hints: builder.with_hints,
 
             // Reset prove-specific fields (will be set when choosing operation)
             save_proofs: false,
@@ -653,6 +663,7 @@ impl<Backend> From<ProverClientBuilder<Backend, ()>>
             asm_path: builder.asm_path,
             base_port: builder.base_port,
             unlock_mapped_memory: builder.unlock_mapped_memory,
+            with_hints: builder.with_hints,
 
             // Initialize prove-specific fields to defaults for verify_constraints mode
             save_proofs: false,    // Not relevant for constraint verification
@@ -689,6 +700,7 @@ impl<Backend> From<ProverClientBuilder<Backend, ()>> for ProverClientBuilder<Bac
             asm_path: builder.asm_path,
             base_port: builder.base_port,
             unlock_mapped_memory: builder.unlock_mapped_memory,
+            with_hints: builder.with_hints,
 
             // Initialize prove-specific fields to sensible defaults
             save_proofs: true,     // Default to saving proofs when proving

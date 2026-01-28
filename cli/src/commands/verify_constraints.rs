@@ -98,11 +98,17 @@ impl ZiskVerifyConstraints {
 
         let stdin = ZiskStdin::from_uri(self.inputs.as_ref())?;
 
-        let hints_stream = StreamSource::from_uri(self.hints.as_deref())?;
+        let hints_stream = if self.hints.is_some() {
+            let hints_stream = StreamSource::from_uri(self.hints.as_ref().unwrap())?;
 
-        if matches!(hints_stream, StreamSource::Quic(_)) {
-            return Err(anyhow::anyhow!("QUIC hints source is not supported for execution."));
-        }
+            if matches!(hints_stream, StreamSource::Quic(_)) {
+                return Err(anyhow::anyhow!("QUIC hints source is not supported for execution."));
+            }
+
+            Some(hints_stream)
+        } else {
+            None
+        };
 
         let emulator = if cfg!(target_os = "macos") {
             if !self.emulator {
@@ -114,7 +120,7 @@ impl ZiskVerifyConstraints {
         };
 
         let result =
-            if emulator { self.run_emu(stdin)? } else { self.run_asm(stdin, Some(hints_stream))? };
+            if emulator { self.run_emu(stdin)? } else { self.run_asm(stdin, hints_stream)? };
 
         tracing::info!("");
         tracing::info!(
@@ -162,6 +168,7 @@ impl ZiskVerifyConstraints {
             .asm_path_opt(self.asm.clone())
             .base_port_opt(self.port)
             .unlock_mapped_memory(self.unlock_mapped_memory)
+            .with_hints(hints_stream.is_some())
             .print_command_info()
             .build()?;
 
