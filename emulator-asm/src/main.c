@@ -2453,6 +2453,11 @@ void client_run (void)
                 request[3] = 0;
                 request[4] = 0;
 
+                if (precompile_results_enabled && (gen_method != ChunkPlayerMTCollectMem) && (gen_method != ChunkPlayerMemReadsCollectMain))
+                {
+                    client_write_precompile_results();
+                }
+
                 // Send data to server
                 result = send(socket_fd, request, sizeof(request), 0);
                 if (result < 0)
@@ -2461,11 +2466,6 @@ void client_run (void)
                     fflush(stdout);
                     fflush(stderr);
                     exit(-1);
-                }
-
-                if (precompile_results_enabled && (gen_method != ChunkPlayerMTCollectMem) && (gen_method != ChunkPlayerMemReadsCollectMain))
-                {
-                    client_write_precompile_results();
                 }
 
                 // Read server response
