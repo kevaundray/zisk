@@ -6,7 +6,7 @@ use std::{collections::HashMap, fs, path::PathBuf, time::Instant};
 use tracing::warn;
 use zisk_build::ZISK_VERSION_MESSAGE;
 use zisk_common::io::{StreamSource, ZiskStdin};
-use zisk_common::{ExecutorStats, Stats};
+use zisk_common::{ExecutorStatsHandle, Stats};
 use zisk_pil::*;
 use zisk_sdk::ProverClient;
 
@@ -146,14 +146,26 @@ impl ZiskStats {
         );
 
         if let Some(stats) = &stats {
-            Self::print_stats(&stats.witness_stats);
+            Self::print_stats(&stats.get_inner().lock().unwrap().witness_stats);
             stats.print_stats();
         }
 
         Ok(())
     }
 
-    pub fn run_emu(&mut self, stdin: ZiskStdin) -> Result<(i32, i32, Option<ExecutorStats>)> {
+    fn create_stdin(&mut self) -> Result<ZiskStdin> {
+        let stdin = if let Some(input) = &self.input {
+            if !input.exists() {
+                return Err(anyhow::anyhow!("Input file not found at {:?}", input.display()));
+            }
+            ZiskStdin::from_file(input)?
+        } else {
+            ZiskStdin::null()
+        };
+        Ok(stdin)
+    }
+
+    pub fn run_emu(&mut self, stdin: ZiskStdin) -> Result<(i32, i32, Option<ExecutorStatsHandle>)> {
         let prover = ProverClient::builder()
             .emu()
             .witness()
@@ -172,7 +184,7 @@ impl ZiskStats {
         &mut self,
         stdin: ZiskStdin,
         hints_stream: Option<StreamSource>,
-    ) -> Result<(i32, i32, Option<ExecutorStats>)> {
+    ) -> Result<(i32, i32, Option<ExecutorStatsHandle>)> {
         let prover = ProverClient::builder()
             .asm()
             .witness()
