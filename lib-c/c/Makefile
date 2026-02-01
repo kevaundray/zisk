@@ -12,11 +12,16 @@ all:
 	nasm -felf64 src/ffiasm/fnec.asm -o build/fnec.o
 	nasm -felf64 src/ffiasm/fq.asm -o build/fq.o
 	nasm -felf64 src/ffiasm/bls12_381_384.asm -o build/bls12_381_384.o
+	nasm -felf64 src/ffiasm/psecp256r1.asm -o build/psecp256r1.o
+	nasm -felf64 src/ffiasm/nsecp256r1.asm -o build/nsecp256r1.o
 	gcc $(CFLAGS) -c src/ffiasm/fec.cpp -o build/fecc.o
 	gcc $(CFLAGS) -c src/ffiasm/fnec.cpp -o build/fnecc.o
 	gcc $(CFLAGS) -c src/ffiasm/fq.cpp -o build/fqc.o
 	gcc $(CFLAGS) -c src/ffiasm/bls12_381_384.cpp -o build/bls12_381_384c.o
+	gcc $(CFLAGS) -c src/ffiasm/psecp256r1.cpp -o build/psecp256r1c.o
+	gcc $(CFLAGS) -c src/ffiasm/nsecp256r1.cpp -o build/nsecp256r1c.o
 	gcc $(CFLAGS) -c src/ec/ec.cpp -o build/ec.o
+	gcc $(CFLAGS) -c src/secp256r1/secp256r1.cpp -o build/secp256r1.o
 	gcc $(CFLAGS) -c src/bn254/bn254.cpp -o build/bn254.o
 	gcc $(CFLAGS) -c src/bls12_381/bls12_381.cpp -o build/bls12_381.o
 	gcc $(CFLAGS) -c src/fcall/fcall.cpp -o build/fcall.o
@@ -32,13 +37,18 @@ all:
 		build/fnec.o\
 		build/fq.o\
 		build/bls12_381_384.o\
+		build/psecp256r1.o\
+		build/nsecp256r1.o\
 		build/ec.o\
+		build/secp256r1.o\
 		build/bn254.o\
 		build/bls12_381.o\
 		build/fecc.o\
 		build/fnecc.o\
 		build/fqc.o\
 		build/bls12_381_384c.o\
+		build/psecp256r1c.o\
+		build/nsecp256r1c.o\
 		build/fcall.o\
 		build/arith256.o\
 		build/arith384.o\
