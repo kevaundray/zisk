@@ -60,6 +60,7 @@ use crate::{Emulator, EmulatorKind, StaticSMBundle};
 use anyhow::Result;
 
 pub type DeviceMetricsByChunk = (ChunkId, Box<dyn BusDeviceMetrics>); // (chunk_id, metrics)
+type ChunkCollector = (usize, Box<dyn BusDevice<u64>>);
 
 #[allow(dead_code)]
 enum MinimalTraceExecutionMode {
@@ -110,9 +111,7 @@ pub struct ZiskExecutor<F: PrimeField64> {
     sm_bundle: StaticSMBundle<F>,
 
     /// Collectors by instance, storing statistics and collectors for each instance.
-    #[allow(clippy::type_complexity)]
-    collectors_by_instance:
-        Arc<RwLock<HashMap<usize, Vec<Option<(usize, Box<dyn BusDevice<u64>>)>>>>>,
+    collectors_by_instance: Arc<RwLock<HashMap<usize, Vec<Option<ChunkCollector>>>>>,
 
     /// Statistics collected during the execution, including time taken for collection and witness computation.
     stats: ExecutorStatsHandle,
@@ -561,7 +560,7 @@ impl<F: PrimeField64> ZiskExecutor<F> {
 
                         // Collect all device results locally to minimize lock acquisitions
                         let devices = data_bus.into_devices(false);
-                        let mut entries: Vec<(usize, usize, Option<(usize, Box<dyn BusDevice<u64>>)>)> = Vec::new();
+                        let mut entries: Vec<(usize, usize, Option<ChunkCollector>)> = Vec::new();
                         let mut affected_globals: Vec<(usize, usize)> = Vec::new();
 
                         for (global_id, collector) in devices {
@@ -576,7 +575,11 @@ impl<F: PrimeField64> ZiskExecutor<F> {
                                     .position(|&id| id == chunk_id)
                                     .expect("Chunk ID not found in order");
 
-                                entries.push((global_id, position, Some((chunk_id, collector.unwrap()))));
+                                entries.push((
+                                    global_id,
+                                    position,
+                                    Some((chunk_id, collector.unwrap())),
+                                ));
                                 affected_globals.push((global_id, global_id_idx));
                             }
                         }
@@ -591,8 +594,7 @@ impl<F: PrimeField64> ZiskExecutor<F> {
 
                         // Update atomic counters and mark ready instances (no lock needed)
                         for (global_id, global_id_idx) in affected_globals {
-                            if n_chunks_left[global_id_idx].fetch_sub(1, Ordering::SeqCst) == 1
-                            {
+                            if n_chunks_left[global_id_idx].fetch_sub(1, Ordering::SeqCst) == 1 {
                                 pctx.set_witness_ready(global_id, true);
 
                                 let collect_start_time = collect_start_times[global_id_idx]

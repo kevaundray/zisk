@@ -160,7 +160,7 @@ impl AsmRunnerMT {
                     let emu_trace = Arc::new(AsmMTChunk::to_emu_trace(&mut data_ptr));
                     let should_exit = emu_trace.end;
 
-                    on_chunk(chunk_id.0 as usize, emu_trace.clone());
+                    on_chunk(chunk_id.0, emu_trace.clone());
                     emu_traces.push(emu_trace);
 
                     if should_exit {

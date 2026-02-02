@@ -20,11 +20,13 @@ pub fn keccak256(input: &[u8], #[cfg(feature = "hints")] hints: &mut Vec<u64>) -
         // XOR block into state
         xor_block_into_state(&mut state, &input[offset..offset + KECCAK256_RATE]);
         // Apply Keccak-f permutation
-        syscall_keccak_f(
-            &mut state,
-            #[cfg(feature = "hints")]
-            hints,
-        );
+        unsafe {
+            syscall_keccak_f(
+                &mut state,
+                #[cfg(feature = "hints")]
+                hints,
+            );
+        }
         offset += KECCAK256_RATE;
     }
 
@@ -44,11 +46,13 @@ pub fn keccak256(input: &[u8], #[cfg(feature = "hints")] hints: &mut Vec<u64>) -
     xor_block_into_state(&mut state, &final_block);
 
     // Final permutation
-    syscall_keccak_f(
-        &mut state,
-        #[cfg(feature = "hints")]
-        hints,
-    );
+    unsafe {
+        syscall_keccak_f(
+            &mut state,
+            #[cfg(feature = "hints")]
+            hints,
+        );
+    }
 
     // Squeeze phase: extract first 32 bytes (256 bits) from state
     let mut result = [0u8; 32];
