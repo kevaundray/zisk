@@ -13,15 +13,16 @@ use std::{fs::File, io::Write, path::PathBuf};
 use zisk_common::ExecutorStatsEvent;
 use zisk_common::{
     io::{StreamSource, ZiskStdin},
-    ExecutorStatsHandle, ProofLog, ZiskExecutionResult, ZiskLib,
+    ExecutorStatsHandle, ProofLog, ZiskExecutionResult,
 };
+use zisk_witness::WitnessLib;
 
 pub(crate) struct ProverBackend {
     pub verify_constraints: bool,
     pub aggregation: bool,
     pub rma: bool,
     pub compressed: bool,
-    pub witness_lib: Box<dyn ZiskLib<Goldilocks>>,
+    pub witness_lib: WitnessLib<Goldilocks>,
     pub proving_key: PathBuf,
     pub verify_proofs: bool,
     pub minimal_memory: bool,

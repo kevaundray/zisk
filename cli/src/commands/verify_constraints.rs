@@ -19,10 +19,6 @@ use zisk_sdk::{ProverClient, ZiskVerifyConstraintsResult};
         .required(false)
 ))]
 pub struct ZiskVerifyConstraints {
-    /// Witness computation dynamic library path
-    #[clap(short = 'w', long)]
-    pub witness_lib: Option<PathBuf>,
-
     /// ROM file path
     /// This is the path to the ROM file that the witness computation dynamic library will use
     /// to generate the witness.
@@ -138,7 +134,6 @@ impl ZiskVerifyConstraints {
         let prover = ProverClient::builder()
             .emu()
             .verify_constraints()
-            .witness_lib_path_opt(self.witness_lib.clone())
             .proving_key_path_opt(self.proving_key.clone())
             .elf_path(self.elf.clone())
             .verbose(self.verbose)
@@ -157,7 +152,6 @@ impl ZiskVerifyConstraints {
         let prover = ProverClient::builder()
             .asm()
             .verify_constraints()
-            .witness_lib_path_opt(self.witness_lib.clone())
             .proving_key_path_opt(self.proving_key.clone())
             .elf_path(self.elf.clone())
             .verbose(self.verbose)
