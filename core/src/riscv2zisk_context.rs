@@ -6,7 +6,7 @@ use riscv::{riscv_interpreter, RiscvInstruction};
 
 use crate::{
     convert_vector, ZiskInstBuilder, ZiskRom, ARCH_ID_CSR_ADDR, ARCH_ID_ZISK, CSR_ADDR,
-    EXTRA_PARAMS, FLOAT_LIB_ROM_ADDR, FLOAT_LIB_SP, FREG_F0, FREG_INST, FREG_RA, FREG_X0,
+    EXTRA_PARAMS_ADDR, FLOAT_LIB_ROM_ADDR, FLOAT_LIB_SP, FREG_F0, FREG_INST, FREG_RA, FREG_X0,
     INPUT_ADDR, MTVEC, OUTPUT_ADDR, REG_X0, ROM_ENTRY, ROM_EXIT,
 };
 
@@ -1179,7 +1179,7 @@ impl Riscv2ZiskContext<'_> {
                         self.output_precompile = Some(i.csr);
                         zib.src_a("imm", 0, false);
                         zib.op("copyb").unwrap();
-                        zib.store("mem", EXTRA_PARAMS as i64, false, false);
+                        zib.store("mem", EXTRA_PARAMS_ADDR as i64, false, false);
                         zib.verbose("param");
                     }
                     _ => {

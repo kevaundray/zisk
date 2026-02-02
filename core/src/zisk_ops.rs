@@ -24,7 +24,7 @@ use tiny_keccak::keccakf;
 
 use crate::{
     sha256f, EmulationMode, InstContext, Mem, ZiskOperationType, ZiskRequiredOperation,
-    EXTRA_PARAMS, M64, REG_A0, SYS_ADDR,
+    EXTRA_PARAMS_ADDR, M64, REG_A0, SYS_ADDR,
 };
 
 use lib_c::{inverse_fn_ec_c, inverse_fp_ec_c, sqrt_fp_ec_parity_c, Fcall, FcallContext};
@@ -2423,13 +2423,13 @@ pub fn opc_dma_memcpy(ctx: &mut InstContext) {
 
     match ctx.emulation_mode {
         EmulationMode::Mem => {
-            let count = ctx.mem.read(EXTRA_PARAMS, 8);
+            let count = ctx.mem.read(EXTRA_PARAMS_ADDR, 8);
             ctx.mem.memcpy(dst, src, count);
         }
         EmulationMode::GenerateMemReads => {
             // In generate mode we need to populate precompiled.input_data with
             // information needed
-            let count = ctx.mem.read(EXTRA_PARAMS, 8);
+            let count = ctx.mem.read(EXTRA_PARAMS_ADDR, 8);
             ctx.precompiled.input_data.clear();
 
             #[cfg(feature = "debug_dma")]
@@ -2514,7 +2514,7 @@ pub fn op_dma_memcpy(_a: u64, _b: u64) -> (u64, bool) {
 pub fn ops_dma_memcpy(ctx: &InstContext, stats: &mut dyn OpStats) {
     let dst = ctx.a;
     let src = ctx.b;
-    let count = ctx.mem.read(EXTRA_PARAMS, 8);
+    let count = ctx.mem.read(EXTRA_PARAMS_ADDR, 8);
 
     // pre, post, dma_align, dma_unalign
     if count == 0 {
@@ -2573,7 +2573,7 @@ pub fn ops_dma_memcpy(ctx: &InstContext, stats: &mut dyn OpStats) {
 pub fn opc_dma_memcmp(ctx: &mut InstContext) {
     let addr_a = ctx.a;
     let addr_b = ctx.b;
-    let count = ctx.mem.read(EXTRA_PARAMS, 8);
+    let count = ctx.mem.read(EXTRA_PARAMS_ADDR, 8);
 
     println!("opc_dma_memcmp 0x{addr_a:08X} 0x{addr_b:08X} {count} {:?}", ctx.emulation_mode);
 
@@ -2616,7 +2616,7 @@ pub fn op_dma_memcmp(_a: u64, _b: u64) -> (u64, bool) {
 pub fn ops_dma_memcmp(ctx: &InstContext, stats: &mut dyn OpStats) {
     let addr_a = ctx.a;
     let addr_b = ctx.b;
-    let count = ctx.mem.read(EXTRA_PARAMS, 8);
+    let count = ctx.mem.read(EXTRA_PARAMS_ADDR, 8);
 
     // pre, post, dma_align, dma_unalign
     if count == 0 {

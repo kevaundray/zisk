@@ -30,6 +30,7 @@ mod stats_cost_mark;
 mod stats_costs;
 pub mod stats_coverage_report;
 pub mod stats_report;
+mod disasm;
 
 pub use elf_symbol_reader::*;
 pub use emu::*;
@@ -48,4 +49,5 @@ pub use stats::*;
 pub use stats_cost_mark::*;
 pub use stats_costs::*;
 pub use stats_coverage_report::*;
+pub use disasm::*;
 pub use stats_report::*;

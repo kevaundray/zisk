@@ -2,7 +2,7 @@ use precompiles_common::MemBusHelpers;
 use precompiles_common::MemProcessor;
 use precompiles_helpers::{DmaHelpers, DmaInfo};
 use zisk_common::{A, B, DMA_ENCODED, OP, OPERATION_PRECOMPILED_BUS_DATA_SIZE, STEP};
-use zisk_core::{zisk_ops::ZiskOp, EXTRA_PARAMS};
+use zisk_core::{zisk_ops::ZiskOp, EXTRA_PARAMS_ADDR};
 
 pub fn generate_dma_mem_inputs<P: MemProcessor>(
     data: &[u64],
@@ -26,7 +26,7 @@ pub fn generate_dma_mem_inputs<P: MemProcessor>(
     // stores happend after loads.
 
     MemBusHelpers::mem_aligned_load(
-        EXTRA_PARAMS as u32,
+        EXTRA_PARAMS_ADDR as u32,
         main_step,
         DmaInfo::get_count(encoded) as u64,
         mem_processors,
@@ -208,7 +208,7 @@ pub fn skip_dma_mem_inputs<P: MemProcessor>(
     let dst64_to = (dst + use_count + 7) as u32 & !0x07;
     let src64_to = (src + use_count + 7) as u32 & !0x07;
 
-    if !mem_processors.skip_addr(EXTRA_PARAMS as u32) {
+    if !mem_processors.skip_addr(EXTRA_PARAMS_ADDR as u32) {
         return false;
     }
 

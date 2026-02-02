@@ -1537,8 +1537,20 @@ impl<'a> Emu<'a> {
         if options.read_symbols {
             if let Some(elf_file) = &options.elf {
                 println!("Loading symbols from ELF file: {elf_file}");
+
+                // Set ROI filter if provided
+                if let Some(roi_filter) = &options.roi_filter {
+                    match elf.set_roi_filter(roi_filter) {
+                        Ok(_) => println!("ROI filter applied: {}", roi_filter),
+                        Err(e) => eprintln!("Invalid ROI filter regex '{}': {}", roi_filter, e),
+                    }
+                }
+
                 elf.load_from_file(elf_file).unwrap();
                 let mut count = 0;
+                let mut roi_count = 0;
+
+                // First pass: add all ROIs
                 for symbol in elf.functions() {
                     count += 1;
                     self.ctx.stats.add_roi(
@@ -1547,7 +1559,46 @@ impl<'a> Emu<'a> {
                         &symbol.name,
                     );
                 }
-                println!("Loaded {} function symbols", count);
+
+                // Second pass: mark selected ROIs for tracking
+                for symbol in elf.functions() {
+                    if symbol.is_selected_roi {
+                        roi_count += 1;
+                        println!("  [Selected ROI] {}", symbol.name);
+                        self.ctx
+                            .stats
+                            .mark_roi_as_selected(symbol.address as u32, options.track_calls);
+                    }
+                }
+
+                println!(
+                    "Loaded {} function symbols ({} marked as selected ROI)",
+                    count, roi_count
+                );
+
+                // Setup call tracking if requested
+                if options.track_calls > 0 {
+                    if roi_count > 0 {
+                        println!(
+                            "Call tracking enabled for {} ROI function(s) (tracking {} parameters)",
+                            roi_count, options.track_calls
+                        );
+                        println!("Output path: {}", options.track_output_path);
+                        println!("Separator: '{}'", options.track_separator);
+
+                        // Initialize tracking files
+                        if let Err(e) = self
+                            .ctx
+                            .stats
+                            .init_roi_tracking(&options.track_output_path, &options.track_separator)
+                        {
+                            eprintln!("Error initializing ROI tracking: {}", e);
+                        }
+                    } else {
+                        eprintln!("Warning: --track-calls specified but no ROI symbols found");
+                    }
+                }
+
                 count = 0;
                 for (id, tag) in elf.profile_tags() {
                     count += 1;
@@ -1558,11 +1609,18 @@ impl<'a> Emu<'a> {
                 self.ctx.stats.set_roi_callers(options.roi_callers);
                 self.ctx.stats.set_top_roi_detail(options.top_roi_detail);
                 self.ctx.stats.set_main_name(options.main_name.clone());
+                self.ctx.stats.set_use_thousands_sep(!options.no_thousands_sep);
+                self.ctx.stats.set_top_rois_filter(options.top_roi_filter);
             }
         }
         if options.coverage && !options.stats {
             panic!("Coverage feature needs at least stats option");
         }
+        if options.top_histogram > 0 && !options.stats {
+            panic!("Top Histogram feature needs at least stats option");
+        }
+
+        self.ctx.stats.set_top_histogram(options.top_histogram);
         self.ctx.stats.set_coverage(options.coverage);
 
         self.ctx.stats.set_legacy_stats(options.legacy_stats);
@@ -1712,6 +1770,32 @@ impl<'a> Emu<'a> {
             println!("{report}");
             if let Some(store_op_output_file) = &options.store_op_output {
                 self.ctx.stats.flush_op_data_to_file(store_op_output_file).unwrap();
+            }
+
+            // Generate disassembly if requested
+            if let Some(disasm_file) = &options.disasm {
+                println!("Writing disassembly to: {}", disasm_file);
+                // Try to load symbols if not already loaded
+                let symbols = if options.read_symbols {
+                    if let Some(elf_file) = &options.elf {
+                        let mut elf = ElfSymbolReader::new();
+                        if let Some(roi_filter) = &options.roi_filter {
+                            let _ = elf.set_roi_filter(roi_filter);
+                        }
+                        elf.load_from_file(elf_file).ok();
+                        Some(elf)
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                };
+
+                if let Err(e) = self.ctx.stats.write_disassembly(self.rom, disasm_file, symbols) {
+                    eprintln!("Error writing disassembly: {}", e);
+                } else {
+                    println!("Disassembly written successfully");
+                }
             }
         }
     }
