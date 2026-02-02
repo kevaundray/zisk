@@ -51,7 +51,6 @@ macro_rules! hint_fields {
     };
 }
 
-/// Read a length-prefixed field from hint data
 // #[inline]
 // fn read_field<'a>(data: &'a [u64], pos: &mut usize) -> anyhow::Result<&'a [u64]> {
 //     let len =
