@@ -188,7 +188,7 @@ impl UnixSocketWriter {
         let writer = UnixSocketStreamWriter::new(path)?;
         Ok(Self { inner: writer })
     }
-    
+
     pub fn open(&mut self) -> Result<()> {
         self.inner.open()
     }
