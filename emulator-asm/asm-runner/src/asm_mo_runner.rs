@@ -8,7 +8,13 @@ use std::sync::atomic::{fence, Ordering};
 use tracing::error;
 
 use crate::SEM_CHUNK_DONE_WAIT_DURATION;
-use crate::{AsmMOChunk, AsmMOHeader, AsmRunError, AsmService, AsmServices, AsmSharedMemory};
+use crate::TRACE_DELTA_SIZE;
+use crate::TRACE_INITIAL_SIZE;
+use crate::TRACE_MAX_SIZE;
+use crate::{
+    AsmMOChunk, AsmMOHeader, AsmMultiSharedMemory, AsmRunError, AsmService, AsmServices,
+    AsmSharedMemory,
+};
 use mem_planner_cpp::MemPlanner;
 
 use anyhow::{Context, Result};
@@ -20,7 +26,7 @@ use zisk_common::ExecutorStatsEvent;
 use mem_common::save_plans;
 
 pub struct PreloadedMO {
-    pub output_shmem: AsmSharedMemory<AsmMOHeader>,
+    pub output_shmem: AsmMultiSharedMemory<AsmMOHeader>,
     mem_planner: Option<MemPlanner>,
     handle_mo: Option<std::thread::JoinHandle<MemPlanner>>,
 }
@@ -41,10 +47,16 @@ impl PreloadedMO {
             base_port.unwrap(),
             AsmService::MO,
             local_rank,
+            None,
         );
 
-        let output_shared_memory =
-            AsmSharedMemory::<AsmMOHeader>::open_and_map(&output_name, unlock_mapped_memory)?;
+        let output_shared_memory = AsmMultiSharedMemory::<AsmMOHeader>::open_and_map(
+            &output_name,
+            TRACE_INITIAL_SIZE,
+            TRACE_DELTA_SIZE,
+            TRACE_MAX_SIZE,
+            unlock_mapped_memory,
+        )?;
 
         Ok(Self {
             output_shmem: output_shared_memory,
@@ -150,12 +162,26 @@ impl AsmRunnerMO {
             ExecutorStatsEvent::Begin,
         );
 
-        // Threshold (in bytes) used to detect when the shared memory region size has changed.
-        // Computed to optimize the common case where minor size fluctuations are ignored.
-        // It is based on the worst-case scenario of memory usage.
-        let threshold_bytes = (chunk_size as usize * 200) + (44 * 8) + 32;
+        // Threshold (in bytes) used to detect when we need to check for new shared memory files.
+        // Must match MAX_CHUNK_TRACE_SIZE from main.c to ensure we check before the producer
+        // reallocates. Constants from main.c:
+        //   MAX_MTRACE_REGS_ACCESS_SIZE = (2 + 2 + 3) * 8 = 56
+        //   MAX_BYTES_DIRECT_MTRACE = 256
+        //   MAX_BYTES_MTRACE_STEP = 256 + 56 = 312
+        //   MAX_TRACE_CHUNK_INFO = (44 * 8) + 32 = 384
+        //   MAX_CHUNK_TRACE_SIZE = (chunk_size * MAX_BYTES_MTRACE_STEP) + MAX_TRACE_CHUNK_INFO
+        const MAX_MTRACE_REGS_ACCESS_SIZE: usize = (2 + 2 + 3) * 8;
+        const MAX_BYTES_DIRECT_MTRACE: usize = 256;
+        const MAX_BYTES_MTRACE_STEP: usize = MAX_BYTES_DIRECT_MTRACE + MAX_MTRACE_REGS_ACCESS_SIZE;
+        const MAX_TRACE_CHUNK_INFO: usize = (44 * 8) + 32;
+
+        let threshold_bytes = (chunk_size as usize * MAX_BYTES_MTRACE_STEP) + MAX_TRACE_CHUNK_INFO;
         let mut threshold = unsafe {
-            preloaded.output_shmem.mapped_ptr().add(threshold_bytes) as *const AsmMOChunk
+            preloaded
+                .output_shmem
+                .mapped_ptr()
+                .add(preloaded.output_shmem.total_mapped_size() - threshold_bytes)
+                as *const AsmMOChunk
         };
 
         let exit_code = loop {
@@ -164,17 +190,19 @@ impl AsmRunnerMO {
                     // Synchronize with memory changes from the C++ side
                     fence(Ordering::Acquire);
 
-                    // Check if we need to remap the shared memory
+                    // Check if we need to map additional shared memory files.
                     if data_ptr >= threshold
-                        && preloaded
-                            .output_shmem
-                            .check_size_changed(&mut data_ptr)
-                            .context("Failed to check and remap shared memory for MO trace")?
+                        && preloaded.output_shmem.check_size_changed().context(
+                            "Failed to check and map new shared memory files for MO trace",
+                        )?
                     {
-                        threshold = unsafe {
-                            preloaded.output_shmem.mapped_ptr().add(threshold_bytes)
-                                as *const AsmMOChunk
-                        };
+                        // Update threshold based on new total mapped size
+                        threshold =
+                            unsafe {
+                                preloaded.output_shmem.mapped_ptr().add(
+                                    preloaded.output_shmem.total_mapped_size() - threshold_bytes,
+                                ) as *const AsmMOChunk
+                            };
                     }
 
                     let chunk = unsafe { std::ptr::read(data_ptr) };

@@ -10,8 +10,9 @@ use std::time::Instant;
 use tracing::{error, info};
 
 use crate::{
-    AsmMTChunk, AsmMTHeader, AsmRunError, AsmService, AsmServices, AsmSharedMemory,
-    SEM_CHUNK_DONE_WAIT_DURATION,
+    AsmMTChunk, AsmMTHeader, AsmMultiSharedMemory, AsmRunError, AsmService, AsmServices,
+    AsmSharedMemory, SEM_CHUNK_DONE_WAIT_DURATION, TRACE_DELTA_SIZE, TRACE_INITIAL_SIZE,
+    TRACE_MAX_SIZE,
 };
 
 use anyhow::{Context, Result};
@@ -26,7 +27,7 @@ pub enum MinimalTraces {
 }
 
 pub struct PreloadedMT {
-    pub output_shmem: AsmSharedMemory<AsmMTHeader>,
+    pub output_shmem: AsmMultiSharedMemory<AsmMTHeader>,
 }
 
 impl PreloadedMT {
@@ -45,10 +46,16 @@ impl PreloadedMT {
             base_port.unwrap(),
             AsmService::MT,
             local_rank,
+            None,
         );
 
-        let output_shared_memory =
-            AsmSharedMemory::<AsmMTHeader>::open_and_map(&output_name, unlock_mapped_memory)?;
+        let output_shared_memory = AsmMultiSharedMemory::<AsmMTHeader>::open_and_map(
+            &output_name,
+            TRACE_INITIAL_SIZE,
+            TRACE_DELTA_SIZE,
+            TRACE_MAX_SIZE,
+            unlock_mapped_memory,
+        )?;
 
         Ok(Self { output_shmem: output_shared_memory })
     }
@@ -120,12 +127,29 @@ impl AsmRunnerMT {
 
         let __stats = _stats.clone();
 
-        // Threshold (in bytes) used to detect when the shared memory region size has changed.
-        // Computed to optimize the common case where minor size fluctuations are ignored.
-        // It is based on the worst-case scenario of memory usage.
-        let threshold_bytes = (chunk_size as usize * 200) + (44 * 8) + 32;
+        // Calculate threshold for detecting when to map additional shared memory files.
+        // CRITICAL: These constants must match main.c to ensure we check for new files BEFORE
+        // the C++ producer needs to allocate beyond current mapped region. Mismatch will cause
+        // the producer to map new files while we still hold Cow::Borrowed references to old
+        // mappings, creating dangling pointers.
+        //
+        // Constants from main.c:
+        //   MAX_MTRACE_REGS_ACCESS_SIZE = (2 + 2 + 3) * 8    // Register access overhead per step
+        //   MAX_BYTES_DIRECT_MTRACE     = 256                // Direct memory trace data per step
+        //   MAX_BYTES_MTRACE_STEP       = 256 + 56 = 312     // Total per-step overhead
+        //   MAX_TRACE_CHUNK_INFO        = (44 * 8) + 32      // Chunk metadata size
+        const MAX_MTRACE_REGS_ACCESS_SIZE: usize = (2 + 2 + 3) * 8; // 56 bytes
+        const MAX_BYTES_DIRECT_MTRACE: usize = 256;
+        const MAX_BYTES_MTRACE_STEP: usize = MAX_BYTES_DIRECT_MTRACE + MAX_MTRACE_REGS_ACCESS_SIZE;
+        const MAX_TRACE_CHUNK_INFO: usize = (44 * 8) + 32; // 384 bytes
+
+        let threshold_bytes = (chunk_size as usize * MAX_BYTES_MTRACE_STEP) + MAX_TRACE_CHUNK_INFO;
         let mut threshold = unsafe {
-            preloaded.output_shmem.mapped_ptr().add(threshold_bytes) as *const AsmMTChunk
+            preloaded
+                .output_shmem
+                .mapped_ptr()
+                .add(preloaded.output_shmem.total_mapped_size() - threshold_bytes)
+                as *const AsmMTChunk
         };
 
         // Pre-allocate reasonable initial capacity to avoid early reallocations
@@ -149,17 +173,19 @@ impl AsmRunnerMT {
                     // Synchronize with memory changes from the C++ side
                     fence(Ordering::Acquire);
 
-                    // Check if we need to remap the shared memory
+                    // Check if we need to map additional shared memory files.
                     if data_ptr >= threshold
-                        && preloaded
-                            .output_shmem
-                            .check_size_changed(&mut data_ptr)
-                            .context("Failed to check and remap shared memory for MO trace")?
+                        && preloaded.output_shmem.check_size_changed().context(
+                            "Failed to check and map new shared memory files for MT trace",
+                        )?
                     {
-                        threshold = unsafe {
-                            preloaded.output_shmem.mapped_ptr().add(threshold_bytes)
-                                as *const AsmMTChunk
-                        };
+                        // Update threshold based on new total mapped size
+                        threshold =
+                            unsafe {
+                                preloaded.output_shmem.mapped_ptr().add(
+                                    preloaded.output_shmem.total_mapped_size() - threshold_bytes,
+                                ) as *const AsmMTChunk
+                            };
                     }
 
                     let emu_trace = Arc::new(AsmMTChunk::to_emu_trace(&mut data_ptr));

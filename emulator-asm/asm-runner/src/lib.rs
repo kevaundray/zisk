@@ -22,6 +22,8 @@ mod hints_file;
 mod hints_shmem;
 #[cfg(not(all(target_os = "linux", target_arch = "x86_64")))]
 mod hints_shmem_stub;
+#[cfg(all(target_os = "linux", target_arch = "x86_64"))]
+mod multi_shmem;
 mod shmem_reader;
 mod shmem_utils;
 mod shmem_writer;
@@ -48,9 +50,15 @@ pub use hints_file::*;
 pub use hints_shmem::*;
 #[cfg(not(all(target_os = "linux", target_arch = "x86_64")))]
 pub use hints_shmem_stub::*;
+#[cfg(all(target_os = "linux", target_arch = "x86_64"))]
+pub use multi_shmem::*;
 pub use shmem_reader::*;
 pub use shmem_utils::*;
 pub use shmem_writer::*;
+
+pub(crate) const TRACE_INITIAL_SIZE: usize = 0x180000000; // 6GB
+pub(crate) const TRACE_DELTA_SIZE: usize = 0x080000000; // 2GB
+pub(crate) const TRACE_MAX_SIZE: usize = 0x1000000000; // 64GB
 
 #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
 const SEM_CHUNK_DONE_WAIT_DURATION: std::time::Duration = std::time::Duration::from_secs(10);

@@ -29,6 +29,7 @@ impl PreloadedRH {
             base_port.unwrap(),
             AsmService::RH,
             local_rank,
+            Some(0),
         );
 
         let output_shared_memory =

@@ -280,7 +280,20 @@ impl<H: AsmShmemHeader> AsmSharedMemory<H> {
         format!("{}_input", AsmServices::shmem_prefix(port, local_rank))
     }
 
-    pub fn shmem_output_name(port: u16, asm_service: AsmService, local_rank: i32) -> String {
+    pub fn shmem_output_name(
+        port: u16,
+        asm_service: AsmService,
+        local_rank: i32,
+        suffix: Option<isize>,
+    ) -> String {
+        if let Some(suffix) = suffix {
+            return format!(
+                "{}_{}_output_{}",
+                AsmServices::shmem_prefix(port, local_rank),
+                asm_service.as_str(),
+                suffix
+            );
+        }
         format!("{}_{}_output", AsmServices::shmem_prefix(port, local_rank), asm_service.as_str())
     }
 
