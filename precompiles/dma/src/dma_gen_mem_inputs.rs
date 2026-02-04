@@ -55,7 +55,7 @@ pub fn generate_dma_mem_inputs<P: MemProcessor>(
 
         MemBusHelpers::mem_aligned_load(dst64, main_step, pre_value, mem_processors);
 
-        let write_value = if DmaInfo::is_double_read_pre(encoded) {
+        if DmaInfo::is_double_read_pre(encoded) {
             let second_read_value = data_ext[pre_data_offset + 1];
             #[cfg(feature = "debug_dma")]
             println!(
@@ -83,8 +83,7 @@ pub fn generate_dma_mem_inputs<P: MemProcessor>(
                 pre_value,
                 &[read_value],
             )
-        };
-        write_value
+        }
     } else {
         0
     };
@@ -130,7 +129,7 @@ pub fn generate_dma_mem_inputs<P: MemProcessor>(
 
         MemBusHelpers::mem_aligned_load(post_dst64, main_step, pre_value, mem_processors);
 
-        let write_value = if DmaInfo::is_double_read_post(encoded) {
+        if DmaInfo::is_double_read_post(encoded) {
             let second_read_value = data_ext[post_data_offset + 1];
             #[cfg(feature = "debug_dma")]
             println!(
@@ -158,8 +157,7 @@ pub fn generate_dma_mem_inputs<P: MemProcessor>(
                 pre_value,
                 &[read_value],
             )
-        };
-        write_value
+        }
     } else {
         0
     };
