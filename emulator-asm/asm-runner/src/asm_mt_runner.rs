@@ -34,7 +34,7 @@ impl MTOutputShmem {
 
         let output_name = shmem_output_name(port, AsmService::MT, local_rank, None);
 
-        let output_shared_memory = AsmMultiSharedMemory::<AsmMTHeader>::open_and_map(
+        let output_shmem = AsmMultiSharedMemory::<AsmMTHeader>::open_and_map(
             &output_name,
             TRACE_INITIAL_SIZE,
             TRACE_DELTA_SIZE,
@@ -42,7 +42,7 @@ impl MTOutputShmem {
             unlock_mapped_memory,
         )?;
 
-        Ok(Self { output_shmem: output_shared_memory })
+        Ok(Self { output_shmem })
     }
 }
 
