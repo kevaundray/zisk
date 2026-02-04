@@ -20,12 +20,6 @@ use anyhow::{Context, Result};
 #[cfg(feature = "stats")]
 use zisk_common::ExecutorStatsEvent;
 
-pub enum MinimalTraces {
-    None,
-    EmuTrace(Vec<EmuTrace>),
-    AsmEmuTrace(AsmRunnerMT),
-}
-
 pub struct PreloadedMT {
     pub output_shmem: AsmMultiSharedMemory<AsmMTHeader>,
 }

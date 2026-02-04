@@ -10,15 +10,6 @@ pub trait Task: Send + Sync + 'static {
     fn execute(self) -> Self::Output;
 }
 
-pub type TaskFactory<'a, T> = Box<dyn Fn(ChunkId, Arc<EmuTrace>) -> T + Send + Sync + 'a>;
-
-#[derive(Debug)]
-pub enum MinimalTraces {
-    None,
-    EmuTrace(Vec<EmuTrace>),
-    AsmEmuTrace(AsmRunnerMT),
-}
-
 pub struct PreloadedMT {}
 
 // This struct is used to run the assembly code in a separate process and generate minimal traces.

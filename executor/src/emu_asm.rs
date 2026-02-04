@@ -9,7 +9,7 @@ use crate::{
 };
 use asm_runner::{
     write_input, AsmMTHeader, AsmRunnerMO, AsmRunnerMT, AsmRunnerRH, AsmService, AsmServices,
-    AsmSharedMemory, MinimalTraces, PreloadedMO, PreloadedMT, PreloadedRH, SharedMemoryWriter,
+    AsmSharedMemory, PreloadedMO, PreloadedMT, PreloadedRH, SharedMemoryWriter,
 };
 use data_bus::DataBusTrait;
 use fields::PrimeField64;
@@ -104,7 +104,7 @@ impl EmulatorAsm {
     ///
     /// # Returns
     /// A tuple containing:
-    /// * `MinimalTraces` - The computed minimal traces.
+    /// * `Vec<EmuTrace>` - The computed minimal traces.
     /// * `DeviceMetricsList` - Flat device metrics collected during execution.
     /// * `NestedDeviceMetricsList` - Hierarchical device metrics collected during execution.
     /// * `Option<JoinHandle<AsmRunnerMO>>` - Optional join handle for the memory-only ASM runner.
@@ -118,7 +118,7 @@ impl EmulatorAsm {
         stats: &ExecutorStatsHandle,
         _caller_stats_id: u64,
     ) -> (
-        MinimalTraces,
+        Vec<EmuTrace>,
         DeviceMetricsList,
         NestedDeviceMetricsList,
         Option<JoinHandle<AsmRunnerMO>>,
@@ -196,11 +196,7 @@ impl EmulatorAsm {
         let (min_traces, main_count, secn_count) = self.run_mt_assembly(sm_bundle, stats);
 
         // Store execute steps
-        let steps = if let MinimalTraces::AsmEmuTrace(asm_min_traces) = &min_traces {
-            asm_min_traces.vec_chunks.iter().map(|trace| trace.steps).sum::<u64>()
-        } else {
-            panic!("Expected AsmEmuTrace, got something else");
-        };
+        let steps = min_traces.iter().map(|trace| trace.steps).sum::<u64>();
 
         let execution_result = ZiskExecutionResult::new(steps);
 
@@ -248,7 +244,7 @@ impl EmulatorAsm {
         &self,
         sm_bundle: &StaticSMBundle<F>,
         stats: &ExecutorStatsHandle,
-    ) -> (MinimalTraces, DeviceMetricsList, NestedDeviceMetricsList) {
+    ) -> (Vec<EmuTrace>, DeviceMetricsList, NestedDeviceMetricsList) {
         #[cfg(feature = "stats")]
         let parent_stats_id = stats.next_id();
         #[cfg(feature = "stats")]
@@ -315,7 +311,6 @@ impl EmulatorAsm {
             .into_iter()
             .map(|arc| Arc::try_unwrap(arc).expect("Arc should have single owner after scope"))
             .collect();
-        let asm_runner_mt = AsmRunnerMT::new(emu_traces);
 
         let mut data_buses = results_mu.into_inner().unwrap();
 
@@ -344,7 +339,7 @@ impl EmulatorAsm {
 
         #[cfg(feature = "stats")]
         stats.add_stat(0, parent_stats_id, "RUN_MT_ASSEMBLY", 0, ExecutorStatsEvent::End);
-        (MinimalTraces::AsmEmuTrace(asm_runner_mt), main_count, secn_count)
+        (emu_traces, main_count, secn_count)
     }
 }
 
@@ -357,7 +352,7 @@ impl<F: PrimeField64> crate::Emulator<F> for EmulatorAsm {
         stats: &ExecutorStatsHandle,
         caller_stats_id: u64,
     ) -> (
-        MinimalTraces,
+        Vec<EmuTrace>,
         DeviceMetricsList,
         NestedDeviceMetricsList,
         Option<JoinHandle<AsmRunnerMO>>,
