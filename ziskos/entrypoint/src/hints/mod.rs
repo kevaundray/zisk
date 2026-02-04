@@ -26,6 +26,9 @@ use std::{
 use zisk_common::io::{StreamWrite, UnixSocketStreamWriter};
 
 #[cfg(zisk_hints_single_thread)]
+use std::thread::ThreadId;
+
+#[cfg(zisk_hints_single_thread)]
 use once_cell::sync::OnceCell;
 
 pub use bls12_381::*;
@@ -130,7 +133,7 @@ pub fn close_hints() -> io::Result<()> {
             },
             Err(e) => Err(io::Error::new(
                 io::ErrorKind::Other,
-                format!("Failed precompile hints writer thread, error: {:?}", e),
+                format!("Failed hints writer thread, error: {:?}", e),
             )),
         }
     } else {
@@ -185,9 +188,7 @@ impl UnixSocketWriter {
         let writer = UnixSocketStreamWriter::new(path)?;
         Ok(Self { inner: writer })
     }
-}
-
-impl UnixSocketWriter {
+    
     pub fn open(&mut self) -> Result<()> {
         self.inner.open()
     }
