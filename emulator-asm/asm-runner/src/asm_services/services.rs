@@ -246,6 +246,12 @@ impl AsmServices {
         base_port + service_offset as u16 + rank_offset
     }
 
+    pub fn port_base_for(base_port: Option<u16>, local_rank: i32) -> u16 {
+        let rank_offset = local_rank as u16 * Self::SERVICES.len() as u16;
+
+        base_port.unwrap_or(ASM_SERVICE_BASE_PORT) + rank_offset
+    }
+
     pub fn send_status_request(&self, service: &AsmService) -> Result<PingResponse> {
         self.send_request(service, &PingRequest {})
     }
@@ -344,11 +350,11 @@ impl AsmServices {
 
     #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
     pub fn send_shutdown_and_wait(&self, service: &AsmService) -> Result<()> {
-        let port = AsmServices::port_for(service, self.base_port, self.local_rank);
+        let port = AsmServices::port_base_for(Some(self.base_port), self.local_rank);
 
         let sem_name = format!(
             "/{}_{}_shutdown_done",
-            Self::shmem_prefix(self.base_port, self.local_rank),
+            Self::shmem_prefix(port, self.local_rank),
             service.as_str()
         );
 

@@ -10,9 +10,9 @@ use std::time::Instant;
 use tracing::{error, info};
 
 use crate::{
-    AsmMTChunk, AsmMTHeader, AsmMultiSharedMemory, AsmRunError, AsmService, AsmServices,
-    AsmSharedMemory, SEM_CHUNK_DONE_WAIT_DURATION, TRACE_DELTA_SIZE, TRACE_INITIAL_SIZE,
-    TRACE_MAX_SIZE,
+    sem_chunk_done_name, shmem_output_name, AsmMTChunk, AsmMTHeader, AsmMultiSharedMemory,
+    AsmRunError, AsmService, AsmServices, SEM_CHUNK_DONE_WAIT_DURATION, TRACE_DELTA_SIZE,
+    TRACE_INITIAL_SIZE, TRACE_MAX_SIZE,
 };
 
 use anyhow::{Context, Result};
@@ -30,18 +30,9 @@ impl MTOutputShmem {
         base_port: Option<u16>,
         unlock_mapped_memory: bool,
     ) -> Result<Self> {
-        let port = if let Some(base_port) = base_port {
-            AsmServices::port_for(&AsmService::MT, base_port, local_rank)
-        } else {
-            AsmServices::default_port(&AsmService::MT, local_rank)
-        };
+        let port = AsmServices::port_base_for(base_port, local_rank);
 
-        let output_name = AsmSharedMemory::<AsmMTHeader>::shmem_output_name(
-            base_port.unwrap(),
-            AsmService::MT,
-            local_rank,
-            None,
-        );
+        let output_name = shmem_output_name(port, AsmService::MT, local_rank, None);
 
         let output_shared_memory = AsmMultiSharedMemory::<AsmMTHeader>::open_and_map(
             &output_name,
@@ -83,17 +74,9 @@ impl AsmRunnerMT {
         #[cfg(feature = "stats")]
         _stats.add_stat(0, parent_stats_id, "ASM_MT_RUNNER", 0, ExecutorStatsEvent::Begin);
 
-        let port = if let Some(base_port) = base_port {
-            AsmServices::port_for(&AsmService::MT, base_port, local_rank)
-        } else {
-            AsmServices::default_port(&AsmService::MT, local_rank)
-        };
+        let port = AsmServices::port_base_for(base_port, local_rank);
 
-        let sem_chunk_done_name = AsmSharedMemory::<AsmMTHeader>::shmem_chunk_done_name(
-            base_port.unwrap(),
-            AsmService::MT,
-            local_rank,
-        );
+        let sem_chunk_done_name = sem_chunk_done_name(port, AsmService::MT, local_rank);
 
         let mut sem_chunk_done = NamedSemaphore::create(sem_chunk_done_name.clone(), 0)
             .map_err(|e| AsmRunError::SemaphoreError(sem_chunk_done_name.clone(), e))?;

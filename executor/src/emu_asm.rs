@@ -8,8 +8,8 @@ use crate::{
     DeviceMetricsList, DummyCounter, NestedDeviceMetricsList, StaticSMBundle, MAX_NUM_STEPS,
 };
 use asm_runner::{
-    write_input, AsmMTHeader, AsmRunnerMO, AsmRunnerMT, AsmRunnerRH, AsmService, AsmServices,
-    AsmSharedMemory, MOOutputShmem, MTOutputShmem, RHOutputShmem, SharedMemoryWriter,
+    shmem_input_name, write_input, AsmRunnerMO, AsmRunnerMT, AsmRunnerRH, AsmService, AsmServices,
+    MOOutputShmem, MTOutputShmem, RHOutputShmem, SharedMemoryWriter,
 };
 use data_bus::DataBusTrait;
 use fields::PrimeField64;
@@ -214,17 +214,9 @@ impl EmulatorAsm {
     }
 
     fn create_shmem_writer(&self, service: &asm_runner::AsmService) -> SharedMemoryWriter {
-        let port = if let Some(base_port) = self.base_port {
-            AsmServices::port_for(service, base_port, self.local_rank)
-        } else {
-            AsmServices::default_port(service, self.local_rank)
-        };
+        let port = AsmServices::port_base_for(self.base_port, self.local_rank);
 
-        let shmem_input_name = AsmSharedMemory::<AsmMTHeader>::shmem_input_name2(
-            self.base_port.unwrap(),
-            *service,
-            self.local_rank,
-        );
+        let shmem_input_name = shmem_input_name(port, self.local_rank);
 
         tracing::debug!(
             "Initializing SharedMemoryWriter for service {:?} at '{}'",

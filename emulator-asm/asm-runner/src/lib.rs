@@ -95,8 +95,8 @@ fn build_sem_name(port: u16, asm_service: AsmService, local_rank: i32, suffix: &
     build_name("/", port, asm_service, local_rank, suffix)
 }
 
-pub fn shmem_input_name(port: u16, asm_service: AsmService, local_rank: i32) -> String {
-    build_shmem_name(port, asm_service, local_rank, "input")
+pub fn shmem_input_name(port: u16, local_rank: i32) -> String {
+    build_shmem_name2(port, local_rank, "input")
 }
 
 /// Shared memory name for precompile hints data
@@ -123,8 +123,22 @@ pub fn shmem_control_reader_name(port: u16, asm_service: AsmService, local_rank:
     build_shmem_name(port, asm_service, local_rank, "control_output")
 }
 
-pub fn shmem_output_name(port: u16, asm_service: AsmService, local_rank: i32) -> String {
-    build_shmem_name(port, asm_service, local_rank, "output")
+pub fn shmem_output_name(
+    port: u16,
+    asm_service: AsmService,
+    local_rank: i32,
+    suffix: Option<isize>,
+) -> String {
+    if let Some(suffix) = suffix {
+        format!(
+            "{}_{}_output_{}",
+            AsmServices::shmem_prefix(port, local_rank),
+            asm_service.as_str(),
+            suffix
+        )
+    } else {
+        build_shmem_name(port, asm_service, local_rank, "output")
+    }
 }
 
 pub fn sem_chunk_done_name(port: u16, asm_service: AsmService, local_rank: i32) -> String {

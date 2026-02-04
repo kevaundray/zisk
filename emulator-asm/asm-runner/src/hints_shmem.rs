@@ -95,12 +95,9 @@ impl HintsShmem {
         let separate_names: Vec<SeparateResourceNames> = AsmServices::SERVICES
             .iter()
             .map(|service| {
-                let port = if let Some(base_port) = base_port {
-                    AsmServices::port_for(service, base_port, local_rank)
-                } else {
-                    AsmServices::default_port(service, local_rank)
-                };
-                SeparateResourceNames::new(service, base_port.unwrap(), local_rank)
+                let port = AsmServices::port_base_for(base_port, local_rank);
+
+                SeparateResourceNames::new(service, port, local_rank)
             })
             .collect();
 

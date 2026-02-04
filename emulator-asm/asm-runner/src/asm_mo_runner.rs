@@ -12,8 +12,8 @@ use crate::TRACE_DELTA_SIZE;
 use crate::TRACE_INITIAL_SIZE;
 use crate::TRACE_MAX_SIZE;
 use crate::{
-    AsmMOChunk, AsmMOHeader, AsmMultiSharedMemory, AsmRunError, AsmService, AsmServices,
-    AsmSharedMemory,
+    sem_chunk_done_name, shmem_output_name, AsmMOChunk, AsmMOHeader, AsmMultiSharedMemory,
+    AsmRunError, AsmService, AsmServices,
 };
 use mem_planner_cpp::MemPlanner;
 
@@ -37,18 +37,9 @@ impl MOOutputShmem {
         base_port: Option<u16>,
         unlock_mapped_memory: bool,
     ) -> Result<Self> {
-        let port = if let Some(base_port) = base_port {
-            AsmServices::port_for(&AsmService::MO, base_port, local_rank)
-        } else {
-            AsmServices::default_port(&AsmService::MO, local_rank)
-        };
+        let port = AsmServices::port_base_for(base_port, local_rank);
 
-        let output_name = AsmSharedMemory::<AsmMOHeader>::shmem_output_name(
-            base_port.unwrap(),
-            AsmService::MO,
-            local_rank,
-            None,
-        );
+        let output_name = shmem_output_name(port, AsmService::MO, local_rank, None);
 
         let output_shared_memory = AsmMultiSharedMemory::<AsmMOHeader>::open_and_map(
             &output_name,
@@ -107,17 +98,9 @@ impl AsmRunnerMO {
         #[cfg(feature = "stats")]
         _stats.add_stat(0, parent_stats_id, "ASM_MO_RUNNER", 0, ExecutorStatsEvent::Begin);
 
-        let port = if let Some(base_port) = base_port {
-            AsmServices::port_for(&AsmService::MO, base_port, local_rank)
-        } else {
-            AsmServices::default_port(&AsmService::MO, local_rank)
-        };
+        let port = AsmServices::port_base_for(base_port, local_rank);
 
-        let sem_chunk_done_name = AsmSharedMemory::<AsmMOHeader>::shmem_chunk_done_name(
-            base_port.unwrap(),
-            AsmService::MO,
-            local_rank,
-        );
+        let sem_chunk_done_name = sem_chunk_done_name(port, AsmService::MO, local_rank);
 
         let mut sem_chunk_done = NamedSemaphore::create(sem_chunk_done_name.clone(), 0)
             .map_err(|e| AsmRunError::SemaphoreError(sem_chunk_done_name.clone(), e))?;

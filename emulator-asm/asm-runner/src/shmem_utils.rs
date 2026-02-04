@@ -16,7 +16,7 @@ use zisk_common::io::{ZiskIO, ZiskStdin};
 use anyhow::anyhow;
 use anyhow::Result;
 
-use crate::{AsmInputHeader, AsmService, AsmServices, SharedMemoryWriter};
+use crate::{AsmInputHeader, SharedMemoryWriter};
 
 pub enum AsmSharedMemoryMode {
     ReadOnly,
@@ -270,39 +270,6 @@ impl<H: AsmShmemHeader> AsmSharedMemory<H> {
     pub fn data_ptr(&self) -> *mut c_void {
         // Skip the header size to get the data pointer
         unsafe { self.mapped_ptr.add(size_of::<H>()) }
-    }
-
-    pub fn shmem_input_name(port: u16, asm_service: AsmService, local_rank: i32) -> String {
-        format!("{}_{}_input", AsmServices::shmem_prefix(port, local_rank), asm_service.as_str())
-    }
-
-    pub fn shmem_input_name2(port: u16, asm_service: AsmService, local_rank: i32) -> String {
-        format!("{}_input", AsmServices::shmem_prefix(port, local_rank))
-    }
-
-    pub fn shmem_output_name(
-        port: u16,
-        asm_service: AsmService,
-        local_rank: i32,
-        suffix: Option<isize>,
-    ) -> String {
-        if let Some(suffix) = suffix {
-            return format!(
-                "{}_{}_output_{}",
-                AsmServices::shmem_prefix(port, local_rank),
-                asm_service.as_str(),
-                suffix
-            );
-        }
-        format!("{}_{}_output", AsmServices::shmem_prefix(port, local_rank), asm_service.as_str())
-    }
-
-    pub fn shmem_chunk_done_name(port: u16, asm_service: AsmService, local_rank: i32) -> String {
-        format!(
-            "/{}_{}_chunk_done",
-            AsmServices::shmem_prefix(port, local_rank),
-            asm_service.as_str()
-        )
     }
 }
 
