@@ -56,8 +56,11 @@ pub use shmem_reader::*;
 pub use shmem_utils::*;
 pub use shmem_writer::*;
 
+#[cfg(all(target_os = "linux", target_arch = "x86_64"))]
 pub(crate) const TRACE_INITIAL_SIZE: usize = 0x180000000; // 6GB
+#[cfg(all(target_os = "linux", target_arch = "x86_64"))]
 pub(crate) const TRACE_DELTA_SIZE: usize = 0x080000000; // 2GB
+#[cfg(all(target_os = "linux", target_arch = "x86_64"))]
 pub(crate) const TRACE_MAX_SIZE: usize = 0x1000000000; // 64GB
 
 #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
