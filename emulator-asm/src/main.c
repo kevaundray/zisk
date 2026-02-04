@@ -336,7 +336,7 @@ int process_id = 0;
 
 uint64_t input_size = 0;
 
-#define MAX_PRECOMPILE_SIZE (uint64_t)0x10000000 // 256MB
+#define MAX_PRECOMPILE_SIZE (uint64_t)0x400000 // 4MB
 //#define MAX_PRECOMPILE_SIZE (uint64_t)0x100000 // 1MB
 
 // Precompile results shared memory
