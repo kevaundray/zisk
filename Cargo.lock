@@ -6126,7 +6126,7 @@ dependencies = [
  "sha2",
  "tiny-keccak",
  "zisk-pil",
- "ziskos",
+ "ziskos-hints",
 ]
 
 [[package]]
@@ -6359,7 +6359,9 @@ dependencies = [
 name = "ziskos"
 version = "0.16.0"
 dependencies = [
+ "anyhow",
  "bincode",
+ "bytes",
  "cfg-if",
  "ctor",
  "fields",
@@ -6377,6 +6379,7 @@ dependencies = [
  "sha2",
  "static_assertions",
  "tiny-keccak",
+ "zisk-common",
 ]
 
 [[package]]

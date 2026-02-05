@@ -6,21 +6,27 @@ mod kzg;
 mod macros;
 mod modexp;
 mod secp256k1;
+mod secp256r1;
 mod sha256f;
 
 #[cfg(zisk_hints_metrics)]
 mod metrics;
 
 use crate::hints::hint_buffer::{build_hint_buffer, HintBuffer};
+use anyhow::Result;
 use once_cell::sync::Lazy;
 use std::cell::UnsafeCell;
 use std::path::PathBuf;
-use std::thread::{self, JoinHandle, ThreadId};
+use std::thread::{self, JoinHandle};
 use std::{ffi::CStr, os::raw::c_char};
 use std::{
     io::{self, BufWriter, Write},
     sync::Arc,
 };
+use zisk_common::io::{StreamWrite, UnixSocketStreamWriter};
+
+#[cfg(zisk_hints_single_thread)]
+use std::thread::ThreadId;
 
 #[cfg(zisk_hints_single_thread)]
 use once_cell::sync::OnceCell;
@@ -31,13 +37,14 @@ pub use keccak256::*;
 pub use kzg::*;
 pub use modexp::*;
 pub use secp256k1::*;
+pub use secp256r1::*;
 pub use sha256f::*;
 
 pub const HINT_START: u32 = 0;
 pub const HINT_END: u32 = 1;
 
 static HINT_BUFFER: Lazy<Arc<HintBuffer>> = Lazy::new(|| build_hint_buffer());
-static HINT_FILE_WRITER_HANDLE: Lazy<HintFileWriterHandleCell> =
+static HINT_WRITER_HANDLE: Lazy<HintFileWriterHandleCell> =
     Lazy::new(HintFileWriterHandleCell::new);
 
 pub struct HintFileWriterHandleCell {
@@ -63,12 +70,12 @@ impl HintFileWriterHandleCell {
     }
 }
 
-pub fn init_precompile_hints(hints_file_path: PathBuf) -> io::Result<()> {
+pub fn init_hints() -> io::Result<()> {
     // Record the main thread id to validate single-threaded calls later
     #[cfg(zisk_hints_single_thread)]
     let _ = MAIN_TID.set(std::thread::current().id());
 
-    if let Some(handle) = HINT_FILE_WRITER_HANDLE.take() {
+    if let Some(handle) = HINT_WRITER_HANDLE.take() {
         HINT_BUFFER.close();
         match handle.join() {
             Ok(result) => {
@@ -79,7 +86,7 @@ pub fn init_precompile_hints(hints_file_path: PathBuf) -> io::Result<()> {
             Err(e) => {
                 return Err(io::Error::new(
                     io::ErrorKind::Other,
-                    format!("Failed precompile hints writer thread, error: {:?}", e),
+                    format!("Failed hints writer thread, error: {:?}", e),
                 ))
             }
         }
@@ -87,16 +94,38 @@ pub fn init_precompile_hints(hints_file_path: PathBuf) -> io::Result<()> {
 
     HINT_BUFFER.reset();
 
-    let handle = thread::spawn(move || write_precompile_hints(hints_file_path));
-    HINT_FILE_WRITER_HANDLE.store(handle);
+    Ok(())
+}
+
+pub fn init_hints_file(hints_file_path: PathBuf) -> io::Result<()> {
+    init_hints()?;
+
+    let handle = thread::spawn(move || write_hints_to_file(hints_file_path));
+    HINT_WRITER_HANDLE.store(handle);
 
     Ok(())
 }
 
-pub fn close_precompile_hints() -> io::Result<()> {
+pub fn init_hints_socket(socket_path: PathBuf) -> io::Result<()> {
+    init_hints()?;
+
+    // Create the Unix socket writer (server)
+    let mut socket_writer = UnixSocketWriter::new(&socket_path).map_err(io::Error::other)?;
+
+    // Open the connection (waits for client to connect)
+    // TODO: Implement open timeout
+    socket_writer.open().map_err(io::Error::other)?;
+    println!("Client connected to hints socket! Starting hint data transfer...");
+
+    let handle = thread::spawn(move || write_hints_to_socket(socket_writer));
+    HINT_WRITER_HANDLE.store(handle);
+
+    Ok(())
+}
+pub fn close_hints() -> io::Result<()> {
     HINT_BUFFER.close();
 
-    let handle = HINT_FILE_WRITER_HANDLE.take();
+    let handle = HINT_WRITER_HANDLE.take();
     if let Some(handle) = handle {
         match handle.join() {
             Ok(result) => match result {
@@ -105,7 +134,7 @@ pub fn close_precompile_hints() -> io::Result<()> {
             },
             Err(e) => Err(io::Error::new(
                 io::ErrorKind::Other,
-                format!("Failed precompile hints writer thread, error: {:?}", e),
+                format!("Failed hints writer thread, error: {:?}", e),
             )),
         }
     } else {
@@ -113,35 +142,73 @@ pub fn close_precompile_hints() -> io::Result<()> {
     }
 }
 
-fn write_precompile_hints(path: PathBuf) -> io::Result<()> {
-    debug_assert!(cfg!(target_endian = "little"));
-
-    let file = std::fs::File::create(path)?;
-    let mut file_writer = BufWriter::with_capacity(1 << 20, file);
+pub fn write_hints<W: Write>(writer: &mut W) -> io::Result<()> {
     let disable_prefix = std::env::var("HINTS_DISABLE_PREFIX").unwrap_or_default() == "1";
 
     // Write HINT_START
     if !disable_prefix {
         let start_header: u64 = ((HINT_START as u64) << 32) | 0u64;
         let start_bytes = start_header.to_le_bytes();
-        file_writer.write_all(&start_bytes)?;
+        writer.write_all(&start_bytes)?;
     }
 
     // Write hints from the buffer
-    HINT_BUFFER.drain_to_writer(&mut file_writer)?;
-    file_writer.flush()?;
-
+    HINT_BUFFER.drain_to_writer(writer)?;
     // Write HINT_END
     if !disable_prefix {
         let end_header: u64 = ((HINT_END as u64) << 32) | 0u64;
         let end_bytes = end_header.to_le_bytes();
-        file_writer.write_all(&end_bytes)?;
+        writer.write_all(&end_bytes)?;
     }
 
-    file_writer.flush()?;
+    writer.flush()?;
 
     #[cfg(zisk_hints_metrics)]
     crate::hints::metrics::print_metrics();
+
+    Ok(())
+}
+
+fn write_hints_to_file(path: PathBuf) -> io::Result<()> {
+    debug_assert!(cfg!(target_endian = "little"));
+
+    let file = std::fs::File::create(path)?;
+    let mut file_writer = BufWriter::with_capacity(1 << 20, file);
+
+    write_hints(&mut file_writer)?;
+
+    Ok(())
+}
+
+struct UnixSocketWriter {
+    inner: UnixSocketStreamWriter,
+}
+
+impl UnixSocketWriter {
+    pub fn new(path: &PathBuf) -> Result<Self> {
+        let writer = UnixSocketStreamWriter::new(path)?;
+        Ok(Self { inner: writer })
+    }
+
+    pub fn open(&mut self) -> Result<()> {
+        self.inner.open()
+    }
+}
+
+impl Write for UnixSocketWriter {
+    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+        self.inner.write(buf).map_err(|e| io::Error::new(io::ErrorKind::Other, e.to_string()))
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        self.inner.flush().map_err(|e| io::Error::new(io::ErrorKind::Other, e.to_string()))
+    }
+}
+
+fn write_hints_to_socket(mut socket_writer: UnixSocketWriter) -> io::Result<()> {
+    debug_assert!(cfg!(target_endian = "little"));
+
+    write_hints(&mut socket_writer)?;
 
     Ok(())
 }
