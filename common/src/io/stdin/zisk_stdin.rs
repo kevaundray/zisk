@@ -19,6 +19,8 @@ pub trait ZiskIO: Send + Sync {
 
     /// Write a slice of bytes to the buffer.
     fn write_slice(&self, data: &[u8]);
+
+    fn save(&self, path: &Path) -> Result<()>;
 }
 
 pub enum ZiskIOVariant {
@@ -67,6 +69,14 @@ impl ZiskIO for ZiskIOVariant {
             ZiskIOVariant::Memory(memory_stdin) => memory_stdin.write_slice(data),
         }
     }
+
+    fn save(&self, path: &Path) -> Result<()> {
+        match self {
+            ZiskIOVariant::File(file_stdin) => file_stdin.save(path),
+            ZiskIOVariant::Null(null_stdin) => null_stdin.save(path),
+            ZiskIOVariant::Memory(memory_stdin) => memory_stdin.save(path),
+        }
+    }
 }
 
 #[derive(Clone)]
@@ -93,6 +103,10 @@ impl ZiskIO for ZiskStdin {
 
     fn write_slice(&self, data: &[u8]) {
         self.io.write_slice(data)
+    }
+
+    fn save(&self, path: &Path) -> Result<()> {
+        self.io.save(path)
     }
 }
 
