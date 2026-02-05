@@ -1461,11 +1461,13 @@ pub fn precompiled_load_data(
         load_chunks,
         load_rem,
         0,
+        None,
         data,
         title,
     );
 }
 
+#[allow(clippy::too_many_arguments)]
 #[inline(always)]
 pub fn precompiled_load_data_with_result(
     ctx: &mut InstContext,
@@ -1473,6 +1475,7 @@ pub fn precompiled_load_data_with_result(
     load_indirections: usize,
     load_chunks: usize,
     load_rem: usize,
+    direct_load_param: Option<usize>,
     data: &mut [u64],
     title: &str,
 ) {
@@ -1483,6 +1486,7 @@ pub fn precompiled_load_data_with_result(
         load_chunks,
         load_rem,
         1,
+        direct_load_param,
         data,
         title,
     );
@@ -1497,6 +1501,7 @@ fn internal_precompiled_load_data(
     load_chunks: usize,
     load_rem: usize,
     result: usize,
+    direct_load_param: Option<usize>, // If one of the load parameters isn't an indirection
     data: &mut [u64],
     title: &str,
 ) {
@@ -1530,7 +1535,7 @@ fn internal_precompiled_load_data(
     // Write the indirections to data
     for (i, data) in data.iter_mut().enumerate().take(params_count) {
         let indirection = ctx.mem.read(address + (8 * i as u64), 8);
-        if indirection & 0x7 != 0 {
+        if indirection & 0x7 != 0 && Some(i) != direct_load_param {
             panic!(
                 "[{title}] precompiled_check_address() found address_{i} [0x{address:08X}]=0x{indirection:08X} \
                 not aligned to 8 bytes at PC:0x{:08X} STEP:{}",
@@ -1622,7 +1627,7 @@ pub fn opc_add256(ctx: &mut InstContext) {
     const WORDS: usize = 4 + 1 + 2 * 4;
     let mut data = [0u64; WORDS];
 
-    precompiled_load_data_with_result(ctx, 4, 2, 4, 0, &mut data, "add256");
+    precompiled_load_data_with_result(ctx, 4, 2, 4, 0, Some(2), &mut data, "add256");
 
     if ctx.emulation_mode != EmulationMode::ConsumeMemReads {
         // ignore 3 indirections
