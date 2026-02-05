@@ -69,7 +69,7 @@ const HINT_BN254_PAIRING_CHECK: u32 = 0x0205;
 
 // Secp256k1 hint codes
 const HINT_SECP256K1_ECRECOVER: u32 = 0x0300;
-const HINT_SECP256R1_VERIFY_SIGNATURE: u32 = 0x0301;
+const HINT_SECP256R1_ECDSA_VERIFY: u32 = 0x0301;
 
 // BLS12-381 hint codes
 const HINT_BLS12_381_G1_ADD: u32 = 0x0400;
@@ -149,7 +149,7 @@ pub enum BuiltInHint {
     /// secp256k1 ECDSA signature recovery.
     Secp256k1EcRecover = HINT_SECP256K1_ECRECOVER,
     /// secp256r1 (P-256) signature verification.
-    Secp256r1VerifySignature = HINT_SECP256R1_VERIFY_SIGNATURE,
+    Secp256r1EcdsaVerify = HINT_SECP256R1_ECDSA_VERIFY,
 
     // BLS12-381 hint types.
     /// BLS12-381 G1 addition (returns 96-byte unpadded G1 point)
@@ -191,7 +191,7 @@ impl Display for BuiltInHint {
             BuiltInHint::Bn254PairingCheck => "BN254_PAIRING_CHECK",
             // Secp256k1 Hints
             BuiltInHint::Secp256k1EcRecover => "SECP256K1_ECRECOVER",
-            BuiltInHint::Secp256r1VerifySignature => "SECP256R1_VERIFY_SIGNATURE",
+            BuiltInHint::Secp256r1EcdsaVerify => "SECP256R1_ECDSA_VERIFY",
             // BLS12-381 Hints
             BuiltInHint::Bls12_381G1Add => "BLS12_381_G1_ADD",
             BuiltInHint::Bls12_381G1Msm => "BLS12_381_G1_MSM",
@@ -225,7 +225,7 @@ impl TryFrom<u32> for BuiltInHint {
             HINT_BN254_PAIRING_CHECK => Ok(Self::Bn254PairingCheck),
             // Secp256k1 Hints
             HINT_SECP256K1_ECRECOVER => Ok(Self::Secp256k1EcRecover),
-            HINT_SECP256R1_VERIFY_SIGNATURE => Ok(Self::Secp256r1VerifySignature),
+            HINT_SECP256R1_ECDSA_VERIFY => Ok(Self::Secp256r1EcdsaVerify),
             // BLS12-381 Hints
             HINT_BLS12_381_G1_ADD => Ok(Self::Bls12_381G1Add),
             HINT_BLS12_381_G1_MSM => Ok(Self::Bls12_381G1Msm),
@@ -304,9 +304,7 @@ impl HintCode {
             HintCode::BuiltIn(BuiltInHint::Bn254PairingCheck) => HINT_BN254_PAIRING_CHECK,
             // Secp256k1 Hints
             HintCode::BuiltIn(BuiltInHint::Secp256k1EcRecover) => HINT_SECP256K1_ECRECOVER,
-            HintCode::BuiltIn(BuiltInHint::Secp256r1VerifySignature) => {
-                HINT_SECP256R1_VERIFY_SIGNATURE
-            }
+            HintCode::BuiltIn(BuiltInHint::Secp256r1EcdsaVerify) => HINT_SECP256R1_ECDSA_VERIFY,
             // BLS12-381 Hints
             HintCode::BuiltIn(BuiltInHint::Bls12_381G1Add) => HINT_BLS12_381_G1_ADD,
             HintCode::BuiltIn(BuiltInHint::Bls12_381G1Msm) => HINT_BLS12_381_G1_MSM,
