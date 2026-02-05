@@ -322,7 +322,7 @@ impl<T: ZiskBackend + 'static> Worker<T> {
         let elf = ElfBinaryOwned::new(
             elf_bin,
             prover_config.elf.file_stem().unwrap().to_str().unwrap().to_string(),
-            true,
+            prover_service_config.hints,
         );
         prover.setup(&elf)?;
 
