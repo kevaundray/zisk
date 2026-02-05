@@ -20,7 +20,7 @@ use zisk_common::ElfBinaryOwned;
 pub struct ZiskRomSetup {
     /// ELF file path
     #[clap(short = 'e', long)]
-    pub elf_path: PathBuf,
+    pub elf: PathBuf,
 
     /// Setup folder path
     #[clap(short = 'k', long)]
@@ -72,26 +72,19 @@ impl ZiskRomSetup {
         pctx.set_device_buffers(&sctx, &setups_vadcop, false, &params_gpu)?;
         let pctx = Arc::new(pctx);
 
-        tracing::info!("Computing setup for ROM {}", self.elf_path.display());
+        tracing::info!("Computing setup for ROM {}", self.elf.display());
 
         tracing::info!("Computing merkle root");
-        let elf_bin = fs::read(&self.elf_path).map_err(|e| {
-            anyhow::anyhow!("Error reading ELF file {}: {}", self.elf_path.display(), e)
-        })?;
+        let elf_bytes = fs::read(&self.elf)
+            .map_err(|e| anyhow::anyhow!("Error reading ELF file {}: {}", self.elf.display(), e))?;
         let elf = ElfBinaryOwned::new(
-            elf_bin,
-            self.elf_path.file_stem().unwrap().to_str().unwrap().to_string(),
+            elf_bytes,
+            self.elf.file_stem().unwrap().to_str().unwrap().to_string(),
             self.hints,
         );
         rom_merkle_setup::<Goldilocks>(&pctx, &elf, &self.output_dir)?;
 
-        gen_assembly(
-            &self.elf_path,
-            &self.zisk_path,
-            &self.output_dir,
-            self.hints,
-            self.verbose > 0,
-        )?;
+        gen_assembly(&self.elf, &self.zisk_path, &self.output_dir, self.hints, self.verbose > 0)?;
 
         println!();
         tracing::info!("{}", "ROM setup successfully completed".bright_green().bold());

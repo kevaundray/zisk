@@ -268,6 +268,12 @@ impl ZiskAsmContext {
     pub fn precompile_results_secp256k1dbl(&self) -> bool {
         self.precompile_results()
     }
+    pub fn precompile_results_secp256r1add(&self) -> bool {
+        self.precompile_results()
+    }
+    pub fn precompile_results_secp256r1dbl(&self) -> bool {
+        self.precompile_results()
+    }
     pub fn precompile_results_fcall(&self) -> bool {
         self.precompile_results()
     }
@@ -5839,12 +5845,18 @@ impl ZiskRom2Asm {
 
                 if !ctx.chunk_player_mt_collect_mem() && !ctx.chunk_player_mem_reads_collect_main()
                 {
-                    // Call the secp256r1_add function
-                    Self::push_internal_registers(ctx, code, false);
-                    //Self::assert_rsp_is_aligned(ctx, code);
-                    *code += "\tcall _opcode_secp256r1_add\n";
-                    Self::pop_internal_registers(ctx, code, false);
-                    //Self::assert_rsp_is_aligned(ctx, code);
+                    // Get result from precompile results data
+                    if ctx.precompile_results_secp256r1add() {
+                        *code += "\tmov rdi, [rdi]\n";
+                        Self::precompile_results_array(ctx, code, unusual_code, "rdi", 8);
+                    } else {
+                        // Call the secp256r1_add function
+                        Self::push_internal_registers(ctx, code, false);
+                        //Self::assert_rsp_is_aligned(ctx, code);
+                        *code += "\tcall _opcode_secp256r1_add\n";
+                        Self::pop_internal_registers(ctx, code, false);
+                        //Self::assert_rsp_is_aligned(ctx, code);
+                    }
                 }
 
                 // Consume mem reads
@@ -5939,12 +5951,17 @@ impl ZiskRom2Asm {
 
                 if !ctx.chunk_player_mt_collect_mem() && !ctx.chunk_player_mem_reads_collect_main()
                 {
-                    // Call the secp256r1_dbl function
-                    Self::push_internal_registers(ctx, code, false);
-                    //Self::assert_rsp_is_aligned(ctx, code);
-                    *code += "\tcall _opcode_secp256r1_dbl\n";
-                    Self::pop_internal_registers(ctx, code, false);
-                    //Self::assert_rsp_is_aligned(ctx, code);
+                    // Get result from precompile results data
+                    if ctx.precompile_results_secp256r1dbl() {
+                        Self::precompile_results_array(ctx, code, unusual_code, "rdi", 8);
+                    } else {
+                        // Call the secp256r1_dbl function
+                        Self::push_internal_registers(ctx, code, false);
+                        //Self::assert_rsp_is_aligned(ctx, code);
+                        *code += "\tcall _opcode_secp256r1_dbl\n";
+                        Self::pop_internal_registers(ctx, code, false);
+                        //Self::assert_rsp_is_aligned(ctx, code);
+                    }
                 }
 
                 // Consume mem reads
