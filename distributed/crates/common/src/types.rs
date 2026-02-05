@@ -12,11 +12,10 @@ use std::{
     collections::HashMap,
     fmt::{self, Debug, Display},
     ops::Range,
-    path::PathBuf,
 };
 use tracing::error;
 
-use crate::{InputModeDto, InputSourceDto};
+use crate::{HintsModeDto, HintsSourceDto, InputSourceDto, InputsModeDto};
 
 /// Job ID wrapper for type safety
 #[derive(
@@ -243,8 +242,10 @@ pub struct Job {
     pub duration_ms: Option<u64>,
     pub state: JobState,
     pub data_id: DataId,
-    pub input_mode: InputModeDto,
+    pub inputs_mode: InputsModeDto,
+    pub hints_mode: HintsModeDto,
     pub compute_capacity: ComputeCapacity,
+    pub minimal_compute_capacity: ComputeCapacity,
     pub workers: Vec<WorkerId>,
     pub agg_worker_id: Option<WorkerId>,
     pub partitions: Vec<Vec<u32>>,
@@ -257,10 +258,13 @@ pub struct Job {
 }
 
 impl Job {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         data_id: DataId,
-        input_mode: InputModeDto,
+        inputs_mode: InputsModeDto,
+        hints_mode: HintsModeDto,
         compute_capacity: ComputeCapacity,
+        minimal_compute_capacity: ComputeCapacity,
         selected_workers: Vec<WorkerId>,
         partitions: Vec<Vec<u32>>,
         execution_mode: JobExecutionMode,
@@ -271,8 +275,10 @@ impl Job {
             duration_ms: None,
             state: JobState::Created,
             data_id,
-            input_mode,
+            inputs_mode,
+            hints_mode,
             compute_capacity,
+            minimal_compute_capacity,
             workers: selected_workers,
             agg_worker_id: None,
             partitions,
@@ -395,6 +401,7 @@ pub struct JobResult {
 pub struct DataCtx {
     pub data_id: DataId,
     pub input_source: InputSourceDto,
+    pub hints_source: HintsSourceDto,
 }
 
 #[repr(u8)]
@@ -438,13 +445,5 @@ pub struct AggregationParams {
     pub agg_proofs: Vec<AggProofData>,
     pub last_proof: bool,
     pub final_proof: bool,
-    pub verify_constraints: bool,
-    pub aggregation: bool,
-    pub rma: bool,
-    pub final_snark: bool,
-    pub verify_proofs: bool,
-    pub save_proofs: bool,
-    pub test_mode: bool,
-    pub output_dir_path: PathBuf,
-    pub minimal_memory: bool,
+    pub compressed: bool,
 }

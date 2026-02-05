@@ -7,11 +7,10 @@ keywords = { workspace = true }
 repository = { workspace = true }
 categories = { workspace = true }
 
-[lib]
-crate-type = ["dylib"]
-
 [dependencies]
 executor = { workspace = true }
+asm-runner = { workspace = true }
+precompiles-hints = { workspace = true }
 sm-arith = { workspace = true }
 sm-binary = { workspace = true }
 sm-main = { workspace = true }
@@ -22,9 +21,11 @@ sm-frequent-ops = { workspace = true }
 data-bus = { workspace = true }
 precomp-keccakf = { workspace = true }
 precomp-sha256f = { workspace = true }
+precomp-poseidon2 = { workspace = true }
 precomp-big-int = { workspace = true }
 precomp-arith-eq = { workspace = true }
 precomp-arith-eq-384 = { workspace = true }
+precomp-dma = { workspace = true }
 zisk-pil = { workspace = true }
 ziskemu = { workspace = true }
 zisk-core = { workspace = true }
@@ -38,6 +39,8 @@ witness = { workspace = true }
 fields = { workspace=true }
 pil-std-lib = { workspace = true }
 tracing = { workspace = true }
+
+anyhow = { workspace = true }
 
 env_logger = "0.11"
 rayon = { workspace = true }

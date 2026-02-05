@@ -145,8 +145,8 @@ impl WorkerServiceConfig {
 #[derive(Debug, Clone)]
 pub struct ProverServiceConfigDto {
     pub elf: PathBuf,
-    pub witness_lib: Option<PathBuf>,
     pub asm: Option<PathBuf>,
+    pub hints: bool,
     pub emulator: bool,
     pub proving_key: Option<PathBuf>,
     pub asm_port: Option<u16>,
@@ -155,7 +155,6 @@ pub struct ProverServiceConfigDto {
     pub debug: Option<Option<String>>,
     pub verify_constraints: bool,
     pub aggregation: bool,
-    pub final_snark: bool,
     pub preallocate: bool,
     pub max_streams: Option<usize>,
     pub number_threads_witness: Option<usize>,
@@ -169,8 +168,8 @@ impl Default for ProverServiceConfigDto {
     fn default() -> Self {
         Self {
             elf: PathBuf::new(),
-            witness_lib: None,
             asm: None,
+            hints: false,
             emulator: false,
             proving_key: None,
             asm_port: None,
@@ -179,7 +178,6 @@ impl Default for ProverServiceConfigDto {
             debug: None,
             verify_constraints: false,
             aggregation: false,
-            final_snark: false,
             preallocate: false,
             max_streams: None,
             number_threads_witness: None,

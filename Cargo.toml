@@ -1,5 +1,5 @@
 [workspace.package]
-version = "0.14.0"
+version = "0.16.0"
 edition = "2021"
 license = "Apache-2.0 or MIT"
 keywords = ["zisk", "zkvm", "zero-knowledge"]
@@ -7,8 +7,8 @@ repository = "https://github.com/0xPolygonHermez/zisk"
 categories = ["cryptography"]
 
 [workspace.metadata]
-gha_pil2_proofman_js_branch = "tags/v0.14.0"
-gha_pil2_compiler_branch = "tags/v0.8.0"
+gha_pil2_proofman_js_branch = "pre-develop-0.16.0"
+gha_pil2_compiler_branch = "develop-0.9.0"
 
 [workspace]
 members = [
@@ -28,19 +28,21 @@ members = [
     "state-machines/rom",
     "witness-computation",
     "ziskos/entrypoint",
+    "ziskos-hints",
     "precompiles/arith_eq",
     "precompiles/arith_eq_384",
     "precompiles/common",
+    "precompiles/hints",
     "precompiles/keccakf",
     "precompiles/sha256f",
     "precompiles/big_int",
+    "precompiles/dma",
     "lib-c",
     "lib-float",
     "emulator-asm/asm-runner",
     "ziskclib",
     "common",
     "tools/circuit",
-    "server",
     "distributed/crates/coordinator",
     "distributed/crates/grpc-api",
     "distributed/crates/common",
@@ -77,10 +79,11 @@ precompiles-common = { path = "precompiles/common" }
 precompiles-helpers = { path = "precompiles/helpers" }
 precomp-keccakf = { path = "precompiles/keccakf" }
 precomp-sha256f = { path = "precompiles/sha256f" }
+precomp-poseidon2 = { path = "precompiles/poseidon2" }
 precomp-big-int = { path = "precompiles/big_int" }
+precomp-dma = { path = "precompiles/dma" }
 riscv = { path = "riscv" }
 rom-setup = { path = "rom-setup" }
-server = { path = "server" }
 sm-arith = { path = "state-machines/arith" }
 sm-binary = { path = "state-machines/binary" }
 sm-main = { path = "state-machines/main" }
@@ -92,9 +95,12 @@ sm-rom = { path = "state-machines/rom" }
 zisk-witness = { path = "witness-computation" }
 ziskclib = { path = "ziskclib" }
 ziskos = { path = "ziskos/entrypoint" }
+ziskos-hints = { path = "ziskos-hints" }
 circuit = { path = "tools/circuit" }
 zisk-sdk = { path = "sdk" }
 zisk-build = { path = "ziskbuild" }
+precompiles-hints = { path = "precompiles/hints" }
+zisk-verifier = { path = "verifier" }
 
 # Distributed crates
 zisk-distributed-common = { path = "distributed/crates/common" }
@@ -103,14 +109,14 @@ zisk-distributed-grpc-api = { path = "distributed/crates/grpc-api" }
 zisk-distributed-prover = { path = "distributed/crates/worker" }
 
 # Proofman
-proofman = { git = "https://github.com/0xPolygonHermez/pil2-proofman.git", tag = "v0.14.0" }
-proofman-common = { git = "https://github.com/0xPolygonHermez/pil2-proofman.git", tag = "v0.14.0" }
-proofman-macros = { git = "https://github.com/0xPolygonHermez/pil2-proofman.git", tag = "v0.14.0" }
-proofman-verifier = { git = "https://github.com/0xPolygonHermez/pil2-proofman.git", tag = "v0.14.0" }
-proofman-util = { git = "https://github.com/0xPolygonHermez/pil2-proofman.git", tag = "v0.14.0" }
-pil-std-lib = { git = "https://github.com/0xPolygonHermez/pil2-proofman.git", tag = "v0.14.0" }
-witness = { git = "https://github.com/0xPolygonHermez/pil2-proofman.git", tag = "v0.14.0" }
-fields = { git = "https://github.com/0xPolygonHermez/pil2-proofman.git", tag = "v0.14.0" }
+proofman = { git = "https://github.com/0xPolygonHermez/pil2-proofman.git", branch = "pre-develop-0.16.0" }
+proofman-common = { git = "https://github.com/0xPolygonHermez/pil2-proofman.git", branch = "pre-develop-0.16.0" }
+proofman-macros = { git = "https://github.com/0xPolygonHermez/pil2-proofman.git", branch = "pre-develop-0.16.0" }
+proofman-verifier = { git = "https://github.com/0xPolygonHermez/pil2-proofman.git", branch = "pre-develop-0.16.0" }
+proofman-util = { git = "https://github.com/0xPolygonHermez/pil2-proofman.git", branch = "pre-develop-0.16.0" }
+pil-std-lib = { git = "https://github.com/0xPolygonHermez/pil2-proofman.git", branch = "pre-develop-0.16.0" }
+witness = { git = "https://github.com/0xPolygonHermez/pil2-proofman.git", branch = "pre-develop-0.16.0" }
+fields = { git = "https://github.com/0xPolygonHermez/pil2-proofman.git", branch = "pre-develop-0.16.0" }
 # Proofman Local development
 # proofman = { path = "../pil2-proofman/proofman" }
 # proofman-common = { path = "../pil2-proofman/common" }
@@ -131,6 +137,7 @@ colored = "3"
 ark-ff = "0.5.0"
 ark-std = "0.5.0"
 ark-secp256k1 = "0.5"
+ark-secp256r1 = "0.5"
 ark-bn254 = "0.5.0"
 ark-bls12-381 = "0.5.0"
 sysinfo = "0.37"
@@ -152,7 +159,7 @@ static_assertions = "1"
 clap = { version = "4", features = ["derive", "env"] }
 futures = { version = "0.3" }
 thiserror = { version = "2" }
-bytes = "1.0"
+bincode = "1.3.3"
 
 tokio = { version = "1", features = ["full"] }
 tokio-stream = "0.1"
@@ -160,6 +167,7 @@ futures-util = "0.3"
 uuid = { version = "1.0", features = ["serde", "v4"] }
 chrono = { version = "0.4", features = ["serde"] }
 sha2 = { version = "0.10.9", features = ["compress"] }
+paste = "1.0"
 
 # gRPC dependencies
 tonic = "0.14"
@@ -177,5 +185,4 @@ reqwest = { version = "0.12", features = [
     "json",
     "rustls-tls",
 ], default-features = false }
-bytemuck = "1.23"
 zstd = "0.13"

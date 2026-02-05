@@ -76,9 +76,12 @@ impl ZiskEmulator {
             println!("process_elf_file() elf_file={elf_filename}");
         }
 
+        let elf = fs::read(&elf_filename)
+            .map_err(|e| ZiskEmulatorErr::Unknown(format!("Error reading ELF file: {e}")))?;
+
         // Create an instance of the RISC-V -> ZisK program transpiler (Riscv2zisk) with the ELF
         // file name
-        let riscv2zisk = Riscv2zisk::new(elf_filename);
+        let riscv2zisk = Riscv2zisk::new(&elf);
 
         // Convert the ELF file to ZisK ROM calling the transpiler run() method
         let zisk_rom = riscv2zisk.run().map_err(|err| ZiskEmulatorErr::Unknown(err.to_string()))?;
@@ -153,9 +156,8 @@ impl ZiskEmulator {
 
         // OUTPUT:
         // Save output to a file if requested
-        if options.output.is_some() {
-            fs::write(options.output.as_ref().unwrap(), &output)
-                .map_err(|e| ZiskEmulatorErr::Unknown(e.to_string()))?
+        if let Some(output_path) = &options.output {
+            fs::write(output_path, &output).map_err(|e| ZiskEmulatorErr::Unknown(e.to_string()))?
         }
 
         // Log output to console if requested

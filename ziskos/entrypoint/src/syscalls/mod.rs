@@ -15,8 +15,11 @@ mod bn254_curve_dbl;
 mod complex;
 mod keccakf;
 mod point;
+mod poseidon2;
 mod secp256k1_add;
 mod secp256k1_dbl;
+mod secp256r1_add;
+mod secp256r1_dbl;
 mod sha256f;
 mod syscall;
 
@@ -37,8 +40,11 @@ pub use bn254_curve_dbl::*;
 pub use complex::*;
 pub use keccakf::*;
 pub use point::*;
+pub use poseidon2::*;
 pub use secp256k1_add::*;
 pub use secp256k1_dbl::*;
+pub use secp256r1_add::*;
+pub use secp256r1_dbl::*;
 pub use sha256f::*;
 pub use syscall::*;
 
@@ -49,6 +55,18 @@ macro_rules! ziskos_syscall {
             asm!(
                 concat!("csrs ", stringify!($csr_addr), ", {value}"),
                 value = in(reg) $addr
+            );
+        }
+    }};
+    ($csr_addr:literal, $arg0:expr, $arg1:expr, $arg2: expr) => {{
+        unsafe {
+            asm!(
+                concat!("csrs ", stringify!($csr_addr), ", {0}"),
+                "add x0, {1}, {2}",
+                in(reg) $arg0,  // {0}
+                in(reg) $arg1,  // {1}
+                in(reg) $arg2,  // {2}
+                options(nostack)
             );
         }
     }};
@@ -63,7 +81,7 @@ macro_rules! ziskos_syscall_ret_u64 {
                 concat!("csrrs {0}, ", stringify!($csr_addr), ", {1}"),
                 out(reg) v,
                 in(reg) $addr,
-                options(nostack, nomem)
+                options(nostack)
             );
         }
         v

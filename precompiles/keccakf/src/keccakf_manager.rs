@@ -2,12 +2,8 @@ use std::sync::Arc;
 
 use fields::PrimeField64;
 use pil_std_lib::Std;
-use proofman_common::SetupCtx;
-use zisk_common::{BusDevice, PayloadType};
 
-use zisk_common::{
-    BusDeviceMetrics, BusDeviceMode, ComponentBuilder, Instance, InstanceCtx, InstanceInfo, Planner,
-};
+use zisk_common::{BusDeviceMode, ComponentBuilder, Instance, InstanceCtx, InstanceInfo, Planner};
 use zisk_core::ZiskOperationType;
 use zisk_pil::KeccakfTrace;
 
@@ -26,14 +22,17 @@ impl<F: PrimeField64> KeccakfManager<F> {
     ///
     /// # Returns
     /// An `Arc`-wrapped instance of `KeccakfManager`.
-    pub fn new(sctx: Arc<SetupCtx<F>>, std: Arc<Std<F>>) -> Arc<Self> {
-        let keccakf_sm = KeccakfSM::new(sctx, std);
+    pub fn new(std: Arc<Std<F>>) -> Arc<Self> {
+        let keccakf_sm = KeccakfSM::new(std);
 
         Arc::new(Self { keccakf_sm })
     }
 
-    pub fn build_keccakf_counter(&self) -> KeccakfCounterInputGen {
-        KeccakfCounterInputGen::new(BusDeviceMode::Counter)
+    pub fn build_keccakf_counter(&self, asm_execution: bool) -> KeccakfCounterInputGen {
+        match asm_execution {
+            true => KeccakfCounterInputGen::new(BusDeviceMode::CounterAsm),
+            false => KeccakfCounterInputGen::new(BusDeviceMode::Counter),
+        }
     }
 
     pub fn build_keccakf_input_generator(&self) -> KeccakfCounterInputGen {
@@ -42,14 +41,6 @@ impl<F: PrimeField64> KeccakfManager<F> {
 }
 
 impl<F: PrimeField64> ComponentBuilder<F> for KeccakfManager<F> {
-    /// Builds and returns a new counter for monitoring keccakf operations.
-    ///
-    /// # Returns
-    /// A boxed implementation of `RegularCounters` configured for keccakf operations.
-    fn build_counter(&self) -> Option<Box<dyn BusDeviceMetrics>> {
-        Some(Box::new(KeccakfCounterInputGen::new(BusDeviceMode::Counter)))
-    }
-
     /// Builds a planner to plan keccakf-related instances.
     ///
     /// # Returns
@@ -86,9 +77,5 @@ impl<F: PrimeField64> ComponentBuilder<F> for KeccakfManager<F> {
                 panic!("KeccakfBuilder::get_instance() Unsupported air_id: {:?}", ictx.plan.air_id)
             }
         }
-    }
-
-    fn build_inputs_generator(&self) -> Option<Box<dyn BusDevice<PayloadType>>> {
-        Some(Box::new(KeccakfCounterInputGen::new(BusDeviceMode::InputGenerator)))
     }
 }

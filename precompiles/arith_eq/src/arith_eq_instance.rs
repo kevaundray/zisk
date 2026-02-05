@@ -7,16 +7,15 @@
 use crate::{
     Arith256Input, Arith256ModInput, ArithEqInput, ArithEqSM, Bn254ComplexAddInput,
     Bn254ComplexMulInput, Bn254ComplexSubInput, Bn254CurveAddInput, Bn254CurveDblInput,
-    Secp256k1AddInput, Secp256k1DblInput,
+    Secp256k1AddInput, Secp256k1DblInput, Secp256r1AddInput, Secp256r1DblInput,
 };
 use fields::PrimeField64;
 use proofman_common::{AirInstance, ProofCtx, ProofmanResult, SetupCtx};
-use std::collections::VecDeque;
 use std::{any::Any, collections::HashMap, sync::Arc};
 use zisk_common::ChunkId;
 use zisk_common::{
     BusDevice, BusId, CheckPoint, CollectSkipper, ExtOperationData, Instance, InstanceCtx,
-    InstanceType, MemCollectorInfo, OperationBusData, PayloadType, OPERATION_BUS_ID,
+    InstanceType, OperationBusData, PayloadType, OPERATION_BUS_ID,
 };
 
 use zisk_core::ZiskOperationType;
@@ -159,9 +158,7 @@ impl ArithEqCollector {
             collect_skipper,
         }
     }
-}
 
-impl BusDevice<PayloadType> for ArithEqCollector {
     /// Processes data received on the bus, collecting the inputs necessary for witness computation.
     ///
     /// # Arguments
@@ -173,13 +170,7 @@ impl BusDevice<PayloadType> for ArithEqCollector {
     /// A boolean indicating whether the program should continue execution or terminate.
     /// Returns `true` to continue execution, `false` to stop.
     #[inline(always)]
-    fn process_data(
-        &mut self,
-        bus_id: &BusId,
-        data: &[PayloadType],
-        _pending: &mut VecDeque<(BusId, Vec<u64>)>,
-        _mem_collector_info: Option<&[MemCollectorInfo]>,
-    ) -> bool {
+    pub fn process_data(&mut self, bus_id: &BusId, data: &[PayloadType]) -> bool {
         debug_assert!(*bus_id == OPERATION_BUS_ID);
 
         if self.inputs.len() == self.num_operations as usize {
@@ -225,21 +216,21 @@ impl BusDevice<PayloadType> for ArithEqCollector {
             ExtOperationData::OperationBn254ComplexMulData(bus_data) => {
                 ArithEqInput::Bn254ComplexMul(Bn254ComplexMulInput::from(&bus_data))
             }
+            ExtOperationData::OperationSecp256r1AddData(bus_data) => {
+                ArithEqInput::Secp256r1Add(Secp256r1AddInput::from(&bus_data))
+            }
+            ExtOperationData::OperationSecp256r1DblData(bus_data) => {
+                ArithEqInput::Secp256r1Dbl(Secp256r1DblInput::from(&bus_data))
+            }
             // Add here new operations
             _ => panic!("Expected ExtOperationData::OperationData"),
         });
 
         self.inputs.len() < self.num_operations as usize
     }
+}
 
-    /// Returns the bus IDs associated with this instance.
-    ///
-    /// # Returns
-    /// A vector containing the connected bus ID.
-    fn bus_id(&self) -> Vec<BusId> {
-        vec![OPERATION_BUS_ID]
-    }
-
+impl BusDevice<PayloadType> for ArithEqCollector {
     fn as_any(self: Box<Self>) -> Box<dyn Any> {
         self
     }

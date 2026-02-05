@@ -1,23 +1,34 @@
-require "std_direct.pil";
+require "std_direct.pil"
 
-require "operations.pil";
-require "opids.pil";
+require "operations.pil"
+require "opids.pil"
+require "config.pil"
 
-require "rom/pil/rom.pil";
-require "main/pil/main.pil";
-require "mem/pil/mem.pil";
-require "mem/pil/mem_align.pil";
-require "mem/pil/mem_align_byte.pil";
-require "frequent-ops/pil/frequent_ops.pil";
-require "binary/pil/binary.pil";
-require "binary/pil/binary_extension.pil";
-require "binary/pil/binary_add.pil";
-require "arith/pil/arith.pil";
-require "big_int/pil/big_int_add.pil";
-require "arith_eq/pil/arith_eq.pil";
-require "arith_eq_384/pil/arith_eq_384.pil";
-require "keccakf/pil/keccakf.pil";
-require "sha256f/pil/sha256f.pil";
+require "dma/pil/dual_range.pil"
+require "rom/pil/rom.pil"
+require "main/pil/main.pil"
+require "mem/pil/mem.pil"
+require "mem/pil/mem_align.pil"
+require "mem/pil/mem_align_byte.pil"
+require "frequent-ops/pil/frequent_ops.pil"
+require "binary/pil/binary.pil"
+require "binary/pil/binary_extension.pil"
+require "binary/pil/binary_add.pil"
+require "arith/pil/arith.pil"
+require "big_int/pil/big_int_add.pil"
+require "arith_eq/pil/arith_eq.pil"
+require "arith_eq_384/pil/arith_eq_384.pil"
+require "keccakf/pil/keccakf.pil"
+require "sha256f/pil/sha256f.pil"
+require "dma/pil/dma.pil"
+require "dma/pil/dma_rom.pil"
+require "dma/pil/dma_pre_post.pil"
+require "dma/pil/dma_pre_post_table.pil"
+require "dma/pil/dma_64_aligned.pil"
+require "dma/pil/dma_unaligned.pil"
+require "poseidon2/pil/poseidon2.pil"
+
+enable_range_stats();
 
 proofval enable_input_data;
 enable_input_data * (1 - enable_input_data);
@@ -25,17 +36,41 @@ enable_input_data * (1 - enable_input_data);
 proofval enable_rom_data;
 enable_rom_data * (1 - enable_rom_data);
 
+proofval enable_dma_64_aligned;
+enable_dma_64_aligned * (1 - enable_dma_64_aligned);
+
+proofval enable_dma_64_aligned_input;
+enable_dma_64_aligned_input * (1 - enable_dma_64_aligned_input);
+
+proofval enable_dma_unaligned;
+enable_dma_unaligned * (1 - enable_dma_unaligned);
+
 const int PUBLIC_INPUTS_64_BITS = 32;  // 32 x 64 bits = 2048 bits
 public inputs[PUBLIC_INPUTS_64_BITS * 2]; // 2 x 32-bits = 64 bits
+
+function range_dual_byte(expr byte_a, expr byte_b, expr sel = 1) {
+    lookup_assumes(DUAL_RANGE_BYTE_ID, expressions: [byte_a, byte_b], sel: sel);
+}
 
 airgroup Zisk {
     // Virtual Tables Configuration
     set_max_std_tables_bits(20);
-    set_max_num_rows_virtual(1 << 20); // Set the maximum rows for virtual tables
+    set_max_num_rows_virtual(1 << 21); // Set the maximum rows for virtual tables
     set_max_num_virtual_tables(2);
-    set_group_virtual_tables(table_ids: [ARITH_TABLE_ID, ARITH_RANGE_TABLE_ID, ARITH_EQ_LT_TABLE_ID, BINARY_EXTENSION_TABLE_ID, BINARY_TABLE_ID, MEMORY_ALIGN_ROM_ID, KECCAKF_TABLE_ID]);
+    set_group_virtual_tables(table_ids: [ARITH_TABLE_ID, ARITH_RANGE_TABLE_ID, ARITH_EQ_LT_TABLE_ID, BINARY_EXTENSION_TABLE_ID, 
+                                         BINARY_TABLE_ID, MEMORY_ALIGN_ROM_ID, KECCAKF_TABLE_ID, DMA_ROM_ID, DMA_PRE_POST_TABLE_ID]);
     set_group_virtual_tables(table_ids: [BINARY_EXTENSION_FROPS_TABLE_ID, BINARY_FROPS_TABLE_ID, ARITH_FROPS_TABLE_ID]);
 
+    virtual DualRange(id: DUAL_RANGE_7_BITS_ID, min1: 0, max1: P2_7-1, min2: 0, max2: P2_7-1) alias DualRange7Bits;
+    virtual DualRange(id: DUAL_RANGE_BYTE_ID, min1: 0, max1: P2_8-1, min2: 0, max2: P2_8-1) alias DualByte;
+
+    Dma();
+    virtual DmaRom();
+    Dma64Aligned(enable: enable_dma_64_aligned);
+    // Dma64Aligned(enable: enable_dma_64_aligned_input, src_is_free_input: 1) alias Dma64AlignedInput;
+    DmaUnaligned(enable: enable_dma_unaligned);
+    DmaPrePost();
+    virtual DmaPrePostTable();
     // Main Program
     Main(N: 2**22);
     Rom(N: 2**22);
@@ -50,8 +85,7 @@ airgroup Zisk {
     MemAlignByte(N: 2**22, read: 1, write: 0) alias MemAlignReadByte;
     MemAlignByte(N: 2**22, read: 0, write: 1) alias MemAlignWriteByte;
     virtual MemAlignRom();
-    virtual DualByte();
-
+    
     // Standard operations
     Arith(N: 2**21);
     virtual ArithTable();
@@ -76,17 +110,15 @@ airgroup Zisk {
     ArithEq384(N: 2**20);
     virtual ArithEqLtTable();
 
-    const int KECCAKF_CHUNKS = 9;
-    const int KECCAKF_BITS = 7;
-    Keccakf(N: 2**21, chunks: KECCAKF_CHUNKS, bits: KECCAKF_BITS, RC: 2, RB: 32, mem_bits_in_parallel: 4);
-    const int KECCAKF_TABLE_CHUNKS = 1;
-    const int KECCAKF_TABLE_BITS = (KECCAKF_BITS - KECCAKF_TABLE_CHUNKS + 1) + KECCAKF_BITS + KECCAKF_BITS + 1;
-    virtual KeccakfTable(N: 2**KECCAKF_TABLE_BITS, chunks: KECCAKF_TABLE_CHUNKS, bits: KECCAKF_BITS);
+    Keccakf(N: 2**17, mem_ops_in_parallel: 25);
+    virtual KeccakfTable(KECCAKF_TABLE_SIZE);
 
     Sha256f(N: 2**18);
 
+    Poseidon2(N: 2**17);
+
     // Public Inputs
     for (int i = 0; i < PUBLIC_INPUTS_64_BITS; i++) {
-        direct_global_update_proves(OPERATION_BUS_ID, [OP_PUBOUT, i, 0, inputs[i*2], inputs[i*2 + 1], inputs[i*2], inputs[i*2 + 1], 0]);
+        direct_global_update_proves(OPERATION_BUS_ID, [OP_PUBOUT, i, 0, inputs[i*2], inputs[i*2 + 1], inputs[i*2], inputs[i*2 + 1], 0, 0]);
     }
 }

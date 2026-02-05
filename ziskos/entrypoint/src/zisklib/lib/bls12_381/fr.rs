@@ -6,17 +6,25 @@ use super::constants::{R, R_MINUS_ONE};
 
 /// Addition in Fr
 #[inline]
-pub fn add_fr_bls12_381(x: &[u64; 4], y: &[u64; 4]) -> [u64; 4] {
+pub fn add_fr_bls12_381(
+    x: &[u64; 4],
+    y: &[u64; 4],
+    #[cfg(feature = "hints")] hints: &mut Vec<u64>,
+) -> [u64; 4] {
     // x·1 + y
     let mut params =
         SyscallArith256ModParams { a: x, b: &[1, 0, 0, 0], c: y, module: &R, d: &mut [0, 0, 0, 0] };
-    syscall_arith256_mod(&mut params);
+    syscall_arith256_mod(
+        &mut params,
+        #[cfg(feature = "hints")]
+        hints,
+    );
     *params.d
 }
 
 /// Doubling in Fr
 #[inline]
-pub fn dbl_fr_bls12_381(x: &[u64; 4]) -> [u64; 4] {
+pub fn dbl_fr_bls12_381(x: &[u64; 4], #[cfg(feature = "hints")] hints: &mut Vec<u64>) -> [u64; 4] {
     // 2·x + 0 or x·1 + x
     let mut params = SyscallArith256ModParams {
         a: x,
@@ -25,23 +33,35 @@ pub fn dbl_fr_bls12_381(x: &[u64; 4]) -> [u64; 4] {
         module: &R,
         d: &mut [0, 0, 0, 0],
     };
-    syscall_arith256_mod(&mut params);
+    syscall_arith256_mod(
+        &mut params,
+        #[cfg(feature = "hints")]
+        hints,
+    );
     *params.d
 }
 
 /// Subtraction in Fr
 #[inline]
-pub fn sub_fr_bls12_381(x: &[u64; 4], y: &[u64; 4]) -> [u64; 4] {
+pub fn sub_fr_bls12_381(
+    x: &[u64; 4],
+    y: &[u64; 4],
+    #[cfg(feature = "hints")] hints: &mut Vec<u64>,
+) -> [u64; 4] {
     // y·(-1) + x
     let mut params =
         SyscallArith256ModParams { a: y, b: &R_MINUS_ONE, c: x, module: &R, d: &mut [0, 0, 0, 0] };
-    syscall_arith256_mod(&mut params);
+    syscall_arith256_mod(
+        &mut params,
+        #[cfg(feature = "hints")]
+        hints,
+    );
     *params.d
 }
 
 /// Negation in Fr
 #[inline]
-pub fn neg_fr_bls12_381(x: &[u64; 4]) -> [u64; 4] {
+pub fn neg_fr_bls12_381(x: &[u64; 4], #[cfg(feature = "hints")] hints: &mut Vec<u64>) -> [u64; 4] {
     // x·(-1) + 0
     let mut params = SyscallArith256ModParams {
         a: x,
@@ -50,109 +70,57 @@ pub fn neg_fr_bls12_381(x: &[u64; 4]) -> [u64; 4] {
         module: &R,
         d: &mut [0, 0, 0, 0],
     };
-    syscall_arith256_mod(&mut params);
+    syscall_arith256_mod(
+        &mut params,
+        #[cfg(feature = "hints")]
+        hints,
+    );
     *params.d
 }
 
 /// Multiplication in Fr
 #[inline]
-pub fn mul_fr_bls12_381(x: &[u64; 4], y: &[u64; 4]) -> [u64; 4] {
+pub fn mul_fr_bls12_381(
+    x: &[u64; 4],
+    y: &[u64; 4],
+    #[cfg(feature = "hints")] hints: &mut Vec<u64>,
+) -> [u64; 4] {
     // x·y + 0
     let mut params =
         SyscallArith256ModParams { a: x, b: y, c: &[0, 0, 0, 0], module: &R, d: &mut [0, 0, 0, 0] };
-    syscall_arith256_mod(&mut params);
+    syscall_arith256_mod(
+        &mut params,
+        #[cfg(feature = "hints")]
+        hints,
+    );
     *params.d
 }
 
 /// Squaring in Fr
 #[inline]
-pub fn square_fr_bls12_381(x: &[u64; 4]) -> [u64; 4] {
+pub fn square_fr_bls12_381(
+    x: &[u64; 4],
+    #[cfg(feature = "hints")] hints: &mut Vec<u64>,
+) -> [u64; 4] {
     // x·x + 0
     let mut params =
         SyscallArith256ModParams { a: x, b: x, c: &[0, 0, 0, 0], module: &R, d: &mut [0, 0, 0, 0] };
-    syscall_arith256_mod(&mut params);
+    syscall_arith256_mod(
+        &mut params,
+        #[cfg(feature = "hints")]
+        hints,
+    );
     *params.d
 }
 
-// ========== Pointer-based API ==========
+/// Convert 32-byte big-endian scalar to [u64; 4] little-endian
+pub fn scalar_bytes_be_to_u64_le_bls12_381(bytes: &[u8; 32]) -> [u64; 4] {
+    let mut result = [0u64; 4];
+    for i in 0..4 {
+        for j in 0..8 {
+            result[3 - i] |= (bytes[i * 8 + j] as u64) << (8 * (7 - j));
+        }
+    }
 
-/// # Safety
-///
-/// Addition in Fr
-#[inline]
-pub unsafe fn add_fr_bls12_381_ptr(a: *mut u64, b: *const u64) {
-    let a_in = core::slice::from_raw_parts(a as *const u64, 4);
-    let b_in = core::slice::from_raw_parts(b, 4);
-
-    let result = add_fr_bls12_381(a_in.try_into().unwrap(), b_in.try_into().unwrap());
-
-    let out = core::slice::from_raw_parts_mut(a, 4);
-    out.copy_from_slice(&result);
-}
-
-/// # Safety
-///
-/// Doubling in Fr
-#[inline]
-pub unsafe fn dbl_fr_bls12_381_ptr(a: *mut u64) {
-    let a_in = core::slice::from_raw_parts(a as *const u64, 4);
-
-    let result = dbl_fr_bls12_381(a_in.try_into().unwrap());
-
-    let out = core::slice::from_raw_parts_mut(a, 4);
-    out.copy_from_slice(&result);
-}
-
-/// # Safety
-///
-/// Subtraction in Fr
-#[inline]
-pub unsafe fn sub_fr_bls12_381_ptr(a: *mut u64, b: *const u64) {
-    let a_in = core::slice::from_raw_parts(a as *const u64, 4);
-    let b_in = core::slice::from_raw_parts(b, 4);
-
-    let result = sub_fr_bls12_381(a_in.try_into().unwrap(), b_in.try_into().unwrap());
-
-    let out = core::slice::from_raw_parts_mut(a, 4);
-    out.copy_from_slice(&result);
-}
-
-/// # Safety
-///
-/// Negation in Fr
-#[inline]
-pub unsafe fn neg_fr_bls12_381_ptr(a: *mut u64) {
-    let a_in = core::slice::from_raw_parts(a as *const u64, 4);
-
-    let result = neg_fr_bls12_381(a_in.try_into().unwrap());
-
-    let out = core::slice::from_raw_parts_mut(a, 4);
-    out.copy_from_slice(&result);
-}
-
-/// # Safety
-///
-/// Multiplication in Fr
-#[inline]
-pub unsafe fn mul_fr_bls12_381_ptr(a: *mut u64, b: *const u64) {
-    let a_in = core::slice::from_raw_parts(a as *const u64, 4);
-    let b_in = core::slice::from_raw_parts(b, 4);
-
-    let result = mul_fr_bls12_381(a_in.try_into().unwrap(), b_in.try_into().unwrap());
-
-    let out = core::slice::from_raw_parts_mut(a, 4);
-    out.copy_from_slice(&result);
-}
-
-/// # Safety
-///
-/// Squaring in Fr
-#[inline]
-pub unsafe fn square_fr_bls12_381_ptr(a: *mut u64) {
-    let a_in = core::slice::from_raw_parts(a as *const u64, 4);
-
-    let result = square_fr_bls12_381(a_in.try_into().unwrap());
-
-    let out = core::slice::from_raw_parts_mut(a, 4);
-    out.copy_from_slice(&result);
+    result
 }

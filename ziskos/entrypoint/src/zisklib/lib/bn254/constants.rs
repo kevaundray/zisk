@@ -15,12 +15,22 @@ pub const ETWISTED_B: [u64; 8] = [
     0x9713B03AF0FED4,
 ];
 
+/// Identity element in G1
+pub const G1_IDENTITY: [u64; 8] = [0u64; 8];
+
+/// Identity element in G2
+pub const G2_IDENTITY: [u64; 16] = [0u64; 16];
+
 /// Base field size
 pub const P: [u64; 4] =
     [0x3C208C16D87CFD47, 0x97816A916871CA8D, 0xB85045B68181585D, 0x30644E72E131A029];
 
 /// Base field size minus one
 pub const P_MINUS_ONE: [u64; 4] = [P[0] - 1, P[1], P[2], P[3]];
+
+/// Scalar field size
+pub const R: [u64; 4] =
+    [0x43E1F593F0000001, 0x2833E84879B97091, 0xB85045B68181585D, 0x30644E72E131A029];
 
 /// Frobenius operator constant 𝛾₁₁ := (9 + u)^((p-1)/6)
 pub const FROBENIUS_GAMMA11: [u64; 8] = [

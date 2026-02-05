@@ -2,13 +2,17 @@ use anyhow::Result;
 use clap::Parser;
 use std::path::PathBuf;
 
+use crate::{commands::get_proving_key, ux::print_banner};
 use colored::Colorize;
-use proofman_common::initialize_logger;
-
-use crate::{
-    commands::{get_proving_key, get_zisk_path},
-    ux::print_banner,
+use fields::Goldilocks;
+use proofman_common::{
+    initialize_logger, MpiCtx, ParamsGPU, ProofCtx, ProofType, SetupCtx, SetupsVadcop,
 };
+use rom_setup::gen_assembly;
+use rom_setup::rom_merkle_setup;
+use std::fs;
+use std::sync::Arc;
+use zisk_common::ElfBinaryOwned;
 
 #[derive(Parser)]
 #[command(version, about, long_about = None)]
@@ -30,8 +34,12 @@ pub struct ZiskRomSetup {
     #[clap(short = 'o', long)]
     pub output_dir: Option<PathBuf>,
 
-    #[clap(short = 'v', long, default_value_t = false)]
-    pub verbose: bool,
+    /// Enable precompile hints in assembly generation
+    #[clap(short = 'n', long, default_value_t = false)]
+    pub hints: bool,
+
+    #[arg(short, long, action = clap::ArgAction::Count, help = "Increase verbosity level")]
+    pub verbose: u8,
 }
 
 impl ZiskRomSetup {
@@ -47,14 +55,39 @@ impl ZiskRomSetup {
         print_banner();
 
         let proving_key = get_proving_key(self.proving_key.as_ref());
-        let zisk_path = get_zisk_path(self.zisk_path.as_ref());
 
-        rom_setup::rom_full_setup(
-            &self.elf,
-            &proving_key,
-            &zisk_path,
-            &self.output_dir,
-            self.verbose,
-        )
+        let mpi_ctx = Arc::new(MpiCtx::new());
+        let mut pctx = ProofCtx::create_ctx(proving_key, false, self.verbose.into(), mpi_ctx)?;
+
+        let params_gpu = ParamsGPU::new(false);
+        let sctx = Arc::new(SetupCtx::<Goldilocks>::new(
+            &pctx.global_info,
+            &ProofType::Basic,
+            false,
+            &params_gpu,
+            &[],
+        ));
+        let setups_vadcop =
+            Arc::new(SetupsVadcop::new(&pctx.global_info, false, false, &params_gpu, &[]));
+        pctx.set_device_buffers(&sctx, &setups_vadcop, false, &params_gpu)?;
+        let pctx = Arc::new(pctx);
+
+        tracing::info!("Computing setup for ROM {}", self.elf.display());
+
+        tracing::info!("Computing merkle root");
+        let elf_bytes = fs::read(&self.elf)
+            .map_err(|e| anyhow::anyhow!("Error reading ELF file {}: {}", self.elf.display(), e))?;
+        let elf = ElfBinaryOwned::new(
+            elf_bytes,
+            self.elf.file_stem().unwrap().to_str().unwrap().to_string(),
+            self.hints,
+        );
+        rom_merkle_setup::<Goldilocks>(&pctx, &elf, &self.output_dir)?;
+
+        gen_assembly(&self.elf, &self.zisk_path, &self.output_dir, self.hints, self.verbose > 0)?;
+
+        println!();
+        tracing::info!("{}", "ROM setup successfully completed".bright_green().bold());
+        Ok(())
     }
 }

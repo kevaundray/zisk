@@ -11,7 +11,7 @@
 use std::{
     path::PathBuf,
     sync::{
-        atomic::{AtomicBool, AtomicU32},
+        atomic::{AtomicBool, AtomicU64},
         Arc, Mutex,
     },
     thread::JoinHandle,
@@ -23,8 +23,7 @@ use fields::PrimeField64;
 use itertools::Itertools;
 use proofman_common::{AirInstance, FromTrace, ProofmanResult};
 use zisk_common::{
-    create_atomic_vec, BusDeviceMetrics, ComponentBuilder, CounterStats, Instance, InstanceCtx,
-    Planner,
+    create_atomic_vec, ComponentBuilder, CounterStats, Instance, InstanceCtx, Planner,
 };
 use zisk_core::{
     zisk_ops::ZiskOp, Riscv2zisk, ZiskRom, ROM_ADDR, ROM_ADDR_MAX, ROM_ENTRY, ROM_EXIT, SRC_IMM,
@@ -37,10 +36,10 @@ pub struct RomSM {
     zisk_rom: Arc<ZiskRom>,
 
     /// Shared biod instruction counter for monitoring ROM operations.
-    bios_inst_count: Arc<Vec<AtomicU32>>,
+    bios_inst_count: Arc<Vec<AtomicU64>>,
 
     /// Shared program instruction counter for monitoring ROM operations.
-    prog_inst_count: Arc<Vec<AtomicU32>>,
+    prog_inst_count: Arc<Vec<AtomicU64>>,
 
     asm_runner_handler: Mutex<Option<JoinHandle<AsmRunnerRH>>>,
 }
@@ -111,14 +110,12 @@ impl RomSM {
                         true => {
                             multiplicity = counter_stats.bios_inst_count
                                 [((inst.paddr - ROM_ENTRY) as usize) >> 2]
-                                .swap(0, std::sync::atomic::Ordering::Relaxed)
-                                as u64;
+                                .swap(0, std::sync::atomic::Ordering::Relaxed);
                         }
                         false => {
                             multiplicity = counter_stats.bios_inst_count
                                 [((inst.paddr - ROM_ENTRY) as usize) >> 2]
-                                .load(std::sync::atomic::Ordering::Relaxed)
-                                as u64;
+                                .load(std::sync::atomic::Ordering::Relaxed);
                         }
                     }
 
@@ -135,13 +132,11 @@ impl RomSM {
                         multiplicity = counter_stats.prog_inst_count
                             [(inst.paddr - ROM_ADDR) as usize]
                             .swap(0, std::sync::atomic::Ordering::Relaxed)
-                            as u64
                     }
                     false => {
                         multiplicity = counter_stats.prog_inst_count
                             [(inst.paddr - ROM_ADDR) as usize]
                             .load(std::sync::atomic::Ordering::Relaxed)
-                            as u64
                     }
                 }
                 if multiplicity == 0 {
@@ -282,17 +277,15 @@ impl RomSM {
     /// * `rom_path` - The path to the ELF file.
     /// * `rom_custom_trace` - Reference to the custom ROM trace.
     pub fn compute_custom_trace_rom<F: PrimeField64>(
-        rom_path: PathBuf,
+        elf: &[u8],
         rom_custom_trace: &mut RomRomTrace<F>,
     ) {
-        // Get the ELF file path as a string
-        let elf_filename: String = rom_path.to_str().unwrap().into();
         tracing::info!("Computing custom trace ROM");
 
         // Load and parse the ELF file, and transpile it into a ZisK ROM using Riscv2zisk
 
         // Create an instance of the RISCV -> ZisK program converter
-        let riscv2zisk = Riscv2zisk::new(elf_filename);
+        let riscv2zisk = Riscv2zisk::new(elf);
 
         // Convert program to rom
         let rom = riscv2zisk.run().expect("RomSM::prover() failed converting elf to rom");
@@ -311,14 +304,6 @@ impl RomSM {
 }
 
 impl<F: PrimeField64> ComponentBuilder<F> for RomSM {
-    /// Builds and returns a new counter for monitoring ROM operations.
-    ///
-    /// # Returns
-    /// A boxed implementation of `RomCounter`.
-    fn build_counter(&self) -> Option<Box<dyn BusDeviceMetrics>> {
-        None
-    }
-
     /// Builds a planner for ROM-related instances.
     ///
     /// # Returns

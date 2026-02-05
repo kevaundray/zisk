@@ -6,15 +6,15 @@ use riscv::{riscv_interpreter, RiscvInstruction};
 
 use crate::{
     convert_vector, ZiskInstBuilder, ZiskRom, ARCH_ID_CSR_ADDR, ARCH_ID_ZISK, CSR_ADDR,
-    FLOAT_LIB_ROM_ADDR, FLOAT_LIB_SP, FREG_F0, FREG_INST, FREG_RA, FREG_X0, INPUT_ADDR, MTVEC,
-    OUTPUT_ADDR, REG_X0, ROM_ENTRY, ROM_EXIT,
+    EXTRA_PARAMS, FLOAT_LIB_ROM_ADDR, FLOAT_LIB_SP, FREG_F0, FREG_INST, FREG_RA, FREG_X0,
+    INPUT_ADDR, MTVEC, OUTPUT_ADDR, REG_X0, ROM_ENTRY, ROM_EXIT,
 };
 
 use std::collections::HashMap;
 // The CSR precompiled addresses are defined in the `ZiskOS` `ziskos/entrypoint/src` files
 // because legacy versions of Rust do not support constant parameters in `asm!` macros.
 
-const CSR_PRECOMPILED: [&str; 18] = [
+const CSR_PRECOMPILED: [&str; 23] = [
     "keccak",
     "arith256",
     "arith256_mod",
@@ -33,6 +33,11 @@ const CSR_PRECOMPILED: [&str; 18] = [
     "bls12_381_complex_sub",
     "bls12_381_complex_mul",
     "add256",
+    "poseidon2",
+    "dma_memcpy",
+    "dma_memcmp",
+    "secp256r1_add",
+    "secp256r1_dbl",
 ];
 const CSR_PRECOMPILED_ADDR_START: u32 = 0x800;
 const CSR_PRECOMPILED_ADDR_END: u32 = CSR_PRECOMPILED_ADDR_START + CSR_PRECOMPILED.len() as u32;
@@ -55,13 +60,23 @@ const FLOAT_HANDLER_RETURN_ADDR: u64 = FLOAT_HANDLER_ADDR + 4 * 34; // 31 regs +
 pub struct Riscv2ZiskContext<'a> {
     /// Map of program address to ZisK instructions
     pub insts: &'a mut HashMap<u64, ZiskInstBuilder>,
+    pub input_precompile: Option<u32>,
+    pub output_precompile: Option<u32>,
 }
 
 impl Riscv2ZiskContext<'_> {
     /// Converts an input RISCV instruction into a ZisK instruction and stores it into the internal
     /// map.  C instrucions are already expanded into their equivalent RISCV instructions, so we
     /// only have to map them to their corresponding IMA 32-bits equivalent instructions.
-    pub fn convert(&mut self, riscv_instruction: &RiscvInstruction) {
+    ///
+    /// # Parameters
+    /// * `riscv_instruction` - The current instruction to convert
+    /// * `next_instructions` - Slice of the remaining instructions after the current one
+    pub fn convert(
+        &mut self,
+        riscv_instruction: &RiscvInstruction,
+        next_instructions: &[RiscvInstruction],
+    ) {
         // ZisK supports the IMAC RISC-V instruction set
         match riscv_instruction.inst.as_str() {
             // I: Base Integer Instruction Set
@@ -69,9 +84,18 @@ impl Riscv2ZiskContext<'_> {
 
             // I.1. Integer Computational (Register-Register)
             "add" => {
-                if riscv_instruction.rs1 == 0 {
-                    // rd = rs1(0) + rs2 = rs2
-                    self.copyb(riscv_instruction, 4, 2);
+                if riscv_instruction.rd == 0 && self.input_precompile == Some(0x813) {
+                    self.create_register_op(riscv_instruction, "dma_memcpy", 4);
+                } else if riscv_instruction.rd == 10 && self.input_precompile == Some(0x814) {
+                    self.create_register_op(riscv_instruction, "dma_memcmp", 4);
+                } else if riscv_instruction.rs1 == 0 {
+                    if !next_instructions.is_empty() {
+                        // rd = rs1(0) + rs2 = rs2 followed by ret
+                        self.copyb(riscv_instruction, 4, 2);
+                    } else {
+                        // rd = rs1(0) + rs2 = rs2
+                        self.copyb(riscv_instruction, 4, 2);
+                    }
                 } else if riscv_instruction.rs2 == 0 {
                     // rd = rs1 + rs2(0) = rs1
                     self.copyb(riscv_instruction, 4, 1);
@@ -106,12 +130,13 @@ impl Riscv2ZiskContext<'_> {
 
             // I.2. Integer Computational (Register-Immediate)
             "addi" => {
-                if riscv_instruction.rd == 0
-                    && riscv_instruction.rs1 == 0
-                    && riscv_instruction.rs2 == 0
-                {
-                    // r0 = r0 + imm(0) = 0
-                    self.nop(riscv_instruction, 4);
+                if riscv_instruction.rd == 0 {
+                    if riscv_instruction.rs1 == 0 && riscv_instruction.rs2 == 0 {
+                        // r0 = r0 + imm(0) = 0
+                        self.nop(riscv_instruction, 4);
+                    } else {
+                        self.hint(riscv_instruction, 4);
+                    }
                 } else if riscv_instruction.imm == 0 && riscv_instruction.rs1 != 0 {
                     // rd = rs1 + imm(0) = rs1
                     self.copyb(riscv_instruction, 4, 1);
@@ -612,6 +637,20 @@ impl Riscv2ZiskContext<'_> {
 
     /// Creates a Zisk flag operation that simply sets the flag to true and continues the execution
     /// to the next operation
+    pub fn hint(&mut self, i: &RiscvInstruction, inst_size: u64) {
+        assert!(inst_size == 2 || inst_size == 4);
+        let mut zib = ZiskInstBuilder::new_from_riscv(i.rom_address, i.inst.clone());
+        zib.src_a("reg", i.rs1 as u64, false);
+        zib.src_b("imm", i.imm as u64, false);
+        zib.op("flag").unwrap();
+        zib.j(inst_size as i64, inst_size as i64);
+        zib.verbose(&i.inst.to_string());
+        zib.build();
+        self.insts.insert(i.rom_address, zib);
+    }
+
+    /// Creates a Zisk flag operation that simply sets the flag to true and continues the execution
+    /// to the next operation
     pub fn nop(&mut self, i: &RiscvInstruction, inst_size: u64) {
         assert!(inst_size == 2 || inst_size == 4);
         let mut zib = ZiskInstBuilder::new_from_riscv(i.rom_address, i.inst.clone());
@@ -752,7 +791,7 @@ impl Riscv2ZiskContext<'_> {
         zib.src_a("imm", 0, false);
         zib.src_b("imm", 0, false);
         zib.op("flag").unwrap();
-        zib.store_ra("reg", i.rd as i64, false);
+        zib.store_pc("reg", i.rd as i64, false);
         zib.j(4, i.imm as i64);
         zib.verbose(&format!("auipc r{}, 0x{:x}", i.rd, i.imm));
         zib.build();
@@ -868,13 +907,42 @@ impl Riscv2ZiskContext<'_> {
     pub fn jalr(&mut self, i: &RiscvInstruction, inst_size: u64) {
         assert!(inst_size == 4 || inst_size == 2);
         let mut rom_address = i.rom_address;
+
+        // Thanks to https://github.com/codygunton for reporting the issue with JALR alignment!
+
+        // JALR target address mask per RISC-V ISA spec Section 2.5.
+        // Must clear only bit 0 (0xfffffffffffffffe) for 2-byte alignment.
+        //
+        // BUG: Using 0xfffffffffffffffc (4-byte alignment) breaks zksync-os at _start.
+        // The startup code (zksync-airbender/riscv_common/src/asm/start64.s) is:
+        //   _start:
+        //       la ra, _abs_start    # auipc + addi (8 bytes)
+        //       jr ra                # c.jr ra (2 bytes, compressed)
+        //   _abs_start:              # offset 10 = 0x8000000a
+        //
+        // The assembler uses compressed `c.jr` (2 bytes), placing _abs_start at
+        // 0x8000000a - valid for C extension but not 4-byte aligned. We could change the start
+        // file but we leave as-is to document the issue.
+        //
+        // With mask 0xfc: 0x8000000a & 0xfc = 0x80000008 (jumps back to `jr ra`!)
+        // With mask 0xfe: 0x8000000a & 0xfe = 0x8000000a (correct target)
+        //
+        // The wrong mask causes an infinite self-loop at the first instruction,
+        // terminating after 16k steps instead of 1.6B.
+        //
+        // Note that this change fixes the misalign2-jalr-01.S test, which is part of the privilege
+        // architecture test suite but which seeems to test requirements of other parts of the
+        // spec.
+
+        const JALR_MASK: u64 = 0xfffffffffffffffe;
+
         if (i.imm % 4) == 0 {
             let mut zib = ZiskInstBuilder::new_from_riscv(rom_address, i.inst.clone());
-            zib.src_a("imm", 0xfffffffffffffffc, false);
+            zib.src_a("imm", JALR_MASK, false);
             zib.src_b("reg", i.rs1 as u64, false);
             zib.op("and").unwrap();
             zib.set_pc();
-            zib.store_ra("reg", i.rd as i64, false);
+            zib.store_pc("reg", i.rd as i64, false);
             zib.j(i.imm as i64, inst_size as i64);
             zib.verbose(&format!("jalr r{}, r{}, 0x{:x}", i.rd, i.rs1, i.imm));
             zib.build();
@@ -893,11 +961,11 @@ impl Riscv2ZiskContext<'_> {
             }
             {
                 let mut zib = ZiskInstBuilder::new(rom_address);
-                zib.src_a("imm", 0xfffffffffffffffc, false);
+                zib.src_a("imm", JALR_MASK, false);
                 zib.src_b("lastc", 0, false);
                 zib.op("and").unwrap();
                 zib.set_pc();
-                zib.store_ra("reg", i.rd as i64, false);
+                zib.store_pc("reg", i.rd as i64, false);
                 zib.j(0, inst_size as i64 - 1);
                 zib.verbose(&format!("jalr r{}, r{}, 0x{:x} ; 2/2", i.rd, i.rs1, i.imm));
                 zib.build();
@@ -915,7 +983,7 @@ impl Riscv2ZiskContext<'_> {
         zib.src_a("imm", 0, false);
         zib.src_b("imm", 0, false);
         zib.op("flag").unwrap();
-        zib.store_ra("reg", i.rd as i64, false);
+        zib.store_pc("reg", i.rd as i64, false);
         zib.j(i.imm as i64, inst_size as i64);
         zib.verbose(&format!("jal r{}, 0x{:x}", i.rd, i.imm));
         zib.build();
@@ -928,7 +996,7 @@ impl Riscv2ZiskContext<'_> {
         zib.src_a("imm", 0, false);
         zib.src_b("mem", MTVEC, false);
         zib.op("copyb").unwrap();
-        zib.store_ra("reg", 1, false);
+        zib.store_pc("reg", 1, false);
         zib.set_pc();
         zib.j(0, 4);
         zib.verbose("ecall");
@@ -1136,11 +1204,23 @@ impl Riscv2ZiskContext<'_> {
             let mut zib = ZiskInstBuilder::new_from_riscv(rom_address, i.inst.clone());
             zib.src_b("reg", i.rs1 as u64, false);
             zib.j(4, 4);
-            if (CSR_PRECOMPILED_ADDR_START..=CSR_PRECOMPILED_ADDR_END).contains(&i.csr) {
-                zib.src_a("step", 0, false);
-                let precompiled = CSR_PRECOMPILED[(i.csr - CSR_PRECOMPILED_ADDR_START) as usize];
-                zib.op(precompiled).unwrap();
-                zib.verbose(precompiled);
+            if (CSR_PRECOMPILED_ADDR_START..CSR_PRECOMPILED_ADDR_END).contains(&i.csr) {
+                match i.csr {
+                    0x813 | 0x814 => {
+                        self.output_precompile = Some(i.csr);
+                        zib.src_a("imm", 0, false);
+                        zib.op("copyb").unwrap();
+                        zib.store("mem", EXTRA_PARAMS as i64, false, false);
+                        zib.verbose("param");
+                    }
+                    _ => {
+                        let precompiled =
+                            CSR_PRECOMPILED[(i.csr - CSR_PRECOMPILED_ADDR_START) as usize];
+                        zib.src_a("imm", 0, false);
+                        zib.op(precompiled).unwrap();
+                        zib.verbose(precompiled);
+                    }
+                }
             } else if (CSR_FCALL_PARAM_ADDR_START..=CSR_FCALL_PARAM_ADDR_END).contains(&i.csr) {
                 let words =
                     CSR_FCALL_PARAM_OFFSET_TO_WORDS[(i.csr - CSR_FCALL_PARAM_ADDR_START) as usize];
@@ -1179,7 +1259,7 @@ impl Riscv2ZiskContext<'_> {
             self.insts.insert(rom_address, zib);
         } else if i.csr == CSR_PRECOMPILED_ADD256 {
             let mut zib = ZiskInstBuilder::new_from_riscv(rom_address, i.inst.clone());
-            zib.src_a("step", 0, false);
+            zib.src_a("imm", 0, false);
             zib.src_b("reg", i.rs1 as u64, false);
             zib.op("add256").unwrap();
             zib.verbose("add256");
@@ -1681,15 +1761,49 @@ pub fn add_zisk_code(rom: &mut ZiskRom, addr: u64, data: &[u8]) {
     let riscv_instructions = riscv_interpreter(addr, &code_vector);
 
     // Create a context to convert RISCV instructions to ZisK instructions, using rom.insts
-    let mut ctx = Riscv2ZiskContext { insts: &mut rom.insts };
+    let mut ctx = Riscv2ZiskContext {
+        insts: &mut rom.insts,
+        input_precompile: None,
+        output_precompile: None,
+    };
+
+    // for (i, riscv_instruction) in riscv_instructions.iter().enumerate() {
+    //     println!("RISCV#{i} 0x{:08X}", riscv_instruction.rom_address);
+    // }
+    // let zisk_memcmp_index =
+    //     riscv_instructions.iter().position(|inst| inst.rom_address == 0x80236edc);
+    // let zisk_memcmp_index: Option<usize> = None;
 
     // For all RISCV instructions
-    for riscv_instruction in riscv_instructions {
+    for (i, riscv_instruction) in riscv_instructions.iter().enumerate() {
         //print!("add_zisk_code() converting RISCV instruction={}\n",
         // riscv_instruction.to_string());
+        // if riscv_instructions[i].rom_address >= 0x80267b28
+        //     && riscv_instructions[i].rom_address <= 0x80267b30
+        // {
+        //     if let Some(zisk_memcmp_index) = zisk_memcmp_index {
+        //         // Get slice of remaining instructions after current one
+        //         let index_offset = (riscv_instructions[i].rom_address - 0x80267b28) as usize >> 2;
+        //         let next_instructions =
+        //             &riscv_instructions[(zisk_memcmp_index + index_offset + 1)..];
+
+        //         let mut instruction = riscv_instructions[zisk_memcmp_index + index_offset].clone();
+        //         instruction.rom_address = riscv_instructions[i].rom_address;
+
+        //         // Convert RICV instruction to ZisK instruction and store it in rom.insts
+        //         ctx.convert(&instruction, next_instructions);
+        //         continue;
+        //         //print!("   to: {}", ctx.insts.iter().last().)
+        //     }
+        // }
+
+        // Get slice of remaining instructions after current one
+        let next_instructions = &riscv_instructions[(i + 1)..];
 
         // Convert RICV instruction to ZisK instruction and store it in rom.insts
-        ctx.convert(&riscv_instruction);
+        ctx.input_precompile = ctx.output_precompile;
+        ctx.output_precompile = None;
+        ctx.convert(riscv_instruction, next_instructions);
         //print!("   to: {}", ctx.insts.iter().last().)
     }
 }
@@ -1886,7 +2000,7 @@ pub fn add_entry_exit_jmp(rom: &mut ZiskRom, addr: u64) {
     zib.src_b("imm", addr, false);
     zib.op("copyb").unwrap();
     zib.set_pc();
-    zib.store_ra("reg", 1, false);
+    zib.store_pc("reg", 1, false);
     zib.j(0, 4);
     zib.verbose(&format!("CALL to entry: 0x{addr:08x}"));
     zib.build();
