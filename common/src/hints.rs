@@ -306,7 +306,9 @@ impl HintCode {
             HintCode::BuiltIn(BuiltInHint::Bn254G1Mul) => HINT_BN254_G1_MUL,
             HintCode::BuiltIn(BuiltInHint::Bn254PairingCheck) => HINT_BN254_PAIRING_CHECK,
             // Secp256k1 Hints
-            HintCode::BuiltIn(BuiltInHint::Secp256k1Recover) => HINT_SECP256K1_ECDSA_ADDRESS_RECOVER,
+            HintCode::BuiltIn(BuiltInHint::Secp256k1Recover) => {
+                HINT_SECP256K1_ECDSA_ADDRESS_RECOVER
+            }
             HintCode::BuiltIn(BuiltInHint::Secp256r1EcdsaVerify) => HINT_SECP256R1_ECDSA_VERIFY,
             // BLS12-381 Hints
             HintCode::BuiltIn(BuiltInHint::Bls12_381G1Add) => HINT_BLS12_381_G1_ADD,

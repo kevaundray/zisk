@@ -1,5 +1,7 @@
 use crate::hints::macros::define_hint;
-use zisk_common::{HINT_SECP256K1_ECDSA_ADDRESS_RECOVER, HINT_SECP256K1_ECDSA_VERIFY_ADDRESS_RECOVER};
+use zisk_common::{
+    HINT_SECP256K1_ECDSA_ADDRESS_RECOVER, HINT_SECP256K1_ECDSA_VERIFY_ADDRESS_RECOVER,
+};
 
 define_hint! {
     secp256k1_ecdsa_address_recover => {
