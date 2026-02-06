@@ -149,7 +149,7 @@ pub enum BuiltInHint {
     Bn254PairingCheck = HINT_BN254_PAIRING_CHECK,
 
     // Secp256k1 hint types.
-    /// secp256k1 ECDSA address recovery
+    /// secp256k1 ECDSA address recovery.
     Secp256k1EcdsaAddressRecover = HINT_SECP256K1_ECDSA_ADDRESS_RECOVER,
     /// secp256k1 ECDSA signature verification and address recovery.
     Secp256k1EcdsaVerifyAddressRecover = HINT_SECP256K1_ECDSA_VERIFY_ADDRESS_RECOVER,
