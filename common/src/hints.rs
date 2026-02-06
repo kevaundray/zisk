@@ -149,8 +149,12 @@ pub enum BuiltInHint {
     Bn254PairingCheck = HINT_BN254_PAIRING_CHECK,
 
     // Secp256k1 hint types.
-    /// secp256k1 ECDSA signature recovery.
-    Secp256k1Recover = HINT_SECP256K1_ECDSA_ADDRESS_RECOVER,
+    /// secp256k1 ECDSA address recovery
+    Secp256k1EcdsaAddressRecover = HINT_SECP256K1_ECDSA_ADDRESS_RECOVER,
+    /// secp256k1 ECDSA signature verification and address recovery.
+    Secp256k1EcdsaVerifyAddressRecover = HINT_SECP256K1_ECDSA_VERIFY_ADDRESS_RECOVER,
+
+    // Secp256r1 hint types.
     /// secp256r1 (P-256) signature verification.
     Secp256r1EcdsaVerify = HINT_SECP256R1_ECDSA_VERIFY,
 
@@ -193,7 +197,11 @@ impl Display for BuiltInHint {
             BuiltInHint::Bn254G1Mul => "BN254_G1_MUL",
             BuiltInHint::Bn254PairingCheck => "BN254_PAIRING_CHECK",
             // Secp256k1 Hints
-            BuiltInHint::Secp256k1Recover => "SECP256K1_RECOVER",
+            BuiltInHint::Secp256k1EcdsaAddressRecover => "SECP256K1_ECDSA_ADDRESS_RECOVER",
+            BuiltInHint::Secp256k1EcdsaVerifyAddressRecover => {
+                "SECP256K1_ECDSA_VERIFY_ADDRESS_RECOVER"
+            }
+            // Secp256r1 Hints
             BuiltInHint::Secp256r1EcdsaVerify => "SECP256R1_ECDSA_VERIFY",
             // BLS12-381 Hints
             BuiltInHint::Bls12_381G1Add => "BLS12_381_G1_ADD",
@@ -227,7 +235,11 @@ impl TryFrom<u32> for BuiltInHint {
             HINT_BN254_G1_MUL => Ok(Self::Bn254G1Mul),
             HINT_BN254_PAIRING_CHECK => Ok(Self::Bn254PairingCheck),
             // Secp256k1 Hints
-            HINT_SECP256K1_ECDSA_ADDRESS_RECOVER => Ok(Self::Secp256k1Recover),
+            HINT_SECP256K1_ECDSA_ADDRESS_RECOVER => Ok(Self::Secp256k1EcdsaAddressRecover),
+            HINT_SECP256K1_ECDSA_VERIFY_ADDRESS_RECOVER => {
+                Ok(Self::Secp256k1EcdsaVerifyAddressRecover)
+            }
+            // Secp256r1 Hints
             HINT_SECP256R1_ECDSA_VERIFY => Ok(Self::Secp256r1EcdsaVerify),
             // BLS12-381 Hints
             HINT_BLS12_381_G1_ADD => Ok(Self::Bls12_381G1Add),
@@ -306,9 +318,13 @@ impl HintCode {
             HintCode::BuiltIn(BuiltInHint::Bn254G1Mul) => HINT_BN254_G1_MUL,
             HintCode::BuiltIn(BuiltInHint::Bn254PairingCheck) => HINT_BN254_PAIRING_CHECK,
             // Secp256k1 Hints
-            HintCode::BuiltIn(BuiltInHint::Secp256k1Recover) => {
+            HintCode::BuiltIn(BuiltInHint::Secp256k1EcdsaAddressRecover) => {
                 HINT_SECP256K1_ECDSA_ADDRESS_RECOVER
             }
+            HintCode::BuiltIn(BuiltInHint::Secp256k1EcdsaVerifyAddressRecover) => {
+                HINT_SECP256K1_ECDSA_VERIFY_ADDRESS_RECOVER
+            }
+            // Secp256r1 Hints
             HintCode::BuiltIn(BuiltInHint::Secp256r1EcdsaVerify) => HINT_SECP256R1_ECDSA_VERIFY,
             // BLS12-381 Hints
             HintCode::BuiltIn(BuiltInHint::Bls12_381G1Add) => HINT_BLS12_381_G1_ADD,
