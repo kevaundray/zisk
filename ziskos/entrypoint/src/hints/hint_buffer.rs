@@ -194,9 +194,6 @@ impl HintBuffer {
                     // Advance to next hint
                     chunk_pos += hint_len;
                 }
-
-                // Advance to next hint
-                chunk_pos += hint_len;
             }
 
             // Flush any remaining data in write buffer
