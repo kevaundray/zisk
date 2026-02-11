@@ -17,7 +17,7 @@ struct HintBufferInner {
     commit_pos: usize,
     closed: bool,
     paused: bool,
-    counter: u64,
+    // counter: u64,
 }
 
 pub fn build_hint_buffer() -> Arc<HintBuffer> {
@@ -27,7 +27,7 @@ pub fn build_hint_buffer() -> Arc<HintBuffer> {
             commit_pos: 0,
             closed: true,
             paused: false,
-            counter: 0,
+            // counter: 0,
         }),
         not_empty: Condvar::new(),
     })
@@ -58,7 +58,7 @@ impl HintBuffer {
         g.commit_pos = 0;
         g.closed = false;
         g.paused = false;
-        g.counter = 0;
+        // g.counter = 0;
         self.not_empty.notify_all();
     }
 
@@ -97,7 +97,7 @@ impl HintBuffer {
 
         g.write_bytes(&header);
 
-        g.counter += 1;
+        // g.counter += 1;
 
         // if g.counter ==  32672 {
         //     panic!("Hint counter reached");
@@ -180,10 +180,14 @@ impl HintBuffer {
 
                         hint_pos += chunk_size;
                     }
+                    // Reset write buffer
+                    buf_start = chunk_pos;
+                    buf_end = chunk_pos;
+                } else {
+                    // Accumulate current hint into write buffer
+                    buf_end += hint_len;
                 }
 
-                // Accumulate current hint into write buffer
-                buf_end += hint_len;
                 // Advance to next hint
                 chunk_pos += hint_len;
             }
