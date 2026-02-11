@@ -354,7 +354,28 @@ impl HintsProcessor {
 
                     let num_hints = self.num_hint.load(Ordering::Relaxed);
 
-                    info!("··· Processed {} hints", num_hints);
+                    if tracing::enabled!(tracing::Level::DEBUG) {
+                        let elapsed = self.instant.lock().as_ref().unwrap().unwrap().elapsed();
+                        let rate = num_hints as f64 / elapsed.as_secs_f64();
+
+                        let (value, unit) = if rate >= 1_000_000.0 {
+                            (rate / 1_000_000.0, "MHz")
+                        } else if rate >= 1_000.0 {
+                            (rate / 1_000.0, "kHz")
+                        } else {
+                            (rate, "Hz")
+                        };
+
+                        debug!(
+                            "Processed {} hints in {:.0?} ({}{})",
+                            num_hints,
+                            elapsed,
+                            value.round(),
+                            unit
+                        );
+                    } else {
+                        info!("··· Processed {} hints", num_hints);
+                    }
 
                     break;
                 }
