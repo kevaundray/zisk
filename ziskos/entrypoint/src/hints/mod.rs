@@ -95,13 +95,16 @@ pub fn init_hints() -> io::Result<()> {
 
     #[cfg(zisk_hints_metrics)]
     crate::hints::metrics::reset_metrics();
-    
+
     HINT_BUFFER.reset();
 
     Ok(())
 }
 
-pub fn init_hints_file(hints_file_path: PathBuf, ready: Option<oneshot::Sender<()>>) -> io::Result<()> {
+pub fn init_hints_file(
+    hints_file_path: PathBuf,
+    ready: Option<oneshot::Sender<()>>,
+) -> io::Result<()> {
     init_hints()?;
 
     if let Some(tx) = ready {
@@ -114,7 +117,10 @@ pub fn init_hints_file(hints_file_path: PathBuf, ready: Option<oneshot::Sender<(
     Ok(())
 }
 
-pub fn init_hints_socket(socket_path: PathBuf, ready: Option<oneshot::Sender<()>>) -> io::Result<()> {
+pub fn init_hints_socket(
+    socket_path: PathBuf,
+    ready: Option<oneshot::Sender<()>>,
+) -> io::Result<()> {
     init_hints()?;
 
     // Create the Unix socket writer (server)

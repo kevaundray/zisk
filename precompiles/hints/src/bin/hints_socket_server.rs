@@ -120,11 +120,9 @@ fn main() -> io::Result<()> {
         match writer.write(data_with_pad) {
             Ok(_) => {
                 if hint_count % 100 == 0 && hint_id != 0 && hint_id != 1 {
-                    println!("#{} Hint id: 0x{:x}, sent: {} bytes, offset: {}",
-                        hint_count,
-                        hint_id,
-                        hint_total_len,
-                        offset
+                    println!(
+                        "#{} Hint id: 0x{:x}, sent: {} bytes, offset: {}",
+                        hint_count, hint_id, hint_total_len, offset
                     );
                 }
             }
@@ -141,10 +139,13 @@ fn main() -> io::Result<()> {
 
         if hint_id == 1 {
             // HINT_END
-            println!("Received END hint. All hints sent, total: {}, time elapsed: {:?}", hint_count, start_time.elapsed());
+            println!(
+                "Received END hint. All hints sent, total: {}, time elapsed: {:?}",
+                hint_count,
+                start_time.elapsed()
+            );
             break;
         }
-
     }
 
     println!("Closing connection...");

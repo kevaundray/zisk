@@ -3,7 +3,7 @@ use std::io::{self, Write};
 use std::sync::{Arc, Condvar, Mutex};
 
 pub const DEFAULT_BUFFER_LEN: usize = 1 << 20; // 1 MiB
-// TODO: Set MAX_WRITE_LEN based on writer type (file or socket)
+                                               // TODO: Set MAX_WRITE_LEN based on writer type (file or socket)
 pub const MAX_WRITER_LEN: usize = 128 * 1024; // 128KB is the max write size for Unix sockets
 pub const HEADER_LEN: usize = 8;
 
@@ -176,7 +176,10 @@ impl HintBuffer {
                     while hint_pos < hint_len {
                         let chunk_size = std::cmp::min(MAX_WRITER_LEN, hint_len - hint_pos);
                         let hint_bytes: &[u8] = unsafe {
-                            core::slice::from_raw_parts(chunk_base.add(chunk_pos + hint_pos), chunk_size)
+                            core::slice::from_raw_parts(
+                                chunk_base.add(chunk_pos + hint_pos),
+                                chunk_size,
+                            )
                         };
 
                         writer.write_all(hint_bytes)?;
