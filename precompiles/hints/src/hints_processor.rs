@@ -72,6 +72,15 @@ impl HintProcessorState {
             generation: AtomicUsize::new(0),
         }
     }
+
+    fn reset(&self) {
+        self.error_flag.store(false, Ordering::Release);
+        self.next_seq.store(0, Ordering::Relaxed);
+        self.generation.fetch_add(1, Ordering::SeqCst);
+        let mut queue = self.queue.lock().unwrap();
+        queue.buffer.clear();
+        queue.next_drain_seq = 0;
+    }
 }
 
 /// Type alias for custom hint handler functions.
@@ -320,8 +329,6 @@ impl HintsProcessor {
                             idx
                         ));
                     }
-                    // Reset global sequence and buffer at stream start
-                    self.reset_state();
                     // Mark stream as active
                     self.stream_active.store(true, Ordering::Release);
                     // Control hint only; skip processing
@@ -612,26 +619,6 @@ impl HintsProcessor {
         Ok(())
     }
 
-    /// Resets the processor state, clearing any errors and the reorder buffer.
-    ///
-    /// This should be called to start a fresh processing session after an error
-    /// or when you want to reset the global sequence counter.
-    ///
-    /// Increments the generation counter to invalidate any in-flight workers
-    /// from the previous session, preventing them from corrupting the new state.
-    fn reset_state(&self) {
-        // Clear error flag - use Release to synchronize with Acquire loads in workers
-        self.state.error_flag.store(false, Ordering::Release);
-        // Reset sequence counter - Relaxed is sufficient as it's only used within mutex
-        self.state.next_seq.store(0, Ordering::Relaxed);
-        // Increment generation with SeqCst to invalidate stale workers
-        // This provides a total ordering fence that synchronizes with worker generation checks
-        self.state.generation.fetch_add(1, Ordering::SeqCst);
-        let mut queue = self.state.queue.lock().unwrap();
-        queue.buffer.clear();
-        queue.next_drain_seq = 0;
-    }
-
     /// Dispatches a single hint to its appropriate handler based on hint type.
     ///
     /// # Arguments
@@ -708,8 +695,13 @@ impl HintsProcessor {
     }
 
     fn reset(&self) {
-        self.pending_partial.lock().unwrap().take();
+        self.num_hint.store(0, Ordering::Relaxed);
+        self.state.reset();
+        self.stats.as_ref().map(|s| s.lock().unwrap().clear());
         self.hints_sink.reset();
+        self.stream_active.store(false, Ordering::Release);
+        self.instant.lock().unwrap().take();
+        self.pending_partial.lock().unwrap().take();
     }
 }
 
