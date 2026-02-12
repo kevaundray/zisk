@@ -72,6 +72,15 @@ impl HintProcessorState {
             generation: AtomicUsize::new(0),
         }
     }
+
+    fn reset(&self) {
+        self.error_flag.store(false, Ordering::Release);
+        self.next_seq.store(0, Ordering::Relaxed);
+        self.generation.fetch_add(1, Ordering::SeqCst);
+        let mut queue = self.queue.lock().unwrap();
+        queue.buffer.clear();
+        queue.next_drain_seq = 0;
+    }
 }
 
 /// Type alias for custom hint handler functions.
@@ -320,8 +329,6 @@ impl HintsProcessor {
                             idx
                         ));
                     }
-                    // Reset global sequence and buffer at stream start
-                    self.reset_state();
                     // Mark stream as active
                     self.stream_active.store(true, Ordering::Release);
                     // Control hint only; skip processing
@@ -352,9 +359,7 @@ impl HintsProcessor {
                         ));
                     }
 
-                    let num_hints = self.num_hint.load(Ordering::Relaxed);
-
-                    info!("··· Processed {} hints", num_hints);
+                    self.print_num_processed_hints();
 
                     break;
                 }
@@ -422,6 +427,28 @@ impl HintsProcessor {
         }
 
         Ok(has_ctrl_end)
+    }
+
+    /// Prints the total number of processed hints and processing rate if in debug mode.
+    fn print_num_processed_hints(&self) {
+        let num_hints = self.num_hint.load(Ordering::Relaxed);
+
+        if tracing::enabled!(tracing::Level::DEBUG) {
+            let elapsed = self.instant.lock().as_ref().unwrap().unwrap().elapsed();
+            let rate = num_hints as f64 / elapsed.as_secs_f64();
+
+            let (value, unit) = if rate >= 1_000_000.0 {
+                (rate / 1_000_000.0, "MHz")
+            } else if rate >= 1_000.0 {
+                (rate / 1_000.0, "kHz")
+            } else {
+                (rate, "Hz")
+            };
+
+            debug!("Processed {} hints in {:.0?} ({}{})", num_hints, elapsed, value.round(), unit);
+        } else {
+            info!("··· Processed {} hints", num_hints);
+        }
     }
 
     /// Worker thread that processes a single hint and stores the result.
@@ -591,26 +618,6 @@ impl HintsProcessor {
         Ok(())
     }
 
-    /// Resets the processor state, clearing any errors and the reorder buffer.
-    ///
-    /// This should be called to start a fresh processing session after an error
-    /// or when you want to reset the global sequence counter.
-    ///
-    /// Increments the generation counter to invalidate any in-flight workers
-    /// from the previous session, preventing them from corrupting the new state.
-    fn reset_state(&self) {
-        // Clear error flag - use Release to synchronize with Acquire loads in workers
-        self.state.error_flag.store(false, Ordering::Release);
-        // Reset sequence counter - Relaxed is sufficient as it's only used within mutex
-        self.state.next_seq.store(0, Ordering::Relaxed);
-        // Increment generation with SeqCst to invalidate stale workers
-        // This provides a total ordering fence that synchronizes with worker generation checks
-        self.state.generation.fetch_add(1, Ordering::SeqCst);
-        let mut queue = self.state.queue.lock().unwrap();
-        queue.buffer.clear();
-        queue.next_drain_seq = 0;
-    }
-
     /// Dispatches a single hint to its appropriate handler based on hint type.
     ///
     /// # Arguments
@@ -687,8 +694,15 @@ impl HintsProcessor {
     }
 
     fn reset(&self) {
-        self.pending_partial.lock().unwrap().take();
+        self.num_hint.store(0, Ordering::Relaxed);
+        self.state.reset();
+        if let Some(stats) = self.stats.as_ref() {
+            stats.lock().unwrap().clear();
+        }
         self.hints_sink.reset();
+        self.stream_active.store(false, Ordering::Release);
+        self.instant.lock().unwrap().take();
+        self.pending_partial.lock().unwrap().take();
     }
 }
 
@@ -867,45 +881,6 @@ mod tests {
         assert!(p.process_hints(&good, false).is_ok());
         assert!(p.wait_for_completion().is_ok());
 
-        let queue = p.state.queue.lock().unwrap();
-        assert_eq!(queue.next_drain_seq, 1);
-    }
-
-    // Stream control tests
-    #[test]
-    fn test_stream_start_resets_state() {
-        let p = processor();
-
-        // First batch increments sequence (8 bytes = 1 u64)
-        let batch1 = vec![make_header(TEST_PASSTHROUGH_HINT, 8), 0x01];
-        p.process_hints(&batch1, false).unwrap();
-        p.wait_for_completion().unwrap();
-
-        // Sequence should be at 1
-        {
-            let queue = p.state.queue.lock().unwrap();
-            assert_eq!(queue.next_drain_seq, 1);
-        }
-
-        // Send START control - should reset sequence
-        let start = vec![make_ctrl_header(HintCode::Ctrl(CtrlHint::Start).to_u32(), 0)];
-        p.process_hints(&start, true).unwrap();
-
-        // Sequence should be reset to 0
-        {
-            let queue = p.state.queue.lock().unwrap();
-            assert_eq!(queue.next_drain_seq, 0);
-            assert!(queue.buffer.is_empty());
-        }
-
-        // Process new batch (8 bytes = 1 u64)
-        let batch2 = vec![make_header(TEST_PASSTHROUGH_HINT, 8), 0x02];
-        p.process_hints(&batch2, false).unwrap();
-
-        let end = vec![make_ctrl_header(HintCode::Ctrl(CtrlHint::End).to_u32(), 0)];
-        p.process_hints(&end, false).unwrap();
-
-        // Should have processed 1 hint (starting from 0 again)
         let queue = p.state.queue.lock().unwrap();
         assert_eq!(queue.next_drain_seq, 1);
     }
