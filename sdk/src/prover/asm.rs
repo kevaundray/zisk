@@ -124,6 +124,8 @@ impl ProverEngine for AsmProver {
             .with_base_port(self.core_prover.base_port)
             .with_world_rank(world_rank)
             .with_local_rank(local_rank)
+            .with_verbose(self.core_prover.verbose == VerboseMode::Debug)
+            .with_metrics(self.core_prover.verbose == VerboseMode::Debug)
             .with_unlock_mapped_memory(self.core_prover.unlock_mapped_memory);
 
         asm_services.start_asm_services(&asm_mt_path, asm_runner_options)?;
