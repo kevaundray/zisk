@@ -6199,6 +6199,7 @@ dependencies = [
  "serde",
  "sha2",
  "tiny-keccak",
+ "tokio",
  "zisk-common",
 ]
 
