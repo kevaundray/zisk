@@ -102,6 +102,9 @@ pub fn init_hints() -> io::Result<()> {
 
     HINT_BUFFER.reset();
 
+    // Write HINT_START
+    HINT_BUFFER.write_hint_start();
+
     Ok(())
 }
 
@@ -144,11 +147,17 @@ pub fn init_hints_socket(
 
     Ok(())
 }
+
 pub fn close_hints() -> io::Result<()> {
     *MAIN_TID.lock().unwrap() = None;
 
+    // Write HINT_END
+    HINT_BUFFER.write_hint_end();
+
+    // Close the hint buffer to signal the writer thread to finish
     HINT_BUFFER.close();
 
+    // Wait for the writer thread to finish and check for errors
     let handle = HINT_WRITER_HANDLE.take();
     if let Some(handle) = handle {
         match handle.join() {
@@ -167,24 +176,8 @@ pub fn close_hints() -> io::Result<()> {
 }
 
 pub fn write_hints<W: Write>(writer: &mut W) -> io::Result<()> {
-    let disable_prefix = std::env::var("HINTS_DISABLE_PREFIX").unwrap_or_default() == "1";
-
-    // Write HINT_START
-    if !disable_prefix {
-        let start_header: u64 = ((HINT_START as u64) << 32) | 0u64;
-        let start_bytes = start_header.to_le_bytes();
-        writer.write_all(&start_bytes)?;
-    }
-
     // Write hints from the buffer
     HINT_BUFFER.drain_to_writer(writer)?;
-
-    // Write HINT_END
-    if !disable_prefix {
-        let end_header: u64 = ((HINT_END as u64) << 32) | 0u64;
-        let end_bytes = end_header.to_le_bytes();
-        writer.write_all(&end_bytes)?;
-    }
 
     writer.flush()?;
 
