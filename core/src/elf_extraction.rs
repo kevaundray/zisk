@@ -73,9 +73,9 @@ pub fn collect_elf_payload_from_bytes(file_data: &[u8]) -> Result<ElfPayload, Bo
             let data = if sh.sh_type == SHT_PROGBITS {
                 let (raw, _) = elf.section_data(&sh)?;
                 let mut data = raw.to_vec();
-                // Word-align by trimming
-                while data.len() % 4 != 0 {
-                    data.pop();
+                // Ensure half-word alignment (2 bytes) for RISC-V code with compressed instructions
+                if data.len() % 2 != 0 {
+                    data.push(0);
                 }
                 data
             } else if sh.sh_type == SHT_NOBITS {

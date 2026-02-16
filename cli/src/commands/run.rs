@@ -51,7 +51,7 @@ impl ZiskRun {
         let runner_command: String;
         // Construct the cargo run command
         let mut command = Command::new("cargo");
-        command.args(["+zisk", "run"]);
+        command.args(["+nightly", "run"]);
 
         // Add the feature selection flags
         if let Some(features) = &self.features {
@@ -139,7 +139,7 @@ impl ZiskRun {
             );
         }
 
-        env::set_var("CARGO_TARGET_RISCV64IMA_ZISK_ZKVM_ELF_RUNNER", runner_command);
+        env::set_var("CARGO_TARGET_RISCV64IMAC_UNKNOWN_NONE_ELF_RUNNER", runner_command);
 
         command.args(["--target", ZISK_TARGET]);
 

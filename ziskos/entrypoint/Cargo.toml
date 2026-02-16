@@ -6,30 +6,40 @@ license = { workspace = true }
 keywords = { workspace = true }
 repository = { workspace = true }
 categories = { workspace = true }
+links = "ziskos"
+
+[features]
+default = ["user-hints", "host-deps"]
+guest = []
+host-deps = [
+    "dep:precompiles-helpers",
+    "dep:lib-c", "dep:num-bigint", "dep:num-integer", "dep:num-traits",
+    "dep:lazy_static",
+    "dep:tiny-keccak", "dep:sha2", "dep:fields",
+]
+user-hints = ["dep:zisk-common", "dep:bytes", "dep:paste", "dep:once_cell", "dep:ctor", "dep:anyhow", "dep:tokio"]
 
 [dependencies]
-lib-c = { workspace = true }
-
-num-bigint = { workspace = true }
-num-integer = { workspace = true }
-num-traits = { workspace = true }
-
-precompiles-helpers = { workspace = true }
-
-lazy_static = "1.5.0"
-rand = "0.8.5"
-getrandom = { version = "0.2", features = ["custom"] }
 cfg-if = "1.0"
-tiny-keccak = { version = "2.0.0", features = ["keccak"] }
-serde = { workspace = true, features = ["derive"] }
+getrandom = { version = "0.2", features = ["custom"] }
+precompiles-helpers = { workspace = true, optional = true }
 
-bincode = { workspace = true }
-sha2 = { workspace = true }
+# Host-only dependencies (software implementations of fcalls, used by emulator)
+lib-c = { workspace = true, optional = true }
+num-bigint = { workspace = true, optional = true }
+num-integer = { workspace = true, optional = true }
+num-traits = { workspace = true, optional = true }
+lazy_static = { version = "1.5.0", optional = true }
+rand = { version = "0.8.5", default-features = false, features = ["small_rng"] }
+tiny-keccak = { version = "2.0.0", features = ["keccak"], optional = true }
+serde = { workspace = true, default-features = false, features = ["derive", "alloc"] }
+bincode = { workspace = true, default-features = false, features = ["serde", "alloc"] }
+sha2 = { workspace = true, optional = true }
 fields = { git = "https://github.com/0xPolygonHermez/pil2-proofman.git", branch = "pre-develop-0.16.0", features = [
     "verify",
-] }
+], optional = true }
 
-[target.'cfg(all(not(all(target_os = "zkvm", target_vendor = "zisk")), any(zisk_hints, zisk_hints_debug)))'.dependencies]
+[target.'cfg(all(not(feature = "guest"), any(zisk_hints, zisk_hints_debug)))'.dependencies]
 bytes = { version = "1.11.0", optional = true }
 once_cell = { version = "1.21.3", optional = true }
 paste = { version = "1.0", optional = true }
@@ -37,12 +47,8 @@ zisk-common = { path = "../../common", optional = true }
 anyhow = { workspace = true, optional = true }
 tokio = { workspace = true, optional = true}
 
-[target.'cfg(all(not(all(target_os = "zkvm", target_vendor = "zisk")), zisk_hints_metrics))'.dependencies]
+[target.'cfg(all(not(feature = "guest"), zisk_hints_metrics))'.dependencies]
 ctor = { version = "0.2", optional = true }
-
-[features]
-default = ["user-hints"]
-user-hints = ["dep:zisk-common", "dep:bytes", "dep:paste", "dep:once_cell", "dep:ctor", "dep:anyhow", "dep:tokio"]
 
 [lints.rust]
 unexpected_cfgs = { level = "warn", check-cfg = [

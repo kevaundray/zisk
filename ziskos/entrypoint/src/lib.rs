@@ -1,12 +1,16 @@
+#![cfg_attr(feature = "guest", no_std)]
 #![allow(unexpected_cfgs)]
 #![allow(unused_imports)]
 
-#[cfg(all(target_os = "zkvm", target_vendor = "zisk"))]
+#[cfg(feature = "guest")]
+extern crate alloc;
+
+#[cfg(feature = "guest")]
 use core::arch::asm;
-#[cfg(all(target_os = "zkvm", target_vendor = "zisk"))]
+#[cfg(feature = "guest")]
 mod fcall;
 mod profile;
-#[cfg(all(target_os = "zkvm", target_vendor = "zisk"))]
+#[cfg(feature = "guest")]
 pub use fcall::*;
 pub mod io;
 pub use profile::*;
@@ -14,11 +18,7 @@ pub mod syscalls;
 pub mod zisklib;
 pub mod ziskos_definitions;
 
-#[cfg(all(
-    not(all(target_os = "zkvm", target_vendor = "zisk")),
-    any(zisk_hints, zisk_hints_debug),
-    feature = "user-hints"
-))]
+#[cfg(all(not(feature = "guest"), any(zisk_hints, zisk_hints_debug), feature = "user-hints"))]
 pub mod hints;
 
 #[macro_export]
@@ -45,12 +45,12 @@ macro_rules! entrypoint {
 #[allow(unused_imports)]
 use crate::ziskos_definitions::ziskos_config::*;
 
-#[cfg(all(target_os = "zkvm", target_vendor = "zisk"))]
-pub(crate) fn read_input() -> Vec<u8> {
+#[cfg(feature = "guest")]
+pub(crate) fn read_input() -> alloc::vec::Vec<u8> {
     read_input_slice().to_vec()
 }
 
-#[cfg(not(all(target_os = "zkvm", target_vendor = "zisk")))]
+#[cfg(not(feature = "guest"))]
 pub(crate) fn read_input() -> Vec<u8> {
     use std::{fs::File, io::Read};
 
@@ -61,7 +61,7 @@ pub(crate) fn read_input() -> Vec<u8> {
     buffer
 }
 
-#[cfg(all(target_os = "zkvm", target_vendor = "zisk"))]
+#[cfg(feature = "guest")]
 pub fn read_input_slice<'a>() -> &'a [u8] {
     // Create a slice of the first 8 bytes to get the size
     let bytes = unsafe { core::slice::from_raw_parts((INPUT_ADDR as *const u8).add(8), 8) };
@@ -72,14 +72,14 @@ pub fn read_input_slice<'a>() -> &'a [u8] {
 }
 
 #[allow(unused)]
-#[cfg(not(all(target_os = "zkvm", target_vendor = "zisk")))]
+#[cfg(not(feature = "guest"))]
 pub fn read_input_slice() -> Box<[u8]> {
     read_input().into_boxed_slice()
 }
 
-#[cfg(all(target_os = "zkvm", target_vendor = "zisk"))]
+#[cfg(feature = "guest")]
 pub(crate) fn set_output(id: usize, value: u32) {
-    use std::arch::asm;
+    use core::arch::asm;
     let addr_v: *mut u32;
     let arch_id_zisk: usize;
 
@@ -101,15 +101,33 @@ pub(crate) fn set_output(id: usize, value: u32) {
     unsafe { core::ptr::write_volatile(addr_v, value) };
 }
 
-#[cfg(not(all(target_os = "zkvm", target_vendor = "zisk")))]
+#[cfg(not(feature = "guest"))]
 pub(crate) fn set_output(id: usize, value: u32) {
     println!("public {id}: {value:#010x}");
 }
 
-#[cfg(all(target_os = "zkvm", target_vendor = "zisk"))]
+#[cfg(feature = "guest")]
 mod ziskos {
     use crate::ziskos_definitions::ziskos_config::*;
     use core::arch::asm;
+
+    // Global allocator backed by sys_alloc_aligned
+    struct ZiskAllocator;
+    unsafe impl core::alloc::GlobalAlloc for ZiskAllocator {
+        unsafe fn alloc(&self, layout: core::alloc::Layout) -> *mut u8 {
+            unsafe { sys_alloc_aligned(layout.size(), layout.align()) }
+        }
+        unsafe fn dealloc(&self, _ptr: *mut u8, _layout: core::alloc::Layout) {}
+    }
+    #[global_allocator]
+    static ALLOCATOR: ZiskAllocator = ZiskAllocator;
+
+    #[panic_handler]
+    fn panic(_info: &core::panic::PanicInfo) -> ! {
+        unsafe {
+            asm!("li a7, 93", "ecall", options(noreturn));
+        }
+    }
 
     #[no_mangle]
     #[link_section = ".text.init"]
@@ -192,25 +210,26 @@ mod ziskos {
             }
         }
     }
-    use lazy_static::lazy_static;
-    use std::sync::Mutex;
-    const PRNG_SEED: u64 = 0x123456789abcdef0;
-    use rand::{rngs::StdRng, Rng, SeedableRng};
 
-    lazy_static! {
-        /// A lazy static to generate a global random number generator.
-        static ref RNG: Mutex<StdRng> = Mutex::new(StdRng::seed_from_u64(PRNG_SEED));
+    use rand::rngs::SmallRng;
+    use rand::{Rng, SeedableRng};
+
+    static mut RNG: Option<SmallRng> = None;
+
+    fn get_rng() -> &'static mut SmallRng {
+        unsafe { RNG.get_or_insert_with(|| SmallRng::seed_from_u64(0x123456789abcdef0)) }
     }
 
-    /// A lazy static to print a warning once for using the `sys_rand` system call.
-    static SYS_RAND_WARNING: std::sync::Once = std::sync::Once::new();
+    static mut SYS_RAND_WARNING: bool = false;
 
     #[no_mangle]
     unsafe extern "C" fn sys_rand(recv_buf: *mut u8, words: usize) {
-        SYS_RAND_WARNING.call_once(|| {
-            println!("WARNING: Using insecure random number generator.");
-        });
-        let mut rng = RNG.lock().unwrap();
+        if !SYS_RAND_WARNING {
+            SYS_RAND_WARNING = true;
+            let msg = b"WARNING: Using insecure random number generator.\n";
+            sys_write(1, msg.as_ptr(), msg.len());
+        }
+        let rng = get_rng();
         for i in 0..words {
             let element = recv_buf.add(i);
             *element = rng.gen();

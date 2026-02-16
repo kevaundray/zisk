@@ -1,15 +1,15 @@
 //! Sha256 system call interception
 
-#[cfg(all(target_os = "zkvm", target_vendor = "zisk"))]
+#[cfg(feature = "guest")]
 use core::arch::asm;
 
-#[cfg(all(target_os = "zkvm", target_vendor = "zisk"))]
+#[cfg(feature = "guest")]
 use crate::ziskos_syscall;
 
-#[cfg(not(all(target_os = "zkvm", target_vendor = "zisk")))]
+#[cfg(not(feature = "guest"))]
 use sha2::compress256;
 
-#[cfg(not(all(target_os = "zkvm", target_vendor = "zisk")))]
+#[cfg(not(feature = "guest"))]
 #[allow(deprecated)]
 use sha2::digest::generic_array::{typenum::U64, GenericArray};
 
@@ -39,9 +39,9 @@ pub extern "C" fn syscall_sha256_f(
     params: &mut SyscallSha256Params,
     #[cfg(feature = "hints")] hints: &mut Vec<u64>,
 ) {
-    #[cfg(all(target_os = "zkvm", target_vendor = "zisk"))]
+    #[cfg(feature = "guest")]
     ziskos_syscall!(0x805, params);
-    #[cfg(not(all(target_os = "zkvm", target_vendor = "zisk")))]
+    #[cfg(not(feature = "guest"))]
     {
         sha256f(params.state, params.input);
 
@@ -52,7 +52,7 @@ pub extern "C" fn syscall_sha256_f(
     }
 }
 
-#[cfg(not(all(target_os = "zkvm", target_vendor = "zisk")))]
+#[cfg(not(feature = "guest"))]
 #[allow(deprecated)]
 fn sha256f(state: &mut [u64; 4], input: &[u64; 8]) {
     let state_u32: &mut [u32; 8] = unsafe { &mut *(state.as_mut_ptr() as *mut [u32; 8]) };

@@ -27,9 +27,9 @@ pub struct ZiskBuild {
 
 impl ZiskBuild {
     pub fn run(&self) -> Result<()> {
-        // Construct the cargo run command
+        // Construct the cargo build command using the nightly toolchain
         let mut command = Command::new("cargo");
-        command.args(["+zisk", "build"]);
+        command.args(["+nightly", "build"]);
         // Add the feature selection flags
         if let Some(features) = &self.features {
             command.arg("--features").arg(features);
@@ -45,6 +45,12 @@ impl ZiskBuild {
         }
 
         command.args(["--target", ZISK_TARGET]);
+
+        // Set RUSTFLAGS for the standard RISC-V target
+        command.env(
+            "CARGO_TARGET_RISCV64IMAC_UNKNOWN_NONE_ELF_RUSTFLAGS",
+            "-Cpasses=lower-atomic",
+        );
 
         // Pass zisk_path to build scripts via environment variable
         if let Some(zisk_path) = &self.zisk_path {

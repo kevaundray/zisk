@@ -30,7 +30,7 @@ proofman-common = { workspace = true }
 proofman-util = { workspace = true }
 sysinfo = { workspace = true }
 tracing = { workspace = true }
-serde = { workspace = true }
+serde = { workspace = true, features = ["std"] }
 serde_json = { workspace = true }
 anyhow = { workspace = true }
 zisk-sdk = { workspace = true }

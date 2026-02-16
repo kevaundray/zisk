@@ -48,13 +48,14 @@ impl ZiskIO for ZiskMemoryStdin {
 
     fn read<T: DeserializeOwned>(&self) -> Result<T> {
         let mut cursor = self.cursor.lock().unwrap();
-        bincode::deserialize_from(&mut *cursor)
+        bincode::serde::decode_from_std_read(&mut *cursor, bincode::config::standard())
             .map_err(|e| anyhow::anyhow!("Failed to deserialize from memory: {}", e))
     }
 
     fn write<T: Serialize>(&self, data: &T) {
         let mut tmp = Vec::new();
-        bincode::serialize_into(&mut tmp, data).expect("Failed to serialize data into memory");
+        bincode::serde::encode_into_std_write(data, &mut tmp, bincode::config::standard())
+            .expect("Failed to serialize data into memory");
         self.data.lock().unwrap().extend_from_slice(&tmp);
         let mut cursor = self.cursor.lock().unwrap();
         cursor.get_mut().extend_from_slice(&tmp);
