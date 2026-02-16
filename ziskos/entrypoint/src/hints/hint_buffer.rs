@@ -1,7 +1,10 @@
 use bytes::{Bytes, BytesMut};
 use std::fs::File;
 use std::io::{self, Write};
-use std::sync::{Arc, Condvar, Mutex};
+use std::sync::{Arc, Condvar, Mutex, MutexGuard};
+use zisk_common::{
+    CTRL_START, CTRL_END,
+};
 
 pub const DEFAULT_BUFFER_LEN: usize = 1 << 20; // 1 MiB
                                                // TODO: Set MAX_WRITE_LEN based on writer type (file or socket)
@@ -105,28 +108,15 @@ impl HintBuffer {
     }
 
     #[inline(always)]
-    pub fn write_hint_data(&self, data: *const u8, len: usize) {
-        let payload = unsafe { std::slice::from_raw_parts(data, len) };
-        self.inner.lock().unwrap().write_bytes(payload);
-    }
-
-    #[inline(always)]
     pub fn write_hint_start(&self) {
-        self.write_hint_header(HINT_START, 0, false);
-        self.commit();
+        let w = self.begin_hint(CTRL_START, 0, false);
+        w.commit();
     }
 
     #[inline(always)]
     pub fn write_hint_end(&self) {
-        self.write_hint_header(HINT_END, 0, false);
-        self.commit();
-    }
-
-    #[inline(always)]
-    pub fn commit(&self) {
-        let mut g = self.inner.lock().unwrap();
-        g.commit();
-        self.not_empty.notify_one();
+        let w = self.begin_hint(CTRL_END, 0, false);
+        w.commit();
     }
 
     pub fn drain_to_writer<W: Write>(&self, writer: &mut W) -> io::Result<()> {
