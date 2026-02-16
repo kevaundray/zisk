@@ -21,7 +21,7 @@ use std::thread::{self, JoinHandle};
 use std::{ffi::CStr, os::raw::c_char};
 use std::{
     io::{self, BufWriter, Write},
-    sync::Arc,
+    sync::{Arc, Mutex},
 };
 use tokio::sync::oneshot;
 use zisk_common::io::{StreamWrite, UnixSocketStreamWriter};
@@ -74,7 +74,11 @@ impl HintFileWriterHandleCell {
 pub fn init_hints() -> io::Result<()> {
     // Initialize the main thread ID for single-threaded assert (if enabled)
     #[cfg(zisk_hints_single_thread)]
-    let _ = MAIN_TID.set(None); // Placeholder value to mark uninitialized
+    {
+        let tid = std::thread::current().id();
+        *MAIN_TID.lock().unwrap() = Some(tid);
+        println!("Initializing MAIN_TID to {:?}", tid);
+    }
 
     if let Some(handle) = HINT_WRITER_HANDLE.take() {
         HINT_BUFFER.close();
@@ -141,6 +145,8 @@ pub fn init_hints_socket(
     Ok(())
 }
 pub fn close_hints() -> io::Result<()> {
+    *MAIN_TID.lock().unwrap() = None;
+
     HINT_BUFFER.close();
 
     let handle = HINT_WRITER_HANDLE.take();
@@ -239,33 +245,25 @@ fn write_hints_to_socket(mut socket_writer: UnixSocketWriter) -> io::Result<()> 
 }
 
 #[cfg(zisk_hints_single_thread)]
-static MAIN_TID: OnceCell<Option<ThreadId>> = OnceCell::new();
+static MAIN_TID: Mutex<Option<ThreadId>> = Mutex::new(None);
 
 #[cfg(zisk_hints_single_thread)]
 #[inline(always)]
-pub(crate) fn check_main_thread() {
-    // Panic on calls from a different thread
+pub(crate) fn check_main_thread() -> bool {
     let tid = std::thread::current().id();
-    match MAIN_TID.get() {
-        Some(main) => {
-            match main {
-                Some(main) => {
-                    if *main != tid {
-                        panic!(
-                            "Precompile hint function called from non-main thread, main={:?}, current={:?}",
-                            main, tid
-                        );
-                    }
-                }
-                None => {
-                    // If not initialized yet, record the first caller thread as main
-                    let _ = MAIN_TID.set(Some(tid));
-                }
+    let guard = MAIN_TID.lock().unwrap();
+
+    match *guard {
+        Some(main_tid) => {
+            if main_tid != tid {
+                println!("Warning: trying to write hint from thread {:?} but MAIN_TID is {:?}. Ignoring...", tid, main_tid);
+                return false;
             }
+            true
         }
         None => {
-            // If not initialized yet, record the first caller thread as main
-            let _ = MAIN_TID.set(Some(tid));
+            println!("Warning: trying to write hint from thread {:?} before MAIN_TID is initialized. Ignoring...", tid);
+            false
         }
     }
 }
