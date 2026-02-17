@@ -14,7 +14,7 @@ use arith_eq_384_constants::ARITH_EQ_384_ROWS_BY_OP;
 fn main() {
     let mut code = String::new();
     code += "#![no_main]\n";
-    code += "#![cfg(all(target_os = \"zkvm\", target_vendor = \"zisk\"))]\n";
+    code += "#![cfg(target_os = \"none\")]\n";
     code += "ziskos::entrypoint!(main);\n\n";
     code += "use ziskos::{\n";
     code += "\tcomplex::*, point::*, arith384_mod::*, bls12_381_curve_add::*, bls12_381_curve_dbl::*, bls12_381_complex_add::*, bls12_381_complex_sub::*, bls12_381_complex_mul::*,\n";

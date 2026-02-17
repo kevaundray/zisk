@@ -59,7 +59,7 @@ brew reinstall jq curl libomp protobuf openssl nasm pkgconf open-mpi libffi nloh
     3. **Install verify key** – Needed only if you want to verify proofs.
     4. **None** – Choose this if you only want to compile programs and execute them using the ZisK emulator.
 
-3. Verify the Rust toolchain: (which includes support for the `riscv64ima-zisk-zkvm` compilation target):
+3. Verify the Rust toolchain: (which includes support for the `riscv64imac-unknown-none-elf` compilation target):
     ```bash
     rustup toolchain list
     ```

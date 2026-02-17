@@ -1,6 +1,6 @@
 /*
  * ZisK linker script for riscv64imac-unknown-none-elf target.
- * Mirrors the memory layout from the custom riscv64ima-zisk-zkvm-elf target.
+ * Memory layout matches addresses in ziskos_definitions.rs.
  */
 
 ENTRY(_start)

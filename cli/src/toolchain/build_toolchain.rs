@@ -61,14 +61,14 @@ impl BuildToolchainCmd {
                 .with_context(|| format!("while creating directory {temp_dir:?}"))?;
         }
 
-        std::fs::File::create(temp_dir.join("riscv64ima-zisk-zkvm-elf.json")).with_context(
-            || format!("while creating file {temp_dir:?}/riscv64ima-zisk-zkvm-elf.json"),
+        std::fs::File::create(temp_dir.join("riscv64imac-unknown-none-elf.json")).with_context(
+            || format!("while creating file {temp_dir:?}/riscv64imac-unknown-none-elf.json"),
         )?;
 
         // Build the toolchain.
         Command::new("python3")
             .env("RUST_TARGET_PATH", &temp_dir)
-            .env("CARGO_TARGET_RISCV64IMA_ZISK_ZKVM_ELF_RUSTFLAGS", "-Cpasses=lower-atomic")
+            .env("CARGO_TARGET_RISCV64IMAC_UNKNOWN_NONE_ELF_RUSTFLAGS", "-Cpasses=lower-atomic -Ctarget-feature=-c")
             .args([
                 "x.py",
                 "build",
@@ -77,7 +77,7 @@ impl BuildToolchainCmd {
                 "compiler/rustc",
                 "library",
                 "--target",
-                &format!("riscv64ima-zisk-zkvm-elf,{}", get_target(),),
+                &format!("riscv64imac-unknown-none-elf,{}", get_target(),),
             ])
             .current_dir(&rust_dir)
             .run()
