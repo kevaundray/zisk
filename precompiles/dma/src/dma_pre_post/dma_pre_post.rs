@@ -186,11 +186,6 @@ impl<F: PrimeField64> DmaPrePostSM<F> {
             src_offset - dst_offset
         };
 
-        let read_value_23 =
-            if selr_value > 0 { input.src_values[0] << (selr_value * 8) } else { 0 };
-        let read_value_01 = (input.src_values[0] >> (selr_value * 8))
-            | if selr_value > 0 { input.src_values[1] << (64 - selr_value * 8) } else { 0 };
-
         // NOTE: special case of count = 8 for memcmp, the mask must be all 0s, for this reason
         // apply mask to count before left shift.
         let mask = if count == 8 {
@@ -200,14 +195,6 @@ impl<F: PrimeField64> DmaPrePostSM<F> {
             let _mask = 0xFFFF_FFFF_FFFF_FFFFu64 << (dst_offset * 8);
             _mask ^ (_mask << (count * 8))
         };
-
-        let write_value_01 = (read_value_01 & mask) | (input.dst_pre_value & !mask);
-        let write_value_23 = (read_value_23 & mask) | (input.dst_pre_value & !mask);
-
-        trace.set_write_value(0, write_value_01 as u32);
-        trace.set_write_value(1, (write_value_01 >> 32) as u32);
-        trace.set_write_value(2, write_value_23 as u32);
-        trace.set_write_value(3, (write_value_23 >> 32) as u32);
 
         trace.set_sb(0, (mask & 0x0000_0000_0000_00FF) != 0);
         trace.set_sb(1, (mask & 0x0000_0000_0000_FF00) != 0);

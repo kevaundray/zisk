@@ -123,6 +123,8 @@ pub struct InstContext {
 
     /// Precompiles uses jmp_offset1 as extended param (static value known in transpilation time)
     pub extended_arg: i64,
+
+    pub stats_hint: u64,
 }
 
 /// RisK instruction context implementation
@@ -146,6 +148,7 @@ impl InstContext {
             fcall: FcallInstContext::default(),
             data_ext_len: 0,
             extended_arg: 0,
+            stats_hint: 0,
         }
     }
 

@@ -3,8 +3,10 @@ use cfg_if::cfg_if;
 cfg_if! {
     if #[cfg(all(target_os = "zkvm", target_vendor = "zisk"))] {
         use core::arch::asm;
-        use crate::{ziskos_fcall, ziskos_fcall_get, ziskos_fcall_param, ziskos_inputcpy};
+        use crate::{ziskos_fcall, ziskos_fcall_get, ziskos_fcall_param};
         use super::FCALL_BIG_INT_DIV_ID;
+        #[cfg(feature = "inputcpy")]
+        use crate::ziskos_inputcpy;
     } else {
         use crate::zisklib::fcalls_impl::big_int_div::big_int_div_into;
     }

@@ -77,6 +77,7 @@ impl<F: PrimeField64> DmaUnalignedSM<F> {
         air_values: &mut DmaUnalignedAirValues<F>,
     ) -> usize {
         let rows = input.count as usize;
+        let is_last_instance_input = rows >= trace.len();
         let initial_count = DmaInfo::get_loop_count(input.encoded) - input.skip as usize;
         let mut count = initial_count;
         let src_offset = DmaInfo::get_loop_src_offset(input.encoded);
@@ -112,19 +113,9 @@ impl<F: PrimeField64> DmaUnalignedSM<F> {
 
             let value = input.src_values[src_values_index];
             src_values_index += 1;
-            let write_value = if count == 0 {
+            if count == 0 {
                 seq_end = true;
                 next_value = 0;
-                match src_offset {
-                    1 => value >> 8,
-                    2 => value >> 16,
-                    3 => value >> 24,
-                    4 => value >> 32,
-                    5 => value >> 40,
-                    6 => value >> 48,
-                    7 => value >> 56,
-                    _ => panic!("invalid src_offset {src_offset} on DmaUnaligned"),
-                }
             } else {
                 count -= 1;
                 if src_values_index >= input.src_values.len() {
@@ -136,16 +127,6 @@ impl<F: PrimeField64> DmaUnalignedSM<F> {
                     );
                 }
                 next_value = input.src_values[src_values_index];
-                match src_offset {
-                    1 => (value >> 8) | (next_value << 56),
-                    2 => (value >> 16) | (next_value << 48),
-                    3 => (value >> 24) | (next_value << 40),
-                    4 => (value >> 32) | (next_value << 32),
-                    5 => (value >> 40) | (next_value << 24),
-                    6 => (value >> 48) | (next_value << 16),
-                    7 => (value >> 56) | (next_value << 8),
-                    _ => panic!("invalid src_offset {src_offset} on DmaUnaligned"),
-                }
             };
 
             row.set_read_bytes(0, value as u8);
@@ -157,8 +138,8 @@ impl<F: PrimeField64> DmaUnalignedSM<F> {
             row.set_read_bytes(6, (value >> 48) as u8);
             row.set_read_bytes(7, (value >> 56) as u8);
 
-            row.set_write_value(0, write_value as u32);
-            row.set_write_value(1, (write_value >> 32) as u32);
+            // row.set_write_value(0, write_value as u32);
+            // row.set_write_value(1, (write_value >> 32) as u32);
 
             let value = value as usize;
             local_dual_byte_table[value & 0xFFFF] += 1;
@@ -167,7 +148,7 @@ impl<F: PrimeField64> DmaUnalignedSM<F> {
             local_dual_byte_table[(value >> 48) & 0xFFFF] += 1;
         }
 
-        if input.is_last_instance_input {
+        if is_last_instance_input {
             if seq_end {
                 air_values.segment_last_seq_end = F::ONE;
                 air_values.segment_last_src64 = F::ZERO;
@@ -233,7 +214,6 @@ impl<F: PrimeField64> DmaUnalignedSM<F> {
             .iter()
             .map(|inputs| inputs.iter().map(|input| input.count as usize).sum::<usize>())
             .sum();
-
         assert!(total_inputs <= num_rows);
         assert!(total_inputs > 0);
 
@@ -241,8 +221,8 @@ impl<F: PrimeField64> DmaUnalignedSM<F> {
 
         timer_start_trace!(DMA_UNALIGNED_TRACE);
 
+        let flat_inputs = crate::flatten_and_reorder_inputs(inputs);
         // Split the dma_trace.buffer into slices matching each inner vector’s length.
-        let flat_inputs: Vec<_> = inputs.iter().flatten().collect();
         let trace_rows = trace.buffer.as_mut_slice();
 
         // TODO: add std method to used short table, no sense with instances around 2^22 use 64 bits, need more space.

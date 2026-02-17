@@ -4,7 +4,7 @@
 //! It manages collected inputs and interacts with the `DmaSM` to compute witnesses for
 //! execution plans.
 
-use crate::{DmaCollectCounters, DmaCollectorRoutingLog, DmaUnalignedInput};
+use crate::{DmaCollectCounters, DmaCollectorRoutingLog, DmaInputPosition, DmaUnalignedInput};
 use std::any::Any;
 use zisk_common::{BusDevice, BusId, ChunkId, OP, OPERATION_BUS_ID, OP_TYPE};
 use zisk_core::{zisk_ops::ZiskOp, ZiskOperationType};
@@ -12,6 +12,7 @@ use zisk_core::{zisk_ops::ZiskOp, ZiskOperationType};
 pub struct DmaUnalignedCollector {
     /// Collected inputs for witness computation.
     pub inputs: Vec<DmaUnalignedInput>,
+    pub last_input_index: Option<usize>,
 
     pub chunk_id: ChunkId,
 
@@ -53,6 +54,7 @@ impl DmaUnalignedCollector {
             last_segment_collector,
             chunk_id,
             rlog: DmaCollectorRoutingLog::new(chunk_id),
+            last_input_index: None,
         }
     }
 
@@ -94,18 +96,16 @@ impl DmaUnalignedCollector {
             return self.rlog.log_discard_cond(false, 1, data, true);
         }
 
-        if let Some((skip, max_count, is_final_skip)) =
-            self.collect_counters.should_collect(rows, op)
-        {
+        if let Some((skip, max_count)) = self.collect_counters.should_collect(rows, op) {
             self.rlog.log_collect(rows as usize, data);
-            self.inputs.push(DmaUnalignedInput::from(
+            self.add_input(DmaUnalignedInput::from(
                 data,
                 data_ext,
                 self.trace_offset,
                 skip as usize,
                 max_count as usize,
-                self.last_segment_collector && is_final_skip,
             ));
+
             self.trace_offset += max_count as usize;
             if self.inputs.len() >= self.num_inputs as usize {
                 self.collect_counters.debug_assert_is_final_skip();
@@ -116,6 +116,39 @@ impl DmaUnalignedCollector {
             self.rlog.log_discard(11, data);
         }
         true
+    }
+
+    /// Adds an input to the collector with proper ordering management.
+    ///
+    /// This method handles:
+    /// - Adding the input to the vector
+    /// - Managing inputs that must be first (swaps to position 0)
+    /// - Tracking inputs that must be last (stores index for later swap)
+    ///
+    /// # Arguments
+    /// * `input` - The input to add
+    #[inline(always)]
+    fn add_input(&mut self, input: DmaUnalignedInput) {
+        // Check if input must be first before pushing
+        let must_be_first = input.must_be_first();
+        let must_be_last = input.must_be_last();
+        let current_index = self.inputs.len();
+
+        // Push the input
+        self.inputs.push(input);
+
+        // Handle ordering requirements
+        if must_be_first {
+            // Swap with position 0 if not already first
+            if current_index > 0 {
+                self.inputs.swap(0, current_index);
+            }
+        } else if must_be_last {
+            // Edge case: if an input is huge and it's both first and last,
+            // must_be_first takes precedence and this branch won't execute
+            assert!(self.last_input_index.is_none(), "Multiple inputs marked as last input");
+            self.last_input_index = Some(current_index);
+        }
     }
 
     /// Returns debug information about the collector's state.
@@ -136,6 +169,19 @@ impl DmaUnalignedCollector {
         ) + &self.rlog.get_debug_info();
         #[cfg(not(feature = "save_dma_collectors"))]
         String::new()
+    }
+    pub fn take_inputs(&mut self) -> Vec<DmaUnalignedInput> {
+        if let Some(last_index) = self.last_input_index {
+            // If there's a last input index, swap it with the last element to ensure it's the last one in the trace.
+            let current_last_index = self.inputs.len() - 1;
+            self.inputs.swap(last_index, current_last_index);
+        }
+        std::mem::take(&mut self.inputs)
+    }
+    pub fn take_debug_inputs(&mut self) -> (String, Vec<DmaUnalignedInput>) {
+        let debug_info = self.get_debug_info();
+        let inputs = self.take_inputs();
+        (debug_info, inputs)
     }
 }
 

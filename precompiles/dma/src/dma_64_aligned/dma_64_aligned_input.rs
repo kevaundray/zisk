@@ -8,7 +8,6 @@ use crate::DMA_64_ALIGNED_OPS_BY_ROW;
 pub struct Dma64AlignedInput {
     pub src: u32,
     pub dst: u32,
-    pub is_first_instance_input: bool,
     pub is_last_instance_input: bool,
     pub op: u8,
     pub trace_offset: u32, // offset inside trace to paralelize
@@ -49,7 +48,6 @@ impl Dma64AlignedInput {
         skip_rows: usize,
         ops_x_rows: usize,
         max_rows: usize,
-        is_last_instance_input: bool,
     ) -> Self {
         let op = data[OP] as u8;
         let encoded = data[DMA_ENCODED];
@@ -63,8 +61,7 @@ impl Dma64AlignedInput {
             dst: data[A] as u32 + pre_count,
             src: data[B] as u32 + pre_count,
             trace_offset: trace_offset as u32,
-            is_first_instance_input: trace_offset == 0,
-            is_last_instance_input,
+            is_last_instance_input: max_rows < (total_rows - skip_rows),
             step: data[STEP],
             skip_rows: skip_rows as u32,
             rows,
@@ -89,7 +86,6 @@ impl Dma64AlignedInput {
         skip_rows: usize,
         ops_x_rows: usize,
         max_rows: usize,
-        is_last_instance_input: bool,
     ) -> Self {
         let op = data[OP] as u8;
         let encoded = data[DMA_ENCODED];
@@ -100,8 +96,7 @@ impl Dma64AlignedInput {
             dst: data[A] as u32 + pre_count,
             src: 0,
             trace_offset: trace_offset as u32,
-            is_first_instance_input: trace_offset == 0,
-            is_last_instance_input,
+            is_last_instance_input: max_rows < (total_rows - skip_rows),
             step: data[STEP],
             skip_rows: skip_rows as u32,
             rows,
@@ -118,7 +113,6 @@ impl Dma64AlignedInput {
         skip_rows: usize,
         ops_x_rows: usize,
         max_rows: usize,
-        is_last_instance_input: bool,
     ) -> Self {
         let dst = data[A] as u32;
         let src = data[B] as u32;
@@ -134,8 +128,7 @@ impl Dma64AlignedInput {
             dst: dst + pre_count,
             src: src + pre_count,
             trace_offset: trace_offset as u32,
-            is_first_instance_input: trace_offset == 0,
-            is_last_instance_input,
+            is_last_instance_input: max_rows < (total_rows - skip_rows),
             step: data[STEP],
             skip_rows: skip_rows as u32,
             rows,
@@ -170,7 +163,7 @@ impl Dma64AlignedInput {
         writeln!(
             file,
             "{:>8}|{:>10}|{:>10}|{:>22}|{:>21}|{:>4}|{:>12}|{:>9}|{:>8}|{:>14}|{:>18}|{:>9}|src_values",
-            "pos", "src", "dst", "is_first_instance_input", "is_last_instance_input", "op", "trace_offset", "skip_rows", "rows", "step", "encoded", "fill_byte"
+            "pos", "src", "dst", "is_last_instance_input", "op", "trace_offset", "skip_rows", "rows", "step", "encoded", "fill_byte"
         )?;
 
         // Write data rows
@@ -183,7 +176,6 @@ impl Dma64AlignedInput {
                 pos,
                 input.src,
                 input.dst,
-                input.is_first_instance_input,
                 input.is_last_instance_input,
                 input.op,
                 input.trace_offset,
@@ -197,5 +189,15 @@ impl Dma64AlignedInput {
         }
 
         Ok(())
+    }
+}
+
+impl crate::DmaInputPosition for Dma64AlignedInput {
+    fn must_be_first(&self) -> bool {
+        self.skip_rows > 0
+    }
+
+    fn must_be_last(&self) -> bool {
+        self.is_last_instance_input
     }
 }

@@ -109,15 +109,14 @@ impl<F: PrimeField64> Instance<F> for Dma64AlignedInstance<F> {
         let (debug, inputs): (Vec<_>, Vec<_>) = collectors
             .into_iter()
             .map(|(_, collector)| {
-                let collector = collector.as_any().downcast::<Dma64AlignedCollector>().unwrap();
-                (collector.get_debug_info(), collector.inputs)
+                collector.as_any().downcast::<Dma64AlignedCollector>().unwrap().take_debug_inputs()
             })
             .unzip();
         #[cfg(not(feature = "save_dma_collectors"))]
         let inputs: Vec<_> = collectors
             .into_iter()
             .map(|(_, collector)| {
-                collector.as_any().downcast::<Dma64AlignedCollector>().unwrap().inputs
+                collector.as_any().downcast::<Dma64AlignedCollector>().unwrap().take_inputs()
             })
             .collect();
 

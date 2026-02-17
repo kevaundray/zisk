@@ -85,7 +85,7 @@ impl DmaPrePostCollector {
             return true;
         }
 
-        if let Some((skip, max_count, _)) = self.collect_counters.should_collect(rows as u64, op) {
+        if let Some((skip, max_count)) = self.collect_counters.should_collect(rows as u64, op) {
             self.rlog.log_collect(rows, data);
             self.inputs.extend(match op {
                 ZiskOp::DMA_XMEMSET => {

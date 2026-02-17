@@ -74,6 +74,7 @@ impl<F: PrimeField64> Dma64AlignedInputCpySM<F> {
     ) -> usize {
         let mut values_index = 0;
         let rows = input.rows as usize;
+        let is_last_instance_input = rows >= trace.len();
         let skip_count = input.skip_rows as usize * self.op_x_rows;
         let initial_count = DmaInfo::get_loop_count(input.encoded) - skip_count;
         let mut count64 = initial_count;
@@ -121,7 +122,7 @@ impl<F: PrimeField64> Dma64AlignedInputCpySM<F> {
             }
         }
 
-        if input.is_last_instance_input {
+        if is_last_instance_input {
             if seq_end {
                 air_values.segment_last_seq_end = F::ONE;
                 air_values.segment_last_dst64 = F::ZERO;
@@ -192,8 +193,8 @@ impl<F: PrimeField64> Dma64AlignedModule<F> for Dma64AlignedInputCpySM<F> {
 
         timer_start_trace!(DMA_64_ALIGNED_TRACE);
 
-        // Split the dma_trace.buffer into slices matching each inner vector’s length.
-        let flat_inputs: Vec<_> = inputs.iter().flatten().collect();
+        // Flat the inputs and reorder to ensure first, last are in theirs positions.
+        let flat_inputs = crate::flatten_and_reorder_inputs(inputs);
         let trace_rows = trace.buffer.as_mut_slice();
 
         let mut values_24_bits = Vec::with_capacity(num_rows * self.op_x_rows * 2);

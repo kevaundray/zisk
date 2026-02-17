@@ -354,8 +354,8 @@ airtemplate DmaPrePost(int N = 2**21,                    // Rows of instance
             _wr_0 += factor * (1 - sb[i]) * pb[i];
             _wr_1 += factor * (1 - sb[i+4]) * pb[i+4];
         }
-        write_value[0] === _wr_0;
-        write_value[1] === _wr_1;
+        write_value[0] <== _wr_0;
+        write_value[1] <== _wr_1;
 
         
         // dst_offset > src_offset
@@ -373,12 +373,12 @@ airtemplate DmaPrePost(int N = 2**21,                    // Rows of instance
         //      -1   1  │      R0  R1  R2 │  R3  R4  R5  R6 │
         //              └─────────────────┴─────────────────┘
 
-        write_value[2] === sr[3] * (                                                               sb[3] * P2_24 * rb[0]) +
+        write_value[2] <== sr[3] * (                                                               sb[3] * P2_24 * rb[0]) +
                            sr[2] * (                                       sb[2] * P2_16 * rb[0] + sb[3] * P2_24 * rb[1]) +
                            sr[1] * (                sb[1] * P2_8 * rb[0] + sb[2] * P2_16 * rb[1] + sb[3] * P2_24 * rb[2]) +
                            (1 - sb[0]) * pb[0] + (1 - sb[1]) * P2_8 * pb[1] + (1 - sb[2]) * P2_16 * pb[2] + (1 - sb[3]) * P2_24 * pb[3];
 
-        write_value[3] === sr[7] * (                                                             + sb[7] * P2_24 * rb[0]) +
+        write_value[3] <== sr[7] * (                                                             + sb[7] * P2_24 * rb[0]) +
                            sr[6] * (                                     + sb[6] * P2_16 * rb[0] + sb[7] * P2_24 * rb[1]) +
                            sr[5] * (              + sb[5] * P2_8 * rb[0] + sb[6] * P2_16 * rb[1] + sb[7] * P2_24 * rb[2]) +
                            sr[4] * (sb[4] * rb[0] + sb[5] * P2_8 * rb[1] + sb[6] * P2_16 * rb[2] + sb[7] * P2_24 * rb[3]) +

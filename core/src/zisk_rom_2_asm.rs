@@ -7252,12 +7252,6 @@ impl ZiskRom2Asm {
                         *code += &format!("\tmov {}, rax {}\n", REG_C, ctx.comment_str("c = rax"));
                         Self::pop_internal_registers_except_c_and_flag(ctx, code, false);
                     }
-                    *code += &format!(
-                        "\tmov {}, {} {}\n",
-                        REG_FLAG,
-                        REG_C,
-                        ctx.comment_str("flag = rax")
-                    );
 
                     // this precompiles store the result in minimal trace
                     if ctx.minimal_trace() || ctx.zip() || ctx.mem_reads() {
@@ -7271,9 +7265,9 @@ impl ZiskRom2Asm {
 
                 // Set result
                 ctx.c.is_saved = true;
-                ctx.flag_is_always_zero = false;
+                ctx.flag_is_always_zero = true;
             }
-            ZiskOp::DmaMemCpy => {
+            ZiskOp::DmaMemCpy | ZiskOp::DmaXMemCpy => {
                 assert_eq!(inst.store, STORE_NONE);
                 // Use the memory address as the first and unique parameter
                 *code += &ctx.full_line_comment("DmaMemCpy".to_string());
@@ -7331,9 +7325,6 @@ impl ZiskRom2Asm {
                 unimplemented!();
             }
             ZiskOp::DmaXMemSet => {
-                unimplemented!();
-            }
-            ZiskOp::DmaXMemCpy => {
                 unimplemented!();
             }
             ZiskOp::DmaXMemCmp => {

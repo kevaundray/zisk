@@ -1656,11 +1656,11 @@ pub fn opc_add256(ctx: &mut InstContext) {
             ctx.precompiled.input_data[4 + 2 * 4] = cout;
         }
         ctx.c = cout;
-        ctx.flag = cout != 0;
+        ctx.flag = false;
     } else {
         assert!(data[4 + 2 * 4] <= 1, "opc_add256: cout > 1");
         ctx.c = data[4 + 2 * 4];
-        ctx.flag = data[4 + 2 * 4] != 0;
+        ctx.flag = false;
     }
 }
 
@@ -2624,7 +2624,6 @@ fn ops_dma_memcpys(ctx: &InstContext, stats: &mut dyn OpStats, extended: bool) {
     let addr_a = ctx.a;
     let addr_b = ctx.b;
     let count = if extended { ctx.extended_arg as u64 } else { ctx.mem.read(EXTRA_PARAMS_ADDR, 8) };
-
     // pre, post, dma_align, dma_unalign
     if count == 0 {
         return;
@@ -2634,7 +2633,7 @@ fn ops_dma_memcpys(ctx: &InstContext, stats: &mut dyn OpStats, extended: bool) {
     let offset_b = addr_b & 0x07;
     let addr64_a = addr_a - offset_a;
     let addr64_b = addr_b - offset_b;
-    let pre_count = (8 - offset_a) & 0x07;
+    let pre_count = std::cmp::min((8 - offset_a) & 0x07, count);
 
     if pre_count > 0 {
         stats.mem_align_read(addr64_a, 1);
@@ -2710,6 +2709,7 @@ fn opc_dma_memcmps(ctx: &mut InstContext, extended: bool) {
             let count =
                 if extended { ctx.extended_arg as u64 } else { ctx.mem.read(EXTRA_PARAMS_ADDR, 8) };
             let (result, effective_count) = ctx.mem.memcmp(dst, src, count);
+            ctx.stats_hint = effective_count as u64;
             ctx.c = result;
         }
         EmulationMode::GenerateMemReads => {
@@ -2815,7 +2815,8 @@ pub fn ops_dma_xmemcmp(ctx: &InstContext, stats: &mut dyn OpStats) {
 fn ops_dma_memcmps(ctx: &InstContext, stats: &mut dyn OpStats, extended: bool) {
     let addr_a = ctx.a;
     let addr_b = ctx.b;
-    let count = if extended { ctx.extended_arg as u64 } else { ctx.mem.read(EXTRA_PARAMS_ADDR, 8) };
+    // let _bus_count = if extended { ctx.extended_arg as u64 } else { ctx.mem.read(EXTRA_PARAMS_ADDR, 8) };
+    let count = ctx.stats_hint;
 
     // pre, post, dma_align, dma_unalign
     if count == 0 {
@@ -2913,27 +2914,32 @@ fn read_from_input(ctx: &mut InstContext, dst: u64, count: u64) {
         (ctx.fcall.result_got - 1) as usize * 8,
     );
     ctx.fcall.result_got += count64;
+    if ctx.fcall.result_got > ctx.fcall.result_size {
+        ctx.mem.free_input = 0;
+    } else {
+        ctx.mem.free_input = ctx.fcall.result[ctx.fcall.result_got as usize - 1];
+    }
 }
 
 fn read_and_get_from_input(ctx: &mut InstContext, dst: u64, count: u64) -> Vec<u64> {
     // Check for consistency
     if count % 8 != 0 {
-        panic!("opc_dma_inputcpy() called without invalid count {count}");
+        panic!("opc_dma_inputcpy() called at 0x{:08x} without invalid count {count}", ctx.pc);
     }
     let count64 = count >> 3;
     if ctx.fcall.result_size == 0 {
-        panic!("opc_dma_inputcpy() called with ctx.fcall.result_size==0");
+        panic!("opc_dma_inputcpy() called at 0x{:08x} with ctx.fcall.result_size==0", ctx.pc);
     }
     if ctx.fcall.result_size as usize > FCALL_RESULT_MAX_SIZE {
         panic!(
-            "opc_dma_inputcpy() called with ctx.fcall.result_size=={}>32",
-            ctx.fcall.result_size
+            "opc_dma_inputcpy() called at 0x{:08x} with ctx.fcall.result_size=={}>32",
+            ctx.pc, ctx.fcall.result_size
         );
     }
     if (ctx.fcall.result_got - 1 + count64) > ctx.fcall.result_size {
         panic!(
-            "opc_dma_inputcpy() called with ctx.fcall.result_got({}) + {count64} >= ctx.fcall.result_size {}",
-            ctx.fcall.result_got, ctx.fcall.result_size
+            "opc_dma_inputcpy() called at 0x{:08x} with ctx.fcall.result_got({}) + {count64} >= ctx.fcall.result_size {}",
+            ctx.pc, ctx.fcall.result_got, ctx.fcall.result_size
         );
     }
 
@@ -2983,24 +2989,19 @@ fn read_and_get_from_input(ctx: &mut InstContext, dst: u64, count: u64) -> Vec<u
     }
 
     ctx.fcall.result_got += count64;
+    if ctx.fcall.result_got > ctx.fcall.result_size {
+        ctx.mem.free_input = 0;
+    } else {
+        ctx.mem.free_input = ctx.fcall.result[ctx.fcall.result_got as usize - 1];
+    }
 
     input_data
 }
 
 #[inline(always)]
-pub fn opc_dma_inputcpy(ctx: &mut InstContext) {
-    opc_dma_inputcpys(ctx, false)
-}
-
-#[inline(always)]
-pub fn opc_dma_xinputcpy(ctx: &mut InstContext) {
-    opc_dma_inputcpys(ctx, true)
-}
-
-#[inline(always)]
-fn opc_dma_inputcpys(ctx: &mut InstContext, extended: bool) {
+fn opc_dma_inputcpy(ctx: &mut InstContext) {
     let dst: u64 = ctx.a;
-    let count = if extended { ctx.extended_arg as u64 } else { ctx.b };
+    let count = ctx.b;
 
     match ctx.emulation_mode {
         EmulationMode::Mem => {
@@ -3079,23 +3080,9 @@ pub fn op_dma_inputcpy(_a: u64, _b: u64) -> (u64, bool) {
 }
 
 #[inline(always)]
-pub fn op_dma_xinputcpy(_a: u64, _b: u64) -> (u64, bool) {
-    unimplemented!("op_dma_xinputcpy() is not implemented");
-}
-
-#[inline(always)]
 pub fn ops_dma_inputcpy(ctx: &InstContext, stats: &mut dyn OpStats) {
-    ops_dma_inputcpys(ctx, stats, false);
-}
-#[inline(always)]
-pub fn ops_dma_xinputcpy(ctx: &InstContext, stats: &mut dyn OpStats) {
-    ops_dma_inputcpys(ctx, stats, true);
-}
-
-#[inline(always)]
-fn ops_dma_inputcpys(ctx: &InstContext, stats: &mut dyn OpStats, extended: bool) {
     let addr_a = ctx.a;
-    let count = if extended { ctx.extended_arg as u64 } else { ctx.b };
+    let count = ctx.b;
 
     // pre, post, dma_align, dma_unalign
     if count == 0 {

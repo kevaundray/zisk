@@ -64,13 +64,11 @@ impl<F: PrimeField64> Dma64AlignedMemCpySM<F> {
         air_values: &mut Dma64AlignedMemCpyAirValues<F>,
     ) -> usize {
         let rows = input.rows as usize;
+        let is_last_instance_input = rows >= trace.len();
         let skip_count = input.skip_rows as usize * self.op_x_rows;
         let initial_count = DmaInfo::get_loop_count(input.encoded) - skip_count;
         let mut count64 = initial_count;
-        // println!(
-        //     "DMA_64_ALIGNED INPUT {input:?} count:{count64} rows:{rows} dma_info:{}",
-        //     DmaInfo::to_string(input.encoded)
-        // );
+
         let mut src_values_index = 0;
         let mut dst64 = ((input.dst + 7) >> 3) + skip_count as u32;
         let mut src64 = ((input.src + 7) >> 3) + skip_count as u32;
@@ -93,10 +91,6 @@ impl<F: PrimeField64> Dma64AlignedMemCpySM<F> {
             src64 += addr_incr_by_row;
 
             row.set_count64(count64 as u32);
-            // println!(
-            //     "DMA_64_ALIGNED INPUT count64:{count64} dst64:{dst64} src64:{src64} ops_x_row:{}",
-            //     self.op_x_rows
-            // );
             let use_count = if count64 <= self.op_x_rows {
                 seq_end = true;
                 // trace i zerofilled, not set values zero
@@ -115,10 +109,9 @@ impl<F: PrimeField64> Dma64AlignedMemCpySM<F> {
                 row.set_value(index, 0, value as u32);
                 row.set_value(index, 1, (value >> 32) as u32);
             }
-            // println!("DMA_64_ALIGNED TRACE ROW {irow} {row:?}");
         }
 
-        if input.is_last_instance_input {
+        if is_last_instance_input {
             if seq_end {
                 air_values.segment_last_seq_end = F::ONE;
                 air_values.segment_last_src64 = F::ZERO;
@@ -194,8 +187,8 @@ impl<F: PrimeField64> Dma64AlignedModule<F> for Dma64AlignedMemCpySM<F> {
 
         timer_start_trace!(DMA_64_ALIGNED_TRACE);
 
-        // Split the dma_trace.buffer into slices matching each inner vector’s length.
-        let flat_inputs: Vec<_> = inputs.iter().flatten().collect();
+        // Flat the inputs and reorder to ensure first, last are in theirs positions.
+        let flat_inputs = crate::flatten_and_reorder_inputs(inputs);
         let trace_rows = trace.buffer.as_mut_slice();
 
         let mut local_16_bits_table = vec![0u32; 1 << 16];

@@ -32,19 +32,13 @@ impl DmaCollectCounters {
             && self.memset.is_final_skip()
             && self.memcmp.is_final_skip()
     }
-    pub fn should_collect(&mut self, rows: u64, op: u8) -> Option<(u32, u32, bool)> {
-        let cc = match op {
-            ZiskOp::DMA_MEMCPY | ZiskOp::DMA_XMEMCPY => &mut self.memcpy,
-            ZiskOp::DMA_MEMCMP | ZiskOp::DMA_XMEMCMP => &mut self.memcmp,
-            ZiskOp::DMA_INPUTCPY => &mut self.inputcpy,
-            ZiskOp::DMA_XMEMSET => &mut self.memset,
+    pub fn should_collect(&mut self, rows: u64, op: u8) -> Option<(u32, u32)> {
+        match op {
+            ZiskOp::DMA_MEMCPY | ZiskOp::DMA_XMEMCPY => self.memcpy.should_process(rows as u32),
+            ZiskOp::DMA_MEMCMP | ZiskOp::DMA_XMEMCMP => self.memcmp.should_process(rows as u32),
+            ZiskOp::DMA_INPUTCPY => self.inputcpy.should_process(rows as u32),
+            ZiskOp::DMA_XMEMSET => self.memset.should_process(rows as u32),
             _ => panic!("Invalid operation 0x{op:02X} for DmaCollectCounters"),
-        };
-
-        if let Some((skip, max_count)) = cc.should_process(rows as u32) {
-            Some((skip, max_count, cc.is_final_skip()))
-        } else {
-            None
         }
     }
     #[inline(always)]

@@ -134,5 +134,5 @@ airtemplate BigIntAdd(const int N = 2**21, const int bits = 256, const int opera
 
     // proves the operation lauched by main, c = flag = carry_out
     proves_operation(op: operation_code, a:[0, 0], b:[addr_params, 0], c:[final_cout, 0], 
-                     flag:final_cout, main_step: step, mul:sel);
+                     flag:0, main_step: step, mul:sel);
 }

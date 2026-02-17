@@ -21,7 +21,7 @@ pub fn elf2rom(elf: &[u8]) -> Result<ZiskRom, Box<dyn Error>> {
     let payloads: Vec<ElfPayload> =
         vec![collect_elf_payload_from_bytes(FLOAT_LIB_DATA)?, collect_elf_payload_from_bytes(elf)?];
     // Get DMA function addresses: (memcpy, memcmp, memset, memmove)
-    let dma_addrs = get_dma_symbol_addresses(&elf);
+    let dma_addrs = get_dma_symbol_addresses(elf);
 
     // Create an empty ZiskRom instance
     let mut rom: ZiskRom = ZiskRom { next_init_inst_addr: ROM_ENTRY, ..Default::default() };

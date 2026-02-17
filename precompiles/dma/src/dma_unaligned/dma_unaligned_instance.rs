@@ -94,15 +94,14 @@ impl<F: PrimeField64> Instance<F> for DmaUnalignedInstance<F> {
         let (debug, inputs): (Vec<_>, Vec<_>) = collectors
             .into_iter()
             .map(|(_, collector)| {
-                let collector = collector.as_any().downcast::<DmaUnalignedCollector>().unwrap();
-                (collector.get_debug_info(), collector.inputs)
+                collector.as_any().downcast::<DmaUnalignedCollector>().unwrap().take_debug_inputs()
             })
             .unzip();
         #[cfg(not(feature = "save_dma_collectors"))]
         let inputs: Vec<_> = collectors
             .into_iter()
             .map(|(_, collector)| {
-                collector.as_any().downcast::<DmaUnalignedCollector>().unwrap().inputs
+                collector.as_any().downcast::<DmaUnalignedCollector>().unwrap().take_inputs()
             })
             .collect();
 

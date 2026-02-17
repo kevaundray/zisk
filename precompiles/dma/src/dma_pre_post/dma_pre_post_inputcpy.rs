@@ -82,13 +82,7 @@ impl<F: PrimeField64> DmaPrePostInputCpySM<F> {
         };
 
         trace.set_count(count as u8);
-        // , set_main_step:ubit(36), set_dst64:ubit(29), set_dst_offset:ubit(3), set_count:ubit(3), set_sel_memcpy:bit, set_sel_memcmp:bit, set_memcmp_result_nz:bit,
-        // set_l_memcmp_result:u32, set_sel_inputcpy:bit, set_sel_memset:bit, set_selr:[bit; 7], set_dst_offset_gt_src_offset:bit, set_src64:ubit(29), set_src_offset:ubit(3),
-        // set_enabled_second_read:bit, set_rb:[u8; 16], set_pb:[u8; 8], set_sb:[bit; 8], set_last_dst_byte:u8, set_abs_diff_dst_src:u8, set_memcmp_result_is_negative:bit,
-        // set_diff_factor:[u64; 2], set_bus_write_value:[u32; 2], set_write_value:[u32; 4],
-
         trace.set_sel_inputcpy(false);
-        // intermediate: trace.last_dst_byte(0);
 
         let mut value = input.src_values[0];
         let mut rb = [0u8; 16];

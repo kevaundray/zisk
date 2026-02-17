@@ -6,7 +6,6 @@ use zisk_core::zisk_ops::ZiskOp;
 pub struct DmaUnalignedInput {
     pub src: u32,
     pub dst: u32,
-    pub is_first_instance_input: bool,
     pub is_last_instance_input: bool,
     pub is_mem_eq: bool,
     pub trace_offset: u32, // offset inside trace to paralelize
@@ -45,7 +44,6 @@ impl DmaUnalignedInput {
         trace_offset: usize,
         skip: usize,
         max_count: usize,
-        is_last_instance_input: bool,
     ) -> Self {
         let encoded = data[DMA_ENCODED];
         let op = data[OP] as u8;
@@ -72,8 +70,7 @@ impl DmaUnalignedInput {
             dst: data[A] as u32 + pre_count,
             src: data[B] as u32 + DmaInfo::get_src64_inc_by_pre(encoded) as u32 * 8,
             trace_offset: trace_offset as u32,
-            is_first_instance_input: trace_offset == 0,
-            is_last_instance_input,
+            is_last_instance_input: max_count < pending_count,
             step: data[STEP],
             skip: skip as u32,
             count: count as u32,
@@ -103,7 +100,6 @@ impl DmaUnalignedInput {
             "pos",
             "src",
             "dst",
-            "is_first_instance_input",
             "is_last_instance_input",
             "is_mem_eq",
             "trace_offset",
@@ -123,7 +119,6 @@ impl DmaUnalignedInput {
                 pos,
                 input.src,
                 input.dst,
-                input.is_first_instance_input,
                 input.is_last_instance_input,
                 input.is_mem_eq,
                 input.trace_offset,
@@ -136,5 +131,14 @@ impl DmaUnalignedInput {
         }
 
         Ok(())
+    }
+}
+
+impl crate::DmaInputPosition for DmaUnalignedInput {
+    fn must_be_first(&self) -> bool {
+        self.skip > 0
+    }
+    fn must_be_last(&self) -> bool {
+        self.is_last_instance_input
     }
 }

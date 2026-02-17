@@ -1391,7 +1391,7 @@ impl Riscv2ZiskContext<'_> {
             zib.op("add256").unwrap();
             zib.verbose("add256");
             zib.store("reg", i.rd as i64, false, false);
-            zib.j(4, 4);
+            zib.j(0, 4);
             zib.build();
             self.insts.insert(rom_address, zib);
         } else {
@@ -2006,7 +2006,7 @@ impl Riscv2ZiskContext<'_> {
                 //  add   rd, reg(dst), reg(count)       addi rd, reg(dst), reg(count)      │ jmp+8
                 //  ..........                           ..........   <─────────────────────┘
                 let rs1 = next_instructions[0].rs1;
-                let rs2 = i.rs1;
+                let rs2 = next_instructions[0].rs2;
                 let rd = next_instructions[0].rd;
                 self.create_extended_precompiles_op(
                     i,
