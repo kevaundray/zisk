@@ -609,6 +609,7 @@ version = "0.16.0"
 dependencies = [
  "anyhow",
  "asm-runner",
+ "cargo_metadata",
  "clap",
  "colored",
  "executor",

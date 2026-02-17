@@ -37,6 +37,7 @@ zisk-sdk = { workspace = true }
 zisk-verifier = { workspace = true }
 
 clap = { workspace = true }
+cargo_metadata = "0.23.0"
 yansi = "1.0.1"
 
 # Distributed mode (mpi) is only supported on Linux x86_64

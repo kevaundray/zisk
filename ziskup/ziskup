@@ -187,8 +187,9 @@ EOF
     fi
   done
 
-  step "Installing ZisK Rust toolchain..."
-  ensure "${CARGO_ZISK}" sdk install-toolchain
+  step "Installing nightly toolchain with RISC-V target..."
+  ensure rustup toolchain install nightly
+  ensure rustup target add riscv64imac-unknown-none-elf --toolchain nightly
 
   # Install the proving/verify key setup
   IFS='.' read -r major minor patch <<< "${ZISK_VERSION}"

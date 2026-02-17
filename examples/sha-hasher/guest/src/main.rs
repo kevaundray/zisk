@@ -2,8 +2,10 @@
 
 // Mark the main function as the entry point for ZisK
 #![no_main]
+#![no_std]
 ziskos::entrypoint!(main);
 
+use core::convert::Into;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
@@ -30,8 +32,8 @@ fn main() {
 
     let output = Output { hash, iterations: n, magic_number: 0xDEADBEEF };
 
-    println!("Computed hash: {:02x?}", output.hash);
-    println!("Iterations: {}", output.iterations);
+    ziskos::zisk_println!("Computed hash: {:02x?}", output.hash);
+    ziskos::zisk_println!("Iterations: {}", output.iterations);
 
     ziskos::io::commit(&output);
 }

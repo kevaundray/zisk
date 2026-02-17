@@ -34,6 +34,37 @@ macro_rules! entrypoint {
     };
 }
 
+/// Formatter writer that sends bytes to ZisK output UART/sys_write.
+pub struct UartWriter;
+
+impl core::fmt::Write for UartWriter {
+    fn write_str(&mut self, s: &str) -> core::fmt::Result {
+        write_bytes(s.as_bytes());
+        Ok(())
+    }
+}
+
+#[macro_export]
+macro_rules! zisk_print {
+    ($($arg:tt)*) => {{
+        use core::fmt::Write;
+        let mut writer = $crate::UartWriter;
+        let _ = write!(&mut writer, $($arg)*);
+    }};
+}
+
+#[macro_export]
+macro_rules! zisk_println {
+    () => {{
+        $crate::zisk_print!("\n");
+    }};
+    ($($arg:tt)*) => {{
+        use core::fmt::Write;
+        let mut writer = $crate::UartWriter;
+        let _ = writeln!(&mut writer, $($arg)*);
+    }};
+}
+
 // #[macro_export]
 // macro_rules! ziskos_fcall_get {
 //     () => {{
@@ -103,6 +134,34 @@ pub(crate) fn set_output(id: usize, value: u32) {
 #[cfg(not(target_os = "none"))]
 pub(crate) fn set_output(id: usize, value: u32) {
     println!("public {id}: {value:#010x}");
+}
+
+#[cfg(target_os = "none")]
+pub(crate) fn write_bytes(bytes: &[u8]) {
+    let arch_id_zisk: usize;
+    let mut addr: *mut u8 = 0x1000_0000 as *mut u8;
+
+    unsafe {
+        asm!(
+          "csrr {0}, marchid",
+          out(reg) arch_id_zisk,
+        )
+    };
+    if arch_id_zisk == ARCH_ID_ZISK as usize {
+        addr = UART_ADDR as *mut u8;
+    }
+
+    for byte in bytes {
+        unsafe {
+            core::ptr::write_volatile(addr, *byte);
+        }
+    }
+}
+
+#[cfg(not(target_os = "none"))]
+pub(crate) fn write_bytes(bytes: &[u8]) {
+    use std::io::Write;
+    let _ = std::io::stdout().write_all(bytes);
 }
 
 #[cfg(target_os = "none")]
@@ -190,24 +249,8 @@ mod ziskos {
 
     #[no_mangle]
     extern "C" fn sys_write(_fd: u32, write_ptr: *const u8, nbytes: usize) {
-        let arch_id_zisk: usize;
-        let mut addr: *mut u8 = 0x1000_0000 as *mut u8;
-
-        unsafe {
-            asm!(
-              "csrr {0}, marchid",
-              out(reg) arch_id_zisk,
-            )
-        };
-        if arch_id_zisk == ARCH_ID_ZISK as usize {
-            addr = UART_ADDR as *mut u8;
-        }
-
-        for i in 0..nbytes {
-            unsafe {
-                core::ptr::write_volatile(addr, *write_ptr.add(i));
-            }
-        }
+        let bytes = unsafe { core::slice::from_raw_parts(write_ptr, nbytes) };
+        crate::write_bytes(bytes);
     }
 
     use rand::rngs::SmallRng;

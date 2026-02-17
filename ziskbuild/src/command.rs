@@ -29,10 +29,12 @@ pub(crate) fn create_command(
     command.args(["--target", ZISK_TARGET]);
 
     // Set RUSTFLAGS for the standard RISC-V target
-    command.env(
-        "CARGO_TARGET_RISCV64IMAC_UNKNOWN_NONE_ELF_RUSTFLAGS",
-        "-Cpasses=lower-atomic",
-    );
+    let mut rustflags = String::from("-Cpasses=lower-atomic");
+    if let Some(ld_script) = ziskos_linker_script(program_metadata) {
+        rustflags.push_str(" -Clink-arg=-T");
+        rustflags.push_str(&ld_script);
+    }
+    command.env("CARGO_TARGET_RISCV64IMAC_UNKNOWN_NONE_ELF_RUSTFLAGS", rustflags);
 
     let canonicalized_program_dir =
         program_dir.canonicalize().expect("Failed to canonicalize program directory");
@@ -42,4 +44,15 @@ pub(crate) fn create_command(
     command.env("CARGO_TARGET_DIR", program_metadata.target_directory.join(HELPER_TARGET_SUBDIR));
 
     command
+}
+
+fn ziskos_linker_script(program_metadata: &cargo_metadata::Metadata) -> Option<String> {
+    let package = program_metadata.packages.iter().find(|pkg| pkg.name == "ziskos")?;
+    let manifest_parent = package.manifest_path.parent()?;
+    let ld_script = manifest_parent.join("zisk.ld");
+    if ld_script.exists() {
+        Some(ld_script.to_string())
+    } else {
+        None
+    }
 }
