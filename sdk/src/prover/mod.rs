@@ -698,6 +698,17 @@ pub trait ProverEngine {
         instance_id: usize,
         first_row: usize,
         num_rows: usize,
+        offset: Option<usize>,
+    ) -> Result<Vec<RowInfo>>;
+
+    fn get_instance_air_values(&self, instance_id: usize) -> Result<Vec<u64>>;
+
+    fn get_instance_fixed(
+        &self,
+        instance_id: usize,
+        first_row: usize,
+        num_rows: usize,
+        offset: Option<usize>,
     ) -> Result<Vec<RowInfo>>;
 
     fn execute(&self, stdin: ZiskStdin, output_path: Option<PathBuf>) -> Result<ZiskExecuteResult>;
@@ -834,8 +845,25 @@ impl<C: ZiskBackend> ZiskProver<C> {
         instance_id: usize,
         first_row: usize,
         num_rows: usize,
+        offset: Option<usize>,
     ) -> Result<Vec<RowInfo>> {
-        self.prover.get_instance_trace(instance_id, first_row, num_rows)
+        self.prover.get_instance_trace(instance_id, first_row, num_rows, offset)
+    }
+
+    /// Get the instance AIR values for a given instance ID.
+    pub fn get_instance_air_values(&self, instance_id: usize) -> Result<Vec<u64>> {
+        self.prover.get_instance_air_values(instance_id)
+    }
+
+    /// Get the instance fixed for a given instance ID and row range.
+    pub fn get_instance_fixed(
+        &self,
+        instance_id: usize,
+        first_row: usize,
+        num_rows: usize,
+        offset: Option<usize>,
+    ) -> Result<Vec<RowInfo>> {
+        self.prover.get_instance_fixed(instance_id, first_row, num_rows, offset)
     }
 
     /// Verify the constraints with the given standard input and debug information.
