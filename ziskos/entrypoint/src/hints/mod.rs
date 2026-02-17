@@ -126,6 +126,7 @@ pub fn init_hints_file(
 
 pub fn init_hints_socket(
     socket_path: PathBuf,
+    debug_file: Option<PathBuf>,
     ready: Option<oneshot::Sender<()>>,
 ) -> io::Result<()> {
     init_hints()?;
@@ -142,7 +143,7 @@ pub fn init_hints_socket(
     // TODO: Implement open timeout
     socket_writer.open().map_err(io::Error::other)?;
 
-    let handle = thread::spawn(move || write_hints_to_socket(socket_writer));
+    let handle = thread::spawn(move || write_hints_to_socket(socket_writer, debug_file));
     HINT_WRITER_HANDLE.store(handle);
 
     Ok(())
@@ -175,11 +176,9 @@ pub fn close_hints() -> io::Result<()> {
     }
 }
 
-pub fn write_hints<W: Write>(writer: &mut W) -> io::Result<()> {
+pub fn write_hints<W: Write + ?Sized>(writer: &mut W, debug_writer: Option<&mut dyn Write>) -> io::Result<()> {
     // Write hints from the buffer
-    HINT_BUFFER.drain_to_writer(writer)?;
-
-    writer.flush()?;
+    HINT_BUFFER.drain_to_writer(writer, debug_writer)?;
 
     #[cfg(zisk_hints_metrics)]
     crate::hints::metrics::print_metrics();
@@ -193,7 +192,7 @@ fn write_hints_to_file(path: PathBuf) -> io::Result<()> {
     let file = std::fs::File::create(path)?;
     let mut file_writer = BufWriter::with_capacity(1 << 20, file);
 
-    write_hints(&mut file_writer)?;
+    write_hints(&mut file_writer, None)?;
 
     Ok(())
 }
@@ -227,10 +226,19 @@ impl Write for UnixSocketWriter {
     }
 }
 
-fn write_hints_to_socket(mut socket_writer: UnixSocketWriter) -> io::Result<()> {
+fn write_hints_to_socket(
+    mut socket_writer: UnixSocketWriter,
+    debug_file: Option<PathBuf>,
+) -> io::Result<()> {
     debug_assert!(cfg!(target_endian = "little"));
 
-    write_hints(&mut socket_writer)?;
+    if let Some(path) = debug_file {
+        let file = std::fs::File::create(path)?;
+        let mut debug_writer = BufWriter::with_capacity(1 << 20, file); // 1 MiB buffer
+        write_hints(&mut socket_writer, Some(&mut debug_writer as &mut dyn Write))?;
+    } else {
+        write_hints(&mut socket_writer, None)?;
+    }
 
     socket_writer.close().map_err(io::Error::other)?;
 

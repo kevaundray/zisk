@@ -57,8 +57,6 @@ impl HintBufferInner {
 impl HintBuffer {
     pub fn close(&self) {
         let mut g = self.inner.lock().unwrap();
-        g.buf.clear();
-        g.commit_pos = 0;
         g.closed = true;
         self.not_empty.notify_all();
     }
@@ -119,28 +117,42 @@ impl HintBuffer {
         w.commit();
     }
 
-    pub fn drain_to_writer<W: Write>(&self, writer: &mut W) -> io::Result<()> {
-        let mut debug_file = match std::env::var("DEBUG_HINTS_FILE") {
-            Ok(file_name) => Some(File::create(&file_name)?),
-            Err(_) => None,
+    pub fn drain_to_writer<W, D>(
+        &self,
+        writer: &mut W,
+        mut debug_writer: Option<&mut D>,
+    ) -> io::Result<()>
+    where
+        W: Write + ?Sized,
+        D: Write + ?Sized,
+    {
+            // Write hints from the buffer to the writer and optionally to a debug writer
+        let mut write_all = |buf: &[u8]| -> io::Result<()> {
+            writer.write_all(buf)?;
+
+            if let Some(debug_writer) = debug_writer.as_deref_mut() {
+                debug_writer.write_all(buf)?;
+            }
+
+            Ok(())
         };
 
-        loop {
-            // Get chunk of hints to write from HintBuffer(under lock)
+        'drain: loop {
+            // Get chunk of hints to write from HintBuffer (under lock)
             let chunk: Bytes = {
                 let mut g = self.inner.lock().unwrap();
 
+                // Wait until there's data to write or buffer is closed
                 while g.commit_pos == 0 && !g.closed {
                     g = self.not_empty.wait(g).unwrap();
                 }
 
+                // If buffer is empty and closed, we're done, we can exit the drain loop
                 if g.commit_pos == 0 && g.closed {
-                    if let Some(f) = debug_file.as_mut() {
-                        f.flush()?;
-                    }
-                    return Ok(());
+                    break 'drain;
                 }
 
+                // Take the committed chunk of hints to write
                 let n = g.commit_pos;
                 g.commit_pos = 0;
                 g.buf.split_to(n).freeze()
@@ -176,11 +188,7 @@ impl HintBuffer {
                     let buf: &[u8] = unsafe {
                         core::slice::from_raw_parts(chunk_base.add(buf_start), buf_end - buf_start)
                     };
-                    writer.write_all(buf)?;
-
-                    if let Some(f) = debug_file.as_mut() {
-                        f.write_all(buf)?;
-                    }
+                    write_all(buf)?;
 
                     // Reset write buffer
                     buf_start = chunk_pos;
@@ -199,11 +207,7 @@ impl HintBuffer {
                             )
                         };
 
-                        writer.write_all(hint_bytes)?;
-
-                        if let Some(f) = debug_file.as_mut() {
-                            f.write_all(hint_bytes)?;
-                        }
+                        write_all(hint_bytes)?;
 
                         hint_pos += chunk_size;
                     }
@@ -220,18 +224,22 @@ impl HintBuffer {
                 }
             }
 
-            // Flush any remaining data in write buffer
+            // Write any remaining data in write buffer
             if buf_end > buf_start {
                 let buf: &[u8] = unsafe {
                     core::slice::from_raw_parts(chunk_base.add(buf_start), buf_end - buf_start)
                 };
-                writer.write_all(buf)?;
-
-                if let Some(f) = debug_file.as_mut() {
-                    f.write_all(buf)?;
-                }
+                write_all(buf)?;
             }
         }
+
+        // Flush the writer and debug writer at the end
+            writer.flush()?;
+            if let Some(debug_writer) = debug_writer.as_deref_mut() {
+            debug_writer.flush()?;
+        }
+
+        Ok(())
     }
 }
 
@@ -241,7 +249,7 @@ impl<'a> HintWrite<'a> {
         if len == 0 {
             return;
         }
-        debug_assert!(!data.is_null(), "null ptr with nonzero len");
+        debug_assert!(!data.is_null(), "write_hint_data_ptr called with null data pointer");
         let payload = unsafe { std::slice::from_raw_parts(data, len) };
         self.g.write_bytes(payload);
     }
