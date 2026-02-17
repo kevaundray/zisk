@@ -1,9 +1,9 @@
 //! Secp256k1Add system call interception
 
-#[cfg(feature = "guest")]
+#[cfg(target_os = "none")]
 use crate::ziskos_syscall;
 
-#[cfg(feature = "guest")]
+#[cfg(target_os = "none")]
 use core::arch::asm;
 
 use super::point::SyscallPoint256;
@@ -39,9 +39,9 @@ pub extern "C" fn syscall_secp256k1_add(
     params: &mut SyscallSecp256k1AddParams,
     #[cfg(feature = "hints")] hints: &mut Vec<u64>,
 ) {
-    #[cfg(feature = "guest")]
+    #[cfg(target_os = "none")]
     ziskos_syscall!(0x803, params);
-    #[cfg(not(feature = "guest"))]
+    #[cfg(not(target_os = "none"))]
     {
         let p1 = [params.p1.x, params.p1.y].concat().try_into().unwrap();
         let p2 = [params.p2.x, params.p2.y].concat().try_into().unwrap();

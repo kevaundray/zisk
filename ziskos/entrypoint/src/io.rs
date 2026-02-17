@@ -3,7 +3,7 @@
 //! This module provides a high-level API for reading inputs and committing public outputs.
 
 use crate::{read_input, read_input_slice, set_output};
-#[cfg(feature = "guest")]
+#[cfg(target_os = "none")]
 use alloc::vec::Vec;
 use serde::{de::DeserializeOwned, Serialize};
 

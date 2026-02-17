@@ -1,9 +1,9 @@
 //! syscall_bls12_381_complex_mul system call interception
 
-#[cfg(feature = "guest")]
+#[cfg(target_os = "none")]
 use crate::ziskos_syscall;
 
-#[cfg(feature = "guest")]
+#[cfg(target_os = "none")]
 use core::arch::asm;
 
 use super::complex::SyscallComplex384;
@@ -40,9 +40,9 @@ pub extern "C" fn syscall_bls12_381_complex_mul(
     params: &mut SyscallBls12_381ComplexMulParams,
     #[cfg(feature = "hints")] hints: &mut Vec<u64>,
 ) {
-    #[cfg(feature = "guest")]
+    #[cfg(target_os = "none")]
     ziskos_syscall!(0x810, params);
-    #[cfg(not(feature = "guest"))]
+    #[cfg(not(target_os = "none"))]
     {
         let f1 = [params.f1.x, params.f1.y].concat().try_into().unwrap();
         let f2 = [params.f2.x, params.f2.y].concat().try_into().unwrap();

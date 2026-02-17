@@ -1,8 +1,8 @@
 #[cfg(test)]
 mod memcpy_tests {
-    #[cfg(feature = "guest")]
+    #[cfg(target_os = "none")]
     use super::ziskos::memcpy;
-    #[cfg(not(feature = "guest"))]
+    #[cfg(not(target_os = "none"))]
     fn memcpy(dst: *mut u8, src: *const u8, len: usize) -> *mut u8 {
         unsafe {
             std::ptr::copy(src, dst, len);

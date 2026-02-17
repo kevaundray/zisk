@@ -1,15 +1,15 @@
 //! Sha256 system call interception
 
-#[cfg(feature = "guest")]
+#[cfg(target_os = "none")]
 use core::arch::asm;
 
-#[cfg(feature = "guest")]
+#[cfg(target_os = "none")]
 use crate::ziskos_syscall;
 
-#[cfg(not(feature = "guest"))]
+#[cfg(not(target_os = "none"))]
 use sha2::compress256;
 
-#[cfg(not(feature = "guest"))]
+#[cfg(not(target_os = "none"))]
 #[allow(deprecated)]
 use sha2::digest::generic_array::{typenum::U64, GenericArray};
 
@@ -39,9 +39,9 @@ pub extern "C" fn syscall_sha256_f(
     params: &mut SyscallSha256Params,
     #[cfg(feature = "hints")] hints: &mut Vec<u64>,
 ) {
-    #[cfg(feature = "guest")]
+    #[cfg(target_os = "none")]
     ziskos_syscall!(0x805, params);
-    #[cfg(not(feature = "guest"))]
+    #[cfg(not(target_os = "none"))]
     {
         sha256f(params.state, params.input);
 
@@ -52,7 +52,7 @@ pub extern "C" fn syscall_sha256_f(
     }
 }
 
-#[cfg(not(feature = "guest"))]
+#[cfg(not(target_os = "none"))]
 #[allow(deprecated)]
 fn sha256f(state: &mut [u64; 4], input: &[u64; 8]) {
     let state_u32: &mut [u32; 8] = unsafe { &mut *(state.as_mut_ptr() as *mut [u32; 8]) };

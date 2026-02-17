@@ -1,9 +1,9 @@
 //! Add256 system call interception
 
-#[cfg(feature = "guest")]
+#[cfg(target_os = "none")]
 use core::arch::asm;
 
-#[cfg(feature = "guest")]
+#[cfg(target_os = "none")]
 use crate::ziskos_syscall_ret_u64;
 
 #[derive(Debug)]
@@ -34,7 +34,7 @@ pub extern "C" fn syscall_add256(
     params: &mut SyscallAdd256Params,
     #[cfg(feature = "hints")] hints: &mut Vec<u64>,
 ) -> u64 {
-    #[cfg(not(feature = "guest"))]
+    #[cfg(not(target_os = "none"))]
     {
         let cout = precompiles_helpers::add256(params.a, params.b, params.cin, params.c);
         #[cfg(feature = "hints")]
@@ -44,6 +44,6 @@ pub extern "C" fn syscall_add256(
         }
         cout
     }
-    #[cfg(feature = "guest")]
+    #[cfg(target_os = "none")]
     ziskos_syscall_ret_u64!(0x811, params)
 }

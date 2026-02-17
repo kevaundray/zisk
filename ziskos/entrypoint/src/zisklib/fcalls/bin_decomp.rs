@@ -1,7 +1,7 @@
 use cfg_if::cfg_if;
 
 cfg_if! {
-    if #[cfg(feature = "guest")] {
+    if #[cfg(target_os = "none")] {
         use core::arch::asm;
         use alloc::vec;
         use alloc::vec::Vec;
@@ -18,7 +18,7 @@ pub fn fcall_bin_decomp(
     x_val: &[u64],
     #[cfg(feature = "hints")] hints: &mut Vec<u64>,
 ) -> (usize, Vec<u64>) {
-    #[cfg(not(feature = "guest"))]
+    #[cfg(not(target_os = "none"))]
     {
         let len_x = x_val.len();
         let bits = bin_decomp(x_val, len_x);
@@ -33,7 +33,7 @@ pub fn fcall_bin_decomp(
 
         (len_bits, bits_u64)
     }
-    #[cfg(feature = "guest")]
+    #[cfg(target_os = "none")]
     {
         let len_x = x_val.len() as usize;
         ziskos_fcall_param!(len_x, 1);

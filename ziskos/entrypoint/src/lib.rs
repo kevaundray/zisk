@@ -1,16 +1,15 @@
-#![cfg_attr(feature = "guest", no_std)]
+#![cfg_attr(target_os = "none", no_std)]
 #![allow(unexpected_cfgs)]
 #![allow(unused_imports)]
 
-#[cfg(feature = "guest")]
 extern crate alloc;
 
-#[cfg(feature = "guest")]
+#[cfg(target_os = "none")]
 use core::arch::asm;
-#[cfg(feature = "guest")]
+#[cfg(target_os = "none")]
 mod fcall;
 mod profile;
-#[cfg(feature = "guest")]
+#[cfg(target_os = "none")]
 pub use fcall::*;
 pub mod io;
 pub use profile::*;
@@ -18,7 +17,7 @@ pub mod syscalls;
 pub mod zisklib;
 pub mod ziskos_definitions;
 
-#[cfg(all(not(feature = "guest"), any(zisk_hints, zisk_hints_debug), feature = "user-hints"))]
+#[cfg(all(not(target_os = "none"), any(zisk_hints, zisk_hints_debug), feature = "user-hints"))]
 pub mod hints;
 
 #[macro_export]
@@ -45,12 +44,12 @@ macro_rules! entrypoint {
 #[allow(unused_imports)]
 use crate::ziskos_definitions::ziskos_config::*;
 
-#[cfg(feature = "guest")]
+#[cfg(target_os = "none")]
 pub(crate) fn read_input() -> alloc::vec::Vec<u8> {
     read_input_slice().to_vec()
 }
 
-#[cfg(not(feature = "guest"))]
+#[cfg(not(target_os = "none"))]
 pub(crate) fn read_input() -> Vec<u8> {
     use std::{fs::File, io::Read};
 
@@ -61,7 +60,7 @@ pub(crate) fn read_input() -> Vec<u8> {
     buffer
 }
 
-#[cfg(feature = "guest")]
+#[cfg(target_os = "none")]
 pub fn read_input_slice<'a>() -> &'a [u8] {
     // Create a slice of the first 8 bytes to get the size
     let bytes = unsafe { core::slice::from_raw_parts((INPUT_ADDR as *const u8).add(8), 8) };
@@ -72,12 +71,12 @@ pub fn read_input_slice<'a>() -> &'a [u8] {
 }
 
 #[allow(unused)]
-#[cfg(not(feature = "guest"))]
+#[cfg(not(target_os = "none"))]
 pub fn read_input_slice() -> Box<[u8]> {
     read_input().into_boxed_slice()
 }
 
-#[cfg(feature = "guest")]
+#[cfg(target_os = "none")]
 pub(crate) fn set_output(id: usize, value: u32) {
     use core::arch::asm;
     let addr_v: *mut u32;
@@ -101,12 +100,12 @@ pub(crate) fn set_output(id: usize, value: u32) {
     unsafe { core::ptr::write_volatile(addr_v, value) };
 }
 
-#[cfg(not(feature = "guest"))]
+#[cfg(not(target_os = "none"))]
 pub(crate) fn set_output(id: usize, value: u32) {
     println!("public {id}: {value:#010x}");
 }
 
-#[cfg(feature = "guest")]
+#[cfg(target_os = "none")]
 mod ziskos {
     use crate::ziskos_definitions::ziskos_config::*;
     use core::arch::asm;

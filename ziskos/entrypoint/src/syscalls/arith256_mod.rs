@@ -1,9 +1,9 @@
 //! Arith256Mod system call interception
 
-#[cfg(feature = "guest")]
+#[cfg(target_os = "none")]
 use core::arch::asm;
 
-#[cfg(feature = "guest")]
+#[cfg(target_os = "none")]
 use crate::ziskos_syscall;
 
 #[derive(Debug)]
@@ -40,9 +40,9 @@ pub extern "C" fn syscall_arith256_mod(
     params: &mut SyscallArith256ModParams,
     #[cfg(feature = "hints")] hints: &mut Vec<u64>,
 ) {
-    #[cfg(feature = "guest")]
+    #[cfg(target_os = "none")]
     ziskos_syscall!(0x802, params);
-    #[cfg(not(feature = "guest"))]
+    #[cfg(not(target_os = "none"))]
     {
         precompiles_helpers::arith256_mod(params.a, params.b, params.c, params.module, params.d);
         #[cfg(feature = "hints")]

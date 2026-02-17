@@ -1,9 +1,9 @@
-#[cfg(feature = "guest")]
+#[cfg(target_os = "none")]
 use core::arch::asm;
 
 // fcall_get 0xFFE
 
-#[cfg(feature = "guest")]
+#[cfg(target_os = "none")]
 pub fn ziskos_fcall_get() -> u64 {
     let value: u64;
     unsafe {

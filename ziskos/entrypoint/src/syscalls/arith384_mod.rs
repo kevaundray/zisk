@@ -1,9 +1,9 @@
 //! Arith384Mod system call interception
 
-#[cfg(feature = "guest")]
+#[cfg(target_os = "none")]
 use core::arch::asm;
 
-#[cfg(feature = "guest")]
+#[cfg(target_os = "none")]
 use crate::ziskos_syscall;
 
 #[derive(Debug)]
@@ -40,9 +40,9 @@ pub extern "C" fn syscall_arith384_mod(
     params: &mut SyscallArith384ModParams,
     #[cfg(feature = "hints")] hints: &mut Vec<u64>,
 ) {
-    #[cfg(feature = "guest")]
+    #[cfg(target_os = "none")]
     ziskos_syscall!(0x80B, params);
-    #[cfg(not(feature = "guest"))]
+    #[cfg(not(target_os = "none"))]
     {
         precompiles_helpers::arith384_mod(params.a, params.b, params.c, params.module, params.d);
         #[cfg(feature = "hints")]

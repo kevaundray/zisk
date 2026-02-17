@@ -1,9 +1,9 @@
 //! syscall_bls12_381_curve_dbl system call interception
 
-#[cfg(feature = "guest")]
+#[cfg(target_os = "none")]
 use crate::ziskos_syscall;
 
-#[cfg(feature = "guest")]
+#[cfg(target_os = "none")]
 use core::arch::asm;
 
 use super::point::SyscallPoint384;
@@ -31,9 +31,9 @@ pub extern "C" fn syscall_bls12_381_curve_dbl(
     p1: &mut SyscallPoint384,
     #[cfg(feature = "hints")] hints: &mut Vec<u64>,
 ) {
-    #[cfg(feature = "guest")]
+    #[cfg(target_os = "none")]
     ziskos_syscall!(0x80D, p1);
-    #[cfg(not(feature = "guest"))]
+    #[cfg(not(target_os = "none"))]
     {
         let _p1 = [p1.x, p1.y].concat().try_into().unwrap();
         let mut p2: [u64; 12] = [0; 12];

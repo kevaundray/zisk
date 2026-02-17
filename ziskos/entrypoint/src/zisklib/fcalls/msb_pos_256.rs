@@ -1,7 +1,7 @@
 use cfg_if::cfg_if;
 
 cfg_if! {
-    if #[cfg(feature = "guest")] {
+    if #[cfg(target_os = "none")] {
         use core::arch::asm;
         use crate::{ziskos_fcall, ziskos_fcall_get, ziskos_fcall_param};
         use super::FCALL_MSB_POS_256_ID;
@@ -16,7 +16,7 @@ pub fn fcall_msb_pos_256(
     y: &[u64; 4],
     #[cfg(feature = "hints")] hints: &mut Vec<u64>,
 ) -> (u64, u64) {
-    #[cfg(not(feature = "guest"))]
+    #[cfg(not(target_os = "none"))]
     {
         let tmp: [u64; 8] = [x[0], x[1], x[2], x[3], y[0], y[1], y[2], y[3]];
         let (i, pos) = msb_pos_256(&tmp, 2);
@@ -28,7 +28,7 @@ pub fn fcall_msb_pos_256(
         }
         (i as u64, pos as u64)
     }
-    #[cfg(feature = "guest")]
+    #[cfg(target_os = "none")]
     {
         ziskos_fcall_param!(2, 1); // Number of inputs
         ziskos_fcall_param!(x, 4);
@@ -45,7 +45,7 @@ pub fn fcall_msb_pos_256_3(
     z: &[u64; 4],
     #[cfg(feature = "hints")] hints: &mut Vec<u64>,
 ) -> (u64, u64) {
-    #[cfg(not(feature = "guest"))]
+    #[cfg(not(target_os = "none"))]
     {
         let tmp: [u64; 12] =
             [x[0], x[1], x[2], x[3], y[0], y[1], y[2], y[3], z[0], z[1], z[2], z[3]];
@@ -58,7 +58,7 @@ pub fn fcall_msb_pos_256_3(
         }
         (i as u64, pos as u64)
     }
-    #[cfg(feature = "guest")]
+    #[cfg(target_os = "none")]
     {
         ziskos_fcall_param!(3, 1); // Number of inputs
         ziskos_fcall_param!(x, 4);

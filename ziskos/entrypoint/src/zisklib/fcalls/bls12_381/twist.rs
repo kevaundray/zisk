@@ -1,7 +1,7 @@
 use cfg_if::cfg_if;
 
 cfg_if! {
-    if #[cfg(feature = "guest")] {
+    if #[cfg(target_os = "none")] {
         use core::arch::asm;
         use crate::{
             ziskos_fcall, ziskos_fcall_get, ziskos_fcall_param,
@@ -26,7 +26,7 @@ pub fn fcall_bls12_381_twist_add_line_coeffs(
     p2_value: &[u64; 24],
     #[cfg(feature = "hints")] hints: &mut Vec<u64>,
 ) -> ([u64; 12], [u64; 12]) {
-    #[cfg(not(feature = "guest"))]
+    #[cfg(not(target_os = "none"))]
     {
         let x1: [u64; 12] = p1_value[0..12].try_into().unwrap();
         let y1: [u64; 12] = p1_value[12..24].try_into().unwrap();
@@ -43,7 +43,7 @@ pub fn fcall_bls12_381_twist_add_line_coeffs(
 
         (lambda, mu)
     }
-    #[cfg(feature = "guest")]
+    #[cfg(target_os = "none")]
     {
         ziskos_fcall_param!(p1_value, 24);
         ziskos_fcall_param!(p2_value, 24);
@@ -94,7 +94,7 @@ pub fn fcall_bls12_381_twist_dbl_line_coeffs(
     p_value: &[u64; 24],
     #[cfg(feature = "hints")] hints: &mut Vec<u64>,
 ) -> ([u64; 12], [u64; 12]) {
-    #[cfg(not(feature = "guest"))]
+    #[cfg(not(target_os = "none"))]
     {
         let x: [u64; 12] = p_value[0..12].try_into().unwrap();
         let y: [u64; 12] = p_value[12..24].try_into().unwrap();
@@ -107,7 +107,7 @@ pub fn fcall_bls12_381_twist_dbl_line_coeffs(
         }
         (lambda, mu)
     }
-    #[cfg(feature = "guest")]
+    #[cfg(target_os = "none")]
     {
         ziskos_fcall_param!(p_value, 24);
         ziskos_fcall!(FCALL_BLS12_381_TWIST_DBL_LINE_COEFFS_ID);
