@@ -173,9 +173,9 @@ impl HintBuffer {
                     u64::from_le_bytes(header_bytes.try_into().unwrap())
                 };
 
-                let hint_id = (hint_header >> 32) as u32 & 0x7FFF_FFFF;
                 #[cfg(zisk_hints_metrics)]
                 {
+                    let hint_id = (hint_header >> 32) as u32 & 0x7FFF_FFFF;
                     crate::hints::metrics::inc_hint_count(hint_id);
                 }
 

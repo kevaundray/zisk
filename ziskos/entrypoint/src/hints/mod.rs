@@ -150,7 +150,10 @@ pub fn init_hints_socket(
 }
 
 pub fn close_hints() -> io::Result<()> {
-    *MAIN_TID.lock().unwrap() = None;
+    #[cfg(zisk_hints_single_thread)]
+    {
+        *MAIN_TID.lock().unwrap() = None;
+    }
 
     // Write HINT_END
     HINT_BUFFER.write_hint_end();
