@@ -52,7 +52,7 @@ impl ZiskIO for ZiskFileStdin {
 
     fn read<T: DeserializeOwned>(&self) -> Result<T> {
         let mut reader = self.reader.lock().unwrap();
-        bincode::deserialize_from(&mut *reader)
+        bincode::serde::decode_from_std_read(&mut *reader, bincode::config::standard())
             .map_err(|e| anyhow::anyhow!("Failed to deserialize from file: {}", e))
     }
 

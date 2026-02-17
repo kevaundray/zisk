@@ -59,17 +59,12 @@ brew reinstall jq curl libomp protobuf openssl nasm pkgconf open-mpi libffi nloh
     3. **Install verify key** – Needed only if you want to verify proofs.
     4. **None** – Choose this if you only want to compile programs and execute them using the ZisK emulator.
 
-3. Verify the Rust toolchain: (which includes support for the `riscv64ima-zisk-zkvm` compilation target):
+3. Verify the Rust nightly toolchain with the RISC-V target is installed:
     ```bash
-    rustup toolchain list
+    rustup target list --toolchain nightly --installed
     ```
 
-    The output should include an entry for `zisk`, similar to this:
-    ```
-    stable-x86_64-unknown-linux-gnu (default)
-    nightly-x86_64-unknown-linux-gnu
-    zisk
-    ```
+    The output should include `riscv64imac-unknown-none-elf`.
 
 4. Verify the `cargo-zisk` CLI tool:
     ```bash
@@ -146,25 +141,17 @@ You can use the flags `--provingkey`, `--verifykey` or `--nokey` to specify the 
     source $HOME/$PROFILE
     ```
 
-6. Install the ZisK Rust toolchain:
+6. Install the nightly Rust toolchain with the RISC-V target:
     ```bash
-    cargo-zisk sdk install-toolchain
-    ```
-
-    **Note**: This command installs the ZisK Rust toolchain from prebuilt binaries. If you prefer to build the toolchain from source, follow these steps:
-
-    1. Ensure all [dependencies](https://github.com/rust-lang/rust/blob/master/INSTALL.md#dependencies) required to build the Rust toolchain from source are installed.
-
-    2. Build and install the Rust ZisK toolchain:
-    ```bash
-    cargo-zisk sdk build-toolchain
+    rustup toolchain install nightly
+    rustup target add riscv64imac-unknown-none-elf --toolchain nightly
     ```
 
 7. Verify the installation:
     ```bash
-    rustup toolchain list
+    rustup target list --toolchain nightly --installed
     ```
-    Confirm that `zisk` appears in the list of installed toolchains.
+    Confirm that `riscv64imac-unknown-none-elf` appears in the list.
 
 #### Build Setup
 
@@ -232,12 +219,7 @@ Please note that the process can be long, taking approximately 45-60 minutes dep
 
 ## Uninstall Zisk
 
-1. Uninstall ZisK toolchain:
-    ```bash
-    rustup uninstall zisk
-    ```
-
-2. Delete ZisK folder
+1. Delete ZisK folder
     ```bash
     rm -rf $HOME/.zisk
     ```

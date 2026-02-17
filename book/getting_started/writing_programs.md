@@ -109,7 +109,7 @@ Once your program is ready to run on ZisK, compile it into an ELF file (RISC-V a
 cargo-zisk build
 ```
 
-This command compiles the program using the `zisk` target. The resulting `guest` ELF file (without extension) is generated in the `./target/riscv64ima-zisk-zkvm-elf/debug` directory.
+This command compiles the program using the `zisk` target. The resulting `guest` ELF file (without extension) is generated in the `./target/riscv64imac-unknown-none-elf/debug` directory.
 
 For production, compile the ELF file with the `--release` flag, similar to how you compile Rust projects:
 
@@ -117,7 +117,7 @@ For production, compile the ELF file with the `--release` flag, similar to how y
 cargo-zisk build --release
 ```
 
-In this case, the `guest` ELF file will be generated in the `./target/elf/riscv64ima-zisk-zkvm-elf/release` directory.
+In this case, the `guest` ELF file will be generated in the `./target/elf/riscv64imac-unknown-none-elf/release` directory.
 
 ## Execute
 
@@ -125,7 +125,7 @@ You can test your compiled program using the ZisK emulator (`ziskemu`) before ge
 
 ```bash
 cargo-zisk build --release
-ziskemu -e target/elf/riscv64ima-zisk-zkvm-elf/release/guest -i host/tmp/input.bin
+ziskemu -e target/elf/riscv64imac-unknown-none-elf/release/guest -i host/tmp/input.bin
 ```
 
 If the program requires a large number of ZisK steps, you might encounter the following error:
@@ -136,7 +136,7 @@ Error: Error executing Run command
 
 To resolve this, you can increase the number of execution steps using the `-n` (`--max-steps`) flag. For example:
 ```bash
-ziskemu -e target/elf/riscv64ima-zisk-zkvm-elf/release/guest -i host/tmp/input.bin -n 10000000000
+ziskemu -e target/elf/riscv64imac-unknown-none-elf/release/guest -i host/tmp/input.bin -n 10000000000
 ```
 
 ## Metrics and Statistics
@@ -146,7 +146,7 @@ You can get performance metrics related to the program execution in ZisK using t
 
 
 ```bash
-ziskemu -e target/elf/riscv64ima-zisk-zkvm-elf/release/guest -i host/tmp/input.bin -m
+ziskemu -e target/elf/riscv64imac-unknown-none-elf/release/guest -i host/tmp/input.bin -m
 ```
 
 The output will include details such as execution time, throughput, and clock cycles per step:
@@ -160,7 +160,7 @@ You can get statistics related to the program execution in Zisk using the `-X` (
 
 
 ```bash
-ziskemu -e target/elf/riscv64ima-zisk-zkvm-elf/release/guest -i host/tmp/input.bin -X
+ziskemu -e target/elf/riscv64imac-unknown-none-elf/release/guest -i host/tmp/input.bin -X
 ```
 
 The output will include details such as cost definitions, total cost, register reads/writes, opcode statistics, etc:
@@ -201,7 +201,7 @@ Opcodes:
 Before generating a proof (or verifying the constraints), you need to generate the program setup files. This must be done the first time after building the program ELF file, or any time it changes:
 
 ```bash
-cargo-zisk rom-setup -e target/elf/riscv64ima-zisk-zkvm-elf/release/guest -k $HOME/.zisk/provingKey
+cargo-zisk rom-setup -e target/elf/riscv64imac-unknown-none-elf/release/guest -k $HOME/.zisk/provingKey
 ```
 In this command:
 
@@ -220,7 +220,7 @@ cargo-zisk clean
 Before generating a proof (which can take some time), you can verify that all constraints are satisfied:
 
 ```bash
-cargo-zisk verify-constraints -e target/elf/riscv64ima-zisk-zkvm-elf/release/guest -i host/tmp/input.bin -k $HOME/.zisk/provingKey
+cargo-zisk verify-constraints -e target/elf/riscv64imac-unknown-none-elf/release/guest -i host/tmp/input.bin -k $HOME/.zisk/provingKey
 ```
 In this command:
 
@@ -241,7 +241,7 @@ If everything is correct, you will see an output similar to:
 To generate a proof, run the following command:
 
 ```bash
-cargo-zisk prove -e target/elf/riscv64ima-zisk-zkvm-elf/release/guest -i host/tmp/input.bin -k $HOME/.zisk/provingKey -o proof -a -y
+cargo-zisk prove -e target/elf/riscv64imac-unknown-none-elf/release/guest -i host/tmp/input.bin -k $HOME/.zisk/provingKey -o proof -a -y
 ```
 In this command:
 

@@ -1,12 +1,12 @@
 //! Keccak system call interception
 
-#[cfg(all(target_os = "zkvm", target_vendor = "zisk"))]
+#[cfg(target_os = "none")]
 use core::arch::asm;
 
-#[cfg(all(target_os = "zkvm", target_vendor = "zisk"))]
+#[cfg(target_os = "none")]
 use crate::ziskos_syscall;
 
-#[cfg(not(all(target_os = "zkvm", target_vendor = "zisk")))]
+#[cfg(not(target_os = "none"))]
 use tiny_keccak::keccakf;
 
 /// Executes the Keccak256 permutation on the given state.
@@ -27,9 +27,9 @@ pub unsafe extern "C" fn syscall_keccak_f(
     state: *mut [u64; 25],
     #[cfg(feature = "hints")] hints: &mut Vec<u64>,
 ) {
-    #[cfg(all(target_os = "zkvm", target_vendor = "zisk"))]
+    #[cfg(target_os = "none")]
     ziskos_syscall!(0x800, state);
-    #[cfg(not(all(target_os = "zkvm", target_vendor = "zisk")))]
+    #[cfg(not(target_os = "none"))]
     {
         // Call keccakf
         keccakf(unsafe { &mut *state });

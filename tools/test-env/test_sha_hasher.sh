@@ -42,7 +42,7 @@ main() {
     step "Building program..."
     ensure cargo build --bin host --release || return 1
 
-    ELF_PATH="target/elf/riscv64ima-zisk-zkvm-elf/release/$PROJECT_NAME"
+    ELF_PATH="target/elf/riscv64imac-unknown-none-elf/release/$PROJECT_NAME"
     INPUT_BIN="host/tmp/input.bin"
 
     step "Running program with ziskemu..."

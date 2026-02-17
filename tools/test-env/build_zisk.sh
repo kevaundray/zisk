@@ -197,12 +197,13 @@ main() {
         info "Added $EXPORT_LINE to $PROFILE"
     fi
 
-    step "Installing ZisK Rust toolchain..."
-    ensure cargo-zisk sdk install-toolchain || return 1
+    step "Installing nightly toolchain with RISC-V target..."
+    ensure rustup toolchain install nightly || return 1
+    ensure rustup target add riscv64imac-unknown-none-elf --toolchain nightly || return 1
 
     step "Verifying toolchain installation..."
-    rustup toolchain list | grep zisk || {
-        err "ZisK toolchain not found."
+    rustup target list --toolchain nightly --installed | grep riscv64imac-unknown-none-elf || {
+        err "RISC-V target not found in nightly toolchain."
         return 1
     }
 

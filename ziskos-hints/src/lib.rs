@@ -3,6 +3,8 @@
 //! This crate compiles the symlinked core/ (which points to ziskos/entrypoint/src)
 //! with the hints feature enabled, and adds hints-specific processing utilities.
 
+extern crate alloc;
+
 // Include the symlinked source as a module
 #[path = "core/lib.rs"]
 mod core;

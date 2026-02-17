@@ -1,8 +1,10 @@
 use cfg_if::cfg_if;
 
 cfg_if! {
-    if #[cfg(all(target_os = "zkvm", target_vendor = "zisk"))] {
+    if #[cfg(target_os = "none")] {
         use core::arch::asm;
+        use alloc::vec;
+        use alloc::vec::Vec;
         use crate::{ziskos_fcall, ziskos_fcall_get, ziskos_fcall_param};
         use super::FCALL_BIN_DECOMP_ID;
     } else {
@@ -16,7 +18,7 @@ pub fn fcall_bin_decomp(
     x_val: &[u64],
     #[cfg(feature = "hints")] hints: &mut Vec<u64>,
 ) -> (usize, Vec<u64>) {
-    #[cfg(not(all(target_os = "zkvm", target_vendor = "zisk")))]
+    #[cfg(not(target_os = "none"))]
     {
         let len_x = x_val.len();
         let bits = bin_decomp(x_val, len_x);
@@ -31,7 +33,7 @@ pub fn fcall_bin_decomp(
 
         (len_bits, bits_u64)
     }
-    #[cfg(all(target_os = "zkvm", target_vendor = "zisk"))]
+    #[cfg(target_os = "none")]
     {
         let len_x = x_val.len() as usize;
         ziskos_fcall_param!(len_x, 1);

@@ -74,7 +74,7 @@ The next step is to build the program using the `cargo-zisk` command to generate
 cargo-zisk build --release
 ```
 
-This command builds the program using the `zkvm` target. The resulting `sha_hasher` ELF file (without extension) is generated in the `./target/elf/riscv64ima-zisk-zkvm-elf/release` directory.
+This command builds the program using the `zkvm` target. The resulting `sha_hasher` ELF file (without extension) is generated in the `./target/elf/riscv64imac-unknown-none-elf/release` directory.
 
 ## Execute
 

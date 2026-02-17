@@ -1,9 +1,9 @@
 //! Arith256 system call interception
 
-#[cfg(all(target_os = "zkvm", target_vendor = "zisk"))]
+#[cfg(target_os = "none")]
 use core::arch::asm;
 
-#[cfg(all(target_os = "zkvm", target_vendor = "zisk"))]
+#[cfg(target_os = "none")]
 use crate::ziskos_syscall;
 
 #[derive(Debug)]
@@ -37,9 +37,9 @@ pub extern "C" fn syscall_arith256(
     params: &mut SyscallArith256Params,
     #[cfg(feature = "hints")] hints: &mut Vec<u64>,
 ) {
-    #[cfg(all(target_os = "zkvm", target_vendor = "zisk"))]
+    #[cfg(target_os = "none")]
     ziskos_syscall!(0x801, params);
-    #[cfg(not(all(target_os = "zkvm", target_vendor = "zisk")))]
+    #[cfg(not(target_os = "none"))]
     {
         precompiles_helpers::arith256(params.a, params.b, params.c, params.dl, params.dh);
         #[cfg(feature = "hints")]

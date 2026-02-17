@@ -369,6 +369,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "bincode"
+version = "2.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "36eaf5d7b090263e8150820482d5d93cd964a81e4019913c972f4edcc6edb740"
+dependencies = [
+ "serde",
+ "unty",
+]
+
+[[package]]
 name = "bindgen"
 version = "0.69.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1518,6 +1528,10 @@ name = "lib-c"
 version = "0.16.0"
 
 [[package]]
+name = "lib-float"
+version = "0.16.0"
+
+[[package]]
 name = "libc"
 version = "0.2.182"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2258,7 +2272,7 @@ name = "proofman"
 version = "0.16.0"
 source = "git+https://github.com/0xPolygonHermez/pil2-proofman.git?branch=pre-develop-0.16.0#ed83276f2d22797b95289c11003828b0ccad826a"
 dependencies = [
- "bincode",
+ "bincode 1.3.3",
  "blake3",
  "borsh",
  "bytemuck",
@@ -2294,7 +2308,7 @@ name = "proofman-common"
 version = "0.16.0"
 source = "git+https://github.com/0xPolygonHermez/pil2-proofman.git?branch=pre-develop-0.16.0#ed83276f2d22797b95289c11003828b0ccad826a"
 dependencies = [
- "bincode",
+ "bincode 1.3.3",
  "borsh",
  "bytemuck",
  "colored",
@@ -2358,7 +2372,7 @@ name = "proofman-util"
 version = "0.16.0"
 source = "git+https://github.com/0xPolygonHermez/pil2-proofman.git?branch=pre-develop-0.16.0#ed83276f2d22797b95289c11003828b0ccad826a"
 dependencies = [
- "bincode",
+ "bincode 1.3.3",
  "bytemuck",
  "colored",
  "serde",
@@ -3599,6 +3613,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8ecb6da28b8a351d773b68d5825ac39017e680750f980f3a1a85cd8dd28a47c1"
 
 [[package]]
+name = "unty"
+version = "0.0.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6d49784317cd0d1ee7ec5c716dd598ec5b4483ea832a2dced265471cc0f690ae"
+
+[[package]]
 name = "url"
 version = "2.5.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4558,7 +4578,7 @@ name = "zisk-common"
 version = "0.16.0"
 dependencies = [
  "anyhow",
- "bincode",
+ "bincode 2.0.1",
  "fields",
  "libc",
  "mpi",
@@ -4584,6 +4604,7 @@ dependencies = [
  "elf",
  "fields",
  "lib-c",
+ "lib-float",
  "paste",
  "precompiles-helpers",
  "rayon",
@@ -4631,7 +4652,7 @@ version = "0.16.0"
 dependencies = [
  "anyhow",
  "asm-runner",
- "bincode",
+ "bincode 2.0.1",
  "colored",
  "executor",
  "fields",
@@ -4728,7 +4749,7 @@ name = "ziskos"
 version = "0.16.0"
 dependencies = [
  "anyhow",
- "bincode",
+ "bincode 2.0.1",
  "bytes",
  "cfg-if",
  "ctor",
@@ -4755,7 +4776,7 @@ name = "ziskos-hints"
 version = "0.16.0"
 dependencies = [
  "anyhow",
- "bincode",
+ "bincode 2.0.1",
  "cfg-if",
  "fields",
  "getrandom 0.2.17",

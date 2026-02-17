@@ -1,4 +1,5 @@
 use anyhow::{anyhow, Context, Result};
+use cargo_metadata::MetadataCommand;
 use std::{
     env,
     process::{Command, Stdio},
@@ -51,7 +52,7 @@ impl ZiskRun {
         let runner_command: String;
         // Construct the cargo run command
         let mut command = Command::new("cargo");
-        command.args(["+zisk", "run"]);
+        command.args(["+nightly", "run"]);
 
         // Add the feature selection flags
         if let Some(features) = &self.features {
@@ -139,7 +140,14 @@ impl ZiskRun {
             );
         }
 
-        env::set_var("CARGO_TARGET_RISCV64IMA_ZISK_ZKVM_ELF_RUNNER", runner_command);
+        env::set_var("CARGO_TARGET_RISCV64IMAC_UNKNOWN_NONE_ELF_RUNNER", runner_command);
+
+        let mut rustflags = String::from("-Cpasses=lower-atomic");
+        if let Some(ld_script) = ziskos_linker_script() {
+            rustflags.push_str(" -Clink-arg=-T");
+            rustflags.push_str(&ld_script);
+        }
+        command.env("CARGO_TARGET_RISCV64IMAC_UNKNOWN_NONE_ELF_RUSTFLAGS", rustflags);
 
         command.args(["--target", ZISK_TARGET]);
 
@@ -157,5 +165,17 @@ impl ZiskRun {
         }
 
         Ok(())
+    }
+}
+
+fn ziskos_linker_script() -> Option<String> {
+    let metadata = MetadataCommand::new().exec().ok()?;
+    let package = metadata.packages.iter().find(|pkg| pkg.name == "ziskos")?;
+    let manifest_parent = package.manifest_path.parent()?;
+    let ld_script = manifest_parent.join("zisk.ld");
+    if ld_script.exists() {
+        Some(ld_script.to_string())
+    } else {
+        None
     }
 }

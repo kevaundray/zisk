@@ -1,7 +1,7 @@
 use cfg_if::cfg_if;
 
 cfg_if! {
-    if #[cfg(all(target_os = "zkvm", target_vendor = "zisk"))] {
+    if #[cfg(target_os = "none")] {
         use core::arch::asm;
         use crate::{ziskos_fcall, ziskos_fcall_get, ziskos_fcall_param, zisklib::FCALL_BN254_FP_INV_ID};
     } else {
@@ -27,7 +27,7 @@ pub fn fcall_bn254_fp_inv(
     p_value: &[u64; 4],
     #[cfg(feature = "hints")] hints: &mut Vec<u64>,
 ) -> [u64; 4] {
-    #[cfg(not(all(target_os = "zkvm", target_vendor = "zisk")))]
+    #[cfg(not(target_os = "none"))]
     {
         let result: [u64; 4] = bn254_fp_inv(p_value);
         #[cfg(feature = "hints")]
@@ -37,7 +37,7 @@ pub fn fcall_bn254_fp_inv(
         }
         result
     }
-    #[cfg(all(target_os = "zkvm", target_vendor = "zisk"))]
+    #[cfg(target_os = "none")]
     {
         ziskos_fcall_param!(p_value, 4);
         ziskos_fcall!(FCALL_BN254_FP_INV_ID);

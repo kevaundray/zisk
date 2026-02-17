@@ -36,7 +36,7 @@ tokio = { workspace = true }
 tokio-stream = { workspace = true }
 tracing = { workspace = true }
 anyhow = { workspace = true }
-serde = { workspace = true }
+serde = { workspace = true, features = ["std"] }
 borsh = { workspace = true }
 clap = { workspace = true }
 colored = { workspace = true }

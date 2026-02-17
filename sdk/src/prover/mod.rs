@@ -221,7 +221,7 @@ impl ZiskVadcopFinalProof {
             std::fs::create_dir_all(parent)?;
         }
 
-        let file = File::create(path).map_err(|e| {
+        let mut file = File::create(path).map_err(|e| {
             std::io::Error::new(
                 e.kind(),
                 format!(
@@ -232,12 +232,12 @@ impl ZiskVadcopFinalProof {
             )
         })?;
 
-        bincode::serialize_into(file, self)?;
+        bincode::serde::encode_into_std_write(self, &mut file, bincode::config::standard())?;
         Ok(())
     }
 
     pub fn load(path: impl AsRef<Path>) -> Result<Self, Box<dyn std::error::Error + Send + Sync>> {
-        let file = File::open(path.as_ref()).map_err(|e| {
+        let mut file = File::open(path.as_ref()).map_err(|e| {
             std::io::Error::new(
                 e.kind(),
                 format!(
@@ -247,7 +247,8 @@ impl ZiskVadcopFinalProof {
                 ),
             )
         })?;
-        let proof: ZiskVadcopFinalProof = bincode::deserialize_from(file)?;
+        let proof: ZiskVadcopFinalProof =
+            bincode::serde::decode_from_std_read(&mut file, bincode::config::standard())?;
         Ok(proof)
     }
 }
@@ -273,19 +274,19 @@ impl ZiskSnarkProof {
             std::fs::create_dir_all(parent)?;
         }
 
-        let file = File::create(path).map_err(|e| {
+        let mut file = File::create(path).map_err(|e| {
             std::io::Error::new(
                 e.kind(),
                 format!("Failed to create file for saving SNARK proof: {}: {}", path.display(), e),
             )
         })?;
 
-        bincode::serialize_into(file, self)?;
+        bincode::serde::encode_into_std_write(self, &mut file, bincode::config::standard())?;
         Ok(())
     }
 
     pub fn load(path: impl AsRef<Path>) -> Result<Self, Box<dyn std::error::Error + Send + Sync>> {
-        let file = File::open(path.as_ref()).map_err(|e| {
+        let mut file = File::open(path.as_ref()).map_err(|e| {
             std::io::Error::new(
                 e.kind(),
                 format!(
@@ -295,7 +296,8 @@ impl ZiskSnarkProof {
                 ),
             )
         })?;
-        let proof: ZiskSnarkProof = bincode::deserialize_from(file)?;
+        let proof: ZiskSnarkProof =
+            bincode::serde::decode_from_std_read(&mut file, bincode::config::standard())?;
         Ok(proof)
     }
 }
@@ -374,7 +376,7 @@ impl ZiskPublics {
     /// Create ZiskPublics from a serializable value.
     /// The value is serialized with bincode and stored in the public outputs as 64-bit chunks.
     pub fn write<T: serde::Serialize>(value: &T) -> Result<Self> {
-        let serialized = bincode::serialize(value)
+        let serialized = bincode::serde::encode_to_vec(value, bincode::config::standard())
             .map_err(|e| anyhow::anyhow!("Serialization failed: {}", e))?;
 
         if serialized.len() > ZISK_PUBLICS * 4 {
@@ -413,11 +415,10 @@ impl ZiskPublics {
     /// The value must have been previously written with bincode serialization using `commit()`.
     pub fn read<T: serde::Serialize + serde::de::DeserializeOwned>(&self) -> Result<T> {
         let ptr = self.ptr.get();
-        let result: T = bincode::deserialize(&self.data[ptr..])
-            .map_err(|e| anyhow::anyhow!("Deserialization failed: {}", e))?;
-        let nb_bytes = bincode::serialized_size(&result)
-            .map_err(|e| anyhow::anyhow!("Failed to get serialized size: {}", e))?;
-        self.ptr.set(ptr + nb_bytes as usize);
+        let (result, nb_bytes): (T, usize) =
+            bincode::serde::decode_from_slice(&self.data[ptr..], bincode::config::standard())
+                .map_err(|e| anyhow::anyhow!("Deserialization failed: {}", e))?;
+        self.ptr.set(ptr + nb_bytes);
         Ok(result)
     }
 
@@ -509,20 +510,21 @@ impl ZiskProofWithPublicValues {
     }
 
     pub fn save(&self, path: impl AsRef<Path>) -> Result<()> {
-        bincode::serialize_into(
-            File::create(path.as_ref()).with_context(|| {
-                format!("failed to create file for saving proof: {}", path.as_ref().display())
-            })?,
-            self,
-        )
-        .map_err(Into::into)
+        let mut file = File::create(path.as_ref()).with_context(|| {
+            format!("failed to create file for saving proof: {}", path.as_ref().display())
+        })?;
+        bincode::serde::encode_into_std_write(self, &mut file, bincode::config::standard())
+            .map_err(|e| anyhow::anyhow!("Failed to serialize proof: {}", e))?;
+        Ok(())
     }
 
     pub fn load(path: impl AsRef<Path>) -> Result<Self> {
-        let file = File::open(path.as_ref()).with_context(|| {
+        let mut file = File::open(path.as_ref()).with_context(|| {
             format!("failed to open file for loading proof: {}", path.as_ref().display())
         })?;
-        let proof_with_publics: ZiskProofWithPublicValues = bincode::deserialize_from(file)?;
+        let proof_with_publics: ZiskProofWithPublicValues =
+            bincode::serde::decode_from_std_read(&mut file, bincode::config::standard())
+                .map_err(|e| anyhow::anyhow!("Failed to deserialize proof: {}", e))?;
         Ok(proof_with_publics)
     }
 

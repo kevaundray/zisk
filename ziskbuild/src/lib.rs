@@ -7,8 +7,6 @@ use build::build_program_internal;
 
 use clap::Parser;
 
-pub const RUSTUP_TOOLCHAIN_NAME: &str = "zisk";
-
 pub const ZISK_VERSION_MESSAGE: &str = concat!(
     env!("CARGO_PKG_VERSION"),
     " (",
@@ -18,7 +16,7 @@ pub const ZISK_VERSION_MESSAGE: &str = concat!(
     ")"
 );
 
-pub const ZISK_TARGET: &str = "riscv64ima-zisk-zkvm-elf";
+pub const ZISK_TARGET: &str = "riscv64imac-unknown-none-elf";
 
 pub const HELPER_TARGET_SUBDIR: &str = "elf";
 

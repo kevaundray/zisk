@@ -1,7 +1,7 @@
 use cfg_if::cfg_if;
 
 cfg_if! {
-    if #[cfg(all(target_os = "zkvm", target_vendor = "zisk"))] {
+    if #[cfg(target_os = "none")] {
         use core::arch::asm;
         use crate::{ziskos_fcall, ziskos_fcall_get, ziskos_fcall_param, zisklib::FCALL_SECP256R1_ECDSA_VERIFY_ID};
     }
@@ -44,7 +44,7 @@ pub fn fcall_secp256r1_ecdsa_verify(
     s_value: &[u64; 4],
     #[cfg(feature = "hints")] hints: &mut Vec<u64>,
 ) -> [u64; 8] {
-    #[cfg(not(all(target_os = "zkvm", target_vendor = "zisk")))]
+    #[cfg(not(target_os = "none"))]
     {
         use crate::zisklib::fcalls_impl;
 
@@ -68,7 +68,7 @@ pub fn fcall_secp256r1_ecdsa_verify(
 
         results
     }
-    #[cfg(all(target_os = "zkvm", target_vendor = "zisk"))]
+    #[cfg(target_os = "none")]
     {
         ziskos_fcall_param!(pk_value, 8);
         ziskos_fcall_param!(z_value, 4);
