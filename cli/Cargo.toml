@@ -37,13 +37,6 @@ zisk-sdk = { workspace = true }
 zisk-verifier = { workspace = true }
 
 clap = { workspace = true }
-dirs = "6"
-rand = "0.9"
-target-lexicon = "0.13"
-reqwest = { workspace = true }
-tokio = { version = "1", features = ["full"] }
-indicatif = "0.17.8"
-futures = { workspace = true }
 yansi = "1.0.1"
 
 # Distributed mode (mpi) is only supported on Linux x86_64

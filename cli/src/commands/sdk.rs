@@ -1,8 +1,6 @@
 use clap::Subcommand;
 
-use crate::toolchain::{
-    build_toolchain::BuildToolchainCmd, install_toolchain::InstallToolchainCmd, new::NewCmd,
-};
+use crate::toolchain::new::NewCmd;
 use anyhow::Result;
 use zisk_build::ZISK_VERSION_MESSAGE;
 
@@ -17,16 +15,12 @@ pub struct ZiskSdk {
 // Enum defining the available subcommands for `ZiskSdk`.
 #[derive(Subcommand)]
 pub enum ZiskSdkCommands {
-    BuildToolchain(BuildToolchainCmd),
-    InstallToolchain(InstallToolchainCmd),
     New(NewCmd),
 }
 
 impl ZiskSdkCommands {
     pub fn run(&self) -> Result<()> {
         match self {
-            ZiskSdkCommands::BuildToolchain(cmd) => cmd.run(),
-            ZiskSdkCommands::InstallToolchain(cmd) => cmd.run(),
             ZiskSdkCommands::New(cmd) => cmd.run(),
         }
     }
