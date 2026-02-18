@@ -106,6 +106,60 @@ pub(crate) fn set_output(id: usize, value: u32) {
     println!("public {id}: {value:#010x}");
 }
 
+#[cfg(any(target_os = "none", all(target_os = "zkvm", target_vendor = "zisk")))]
+#[no_mangle]
+pub unsafe extern "C" fn sys_alloc_aligned(bytes: usize, align: usize) -> *mut u8 {
+    use core::arch::asm;
+    let heap_bottom: usize;
+    unsafe {
+        asm!(
+          "la {heap_bottom}, _kernel_heap_bottom",
+          heap_bottom = out(reg) heap_bottom,
+          options(nomem)
+        )
+    };
+
+    static mut HEAP_POS: usize = 0;
+
+    let mut heap_pos = unsafe { HEAP_POS };
+
+    if heap_pos == 0 {
+        heap_pos = heap_bottom;
+    }
+
+    let offset = heap_pos & (align - 1);
+    if offset != 0 {
+        heap_pos += align - offset;
+    }
+
+    let ptr = heap_pos as *mut u8;
+    heap_pos += bytes;
+
+    unsafe { HEAP_POS = heap_pos };
+
+    ptr
+}
+
+#[cfg(target_os = "none")]
+mod allocator {
+    use core::alloc::{GlobalAlloc, Layout};
+
+    struct BumpAllocator;
+
+    unsafe impl GlobalAlloc for BumpAllocator {
+        unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
+            unsafe { super::sys_alloc_aligned(layout.size(), layout.align()) }
+        }
+
+        unsafe fn dealloc(&self, _ptr: *mut u8, _layout: Layout) {
+            // Bump allocator never frees
+        }
+    }
+
+    #[global_allocator]
+    static ALLOCATOR: BumpAllocator = BumpAllocator;
+}
+
 #[cfg(all(target_os = "zkvm", target_vendor = "zisk"))]
 mod ziskos {
     use crate::ziskos_definitions::ziskos_config::*;
@@ -237,48 +291,6 @@ mod ziskos {
         unimplemented!("sys_argv");
     }
 
-    #[no_mangle]
-    pub unsafe extern "C" fn sys_alloc_aligned(bytes: usize, align: usize) -> *mut u8 {
-        use core::arch::asm;
-        let heap_bottom: usize;
-        // UNSAFE: This is fine, just loading some constants.
-        unsafe {
-            // using inline assembly is easier to access linker constants
-            asm!(
-              "la {heap_bottom}, _kernel_heap_bottom",
-              heap_bottom = out(reg) heap_bottom,
-              options(nomem)
-            )
-        };
-
-        // Pointer to next heap address to use, or 0 if the heap has not yet been
-        // initialized.
-        static mut HEAP_POS: usize = 0;
-
-        // SAFETY: Single threaded, so nothing else can touch this while we're working.
-        let mut heap_pos = unsafe { HEAP_POS };
-
-        if heap_pos == 0 {
-            heap_pos = heap_bottom;
-        }
-
-        let offset = heap_pos & (align - 1);
-        if offset != 0 {
-            heap_pos += align - offset;
-        }
-
-        let ptr = heap_pos as *mut u8;
-        heap_pos += bytes;
-
-        // Check to make sure heap doesn't collide with SYSTEM memory.
-        //if SYSTEM_START < heap_pos {
-        //    panic!();
-        // }
-
-        unsafe { HEAP_POS = heap_pos };
-
-        ptr
-    }
     core::arch::global_asm!(include_str!("dma/memcpy.s"));
     core::arch::global_asm!(include_str!("dma/memmove.s"));
     // core::arch::global_asm!(include_str!("dma/memcmp.s"));
