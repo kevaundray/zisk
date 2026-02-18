@@ -26,7 +26,7 @@ zisk-verifier = { workspace = true }
 zisk-build = { workspace = true }
 zisk-witness = { workspace = true }
 sha2 = { workspace = true }
-bincode = { workspace = true }
+bincode = { workspace = true, features = ["std"] }
 serde = { workspace = true }
 
 [features]

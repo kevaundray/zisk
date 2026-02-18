@@ -21,7 +21,10 @@ use serde::{de::DeserializeOwned, Serialize};
 /// ```
 pub fn read<T: DeserializeOwned>() -> T {
     let bytes = read_input_slice();
-    bincode::deserialize(&bytes).expect("Deserialization failed")
+    let (val, _): (T, usize) =
+        bincode::serde::decode_from_slice(&bytes, bincode::config::standard())
+            .expect("Deserialization failed");
+    val
 }
 
 /// Read raw bytes from the input stream.
@@ -37,7 +40,8 @@ pub fn read_vec() -> Vec<u8> {
 /// Commit a serializable value to public outputs.
 /// The value is serialized with bincode and written as 32-bit chunks.
 pub fn commit<T: Serialize>(value: &T) {
-    let bytes = bincode::serialize(value).expect("Serialization failed");
+    let bytes = bincode::serde::encode_to_vec(value, bincode::config::standard())
+        .expect("Serialization failed");
     write(&bytes);
 }
 
