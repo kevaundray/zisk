@@ -11,7 +11,7 @@ opt-level = 0
 
 [workspace.dependencies]
 # Guest dependencies
-ziskos = { path = "../ziskos/entrypoint" }
+ziskos = { path = "../ziskos/entrypoint", default-features = false, features = ["zisk_guest"] }
 
 # Host dependencies
 zisk-sdk = { path = "../sdk" }

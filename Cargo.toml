@@ -95,7 +95,7 @@ mem-planner-cpp = { path = "state-machines/mem-cpp" }
 sm-rom = { path = "state-machines/rom" }
 zisk-witness = { path = "witness-computation" }
 ziskclib = { path = "ziskclib" }
-ziskos = { path = "ziskos/entrypoint" }
+ziskos = { path = "ziskos/entrypoint", features = ["zisk_host"] }
 ziskos-hints = { path = "ziskos-hints" }
 circuit = { path = "tools/circuit" }
 zisk-sdk = { path = "sdk" }

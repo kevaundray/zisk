@@ -801,16 +801,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "ctor"
-version = "0.2.9"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "32a2785755761f3ddc1492979ce1e48d2c00d09311c39e4466429188f3dd6501"
-dependencies = [
- "quote",
- "syn 2.0.116",
-]
-
-[[package]]
 name = "curves"
 version = "0.16.0"
 source = "git+https://github.com/0xPolygonHermez/pil2-proofman.git?branch=pre-develop-0.16.0#28ec794c611b5c53c7096c565da80bd0639f2fe9"
@@ -4732,11 +4722,8 @@ dependencies = [
 name = "ziskos"
 version = "0.16.0"
 dependencies = [
- "anyhow",
  "bincode",
- "bytes",
  "cfg-if",
- "ctor",
  "fields",
  "getrandom 0.2.17",
  "lazy_static",
@@ -4744,15 +4731,11 @@ dependencies = [
  "num-bigint",
  "num-integer",
  "num-traits",
- "once_cell",
- "paste",
  "precompiles-helpers",
  "rand 0.8.5",
  "serde",
  "sha2",
  "tiny-keccak",
- "tokio",
- "zisk-common",
 ]
 
 [[package]]

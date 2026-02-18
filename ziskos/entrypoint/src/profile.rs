@@ -137,7 +137,7 @@ macro_rules! ziskos_profile_arguments {
     };
 }
 
-#[cfg(all(target_os = "zkvm", target_vendor = "zisk"))]
+#[cfg(feature = "zisk_guest")]
 use core::arch::asm;
 
 const MAX_TAG_ID: u16 = 256;
@@ -150,7 +150,7 @@ fn check_tag_id<const TAG_ID: u16>() {
 ///
 /// # Arguments
 /// * `TAG_ID` - Unique identifier for the cost region (must fit in 12-bit immediate)
-#[cfg(all(target_os = "zkvm", target_vendor = "zisk"))]
+#[cfg(feature = "zisk_guest")]
 #[inline(always)]
 pub fn ziskos_profile_start<const TAG_ID: u16>() {
     check_tag_id::<TAG_ID>();
@@ -159,7 +159,7 @@ pub fn ziskos_profile_start<const TAG_ID: u16>() {
     }
 }
 
-#[cfg(not(all(target_os = "zkvm", target_vendor = "zisk")))]
+#[cfg(not(feature = "zisk_guest"))]
 #[inline(always)]
 pub fn ziskos_profile_start<const TAG_ID: u16>() {
     check_tag_id::<TAG_ID>();
@@ -169,7 +169,7 @@ pub fn ziskos_profile_start<const TAG_ID: u16>() {
 ///
 /// # Arguments
 /// * `TAG_ID` - Unique identifier for the cost region (must match the start tag)
-#[cfg(all(target_os = "zkvm", target_vendor = "zisk"))]
+#[cfg(feature = "zisk_guest")]
 #[inline(always)]
 pub fn ziskos_profile_end<const TAG_ID: u16>() {
     check_tag_id::<TAG_ID>();
@@ -178,14 +178,14 @@ pub fn ziskos_profile_end<const TAG_ID: u16>() {
     }
 }
 
-#[cfg(not(all(target_os = "zkvm", target_vendor = "zisk")))]
+#[cfg(not(feature = "zisk_guest"))]
 #[inline(always)]
 pub fn ziskos_profile_end<const TAG_ID: u16>() {
     check_tag_id::<TAG_ID>();
 }
 
 /// Records an absolute cost measurement
-#[cfg(all(target_os = "zkvm", target_vendor = "zisk"))]
+#[cfg(feature = "zisk_guest")]
 #[inline(always)]
 pub fn ziskos_profile_absolute<const TAG_ID: u16>() {
     unsafe {
@@ -193,14 +193,14 @@ pub fn ziskos_profile_absolute<const TAG_ID: u16>() {
     }
 }
 
-#[cfg(not(all(target_os = "zkvm", target_vendor = "zisk")))]
+#[cfg(not(feature = "zisk_guest"))]
 #[inline(always)]
 pub fn ziskos_profile_absolute<const TAG_ID: u16>() {
     check_tag_id::<TAG_ID>();
 }
 
 /// Records a relative cost measurement
-#[cfg(all(target_os = "zkvm", target_vendor = "zisk"))]
+#[cfg(feature = "zisk_guest")]
 #[inline(always)]
 pub fn ziskos_profile_relative<const TAG_ID: u16>() {
     check_tag_id::<TAG_ID>();
@@ -209,14 +209,14 @@ pub fn ziskos_profile_relative<const TAG_ID: u16>() {
     }
 }
 
-#[cfg(not(all(target_os = "zkvm", target_vendor = "zisk")))]
+#[cfg(not(feature = "zisk_guest"))]
 #[inline(always)]
 pub fn ziskos_profile_relative<const TAG_ID: u16>() {
     check_tag_id::<TAG_ID>();
 }
 
 /// Reset relative cost measurement
-#[cfg(all(target_os = "zkvm", target_vendor = "zisk"))]
+#[cfg(feature = "zisk_guest")]
 #[inline(always)]
 pub fn ziskos_profile_reset_relative<const TAG_ID: u16>() {
     check_tag_id::<TAG_ID>();
@@ -225,14 +225,14 @@ pub fn ziskos_profile_reset_relative<const TAG_ID: u16>() {
     }
 }
 
-#[cfg(not(all(target_os = "zkvm", target_vendor = "zisk")))]
+#[cfg(not(feature = "zisk_guest"))]
 #[inline(always)]
 pub fn ziskos_profile_reset_relative<const TAG_ID: u16>() {
     check_tag_id::<TAG_ID>();
 }
 
 /// Counter of executions
-#[cfg(all(target_os = "zkvm", target_vendor = "zisk"))]
+#[cfg(feature = "zisk_guest")]
 #[inline(always)]
 pub fn ziskos_profile_counter<const TAG_ID: u16>() {
     check_tag_id::<TAG_ID>();
@@ -242,14 +242,14 @@ pub fn ziskos_profile_counter<const TAG_ID: u16>() {
 }
 
 /// Counter of executions
-#[cfg(not(all(target_os = "zkvm", target_vendor = "zisk")))]
+#[cfg(not(feature = "zisk_guest"))]
 #[inline(always)]
 pub fn ziskos_profile_counter<const TAG_ID: u16>() {
     check_tag_id::<TAG_ID>();
 }
 
 /// Cost arguments
-#[cfg(all(target_os = "zkvm", target_vendor = "zisk"))]
+#[cfg(feature = "zisk_guest")]
 #[inline(always)]
 pub fn ziskos_profile_value<const TAG_ID: u16>(a: u64) {
     check_tag_id::<TAG_ID>();
@@ -258,14 +258,14 @@ pub fn ziskos_profile_value<const TAG_ID: u16>(a: u64) {
     }
 }
 
-#[cfg(not(all(target_os = "zkvm", target_vendor = "zisk")))]
+#[cfg(not(feature = "zisk_guest"))]
 #[inline(always)]
 pub fn ziskos_profile_value<const TAG_ID: u16>(_a: u64) {
     check_tag_id::<TAG_ID>();
 }
 
 /// Cost arguments
-#[cfg(all(target_os = "zkvm", target_vendor = "zisk"))]
+#[cfg(feature = "zisk_guest")]
 #[inline(always)]
 pub fn ziskos_profile_argument<const TAG_ID: u16>(a: u64) {
     check_tag_id::<TAG_ID>();
@@ -274,14 +274,14 @@ pub fn ziskos_profile_argument<const TAG_ID: u16>(a: u64) {
     }
 }
 
-#[cfg(not(all(target_os = "zkvm", target_vendor = "zisk")))]
+#[cfg(not(feature = "zisk_guest"))]
 #[inline(always)]
 pub fn ziskos_profile_argument<const TAG_ID: u16>(_a: u64) {
     check_tag_id::<TAG_ID>();
 }
 
 /// Cost arguments
-#[cfg(all(target_os = "zkvm", target_vendor = "zisk"))]
+#[cfg(feature = "zisk_guest")]
 #[inline(always)]
 pub fn ziskos_profile_2_arguments<const TAG_ID: u16>(a: u64, b: u64) {
     check_tag_id::<TAG_ID>();
@@ -298,14 +298,14 @@ pub fn ziskos_profile_2_arguments<const TAG_ID: u16>(a: u64, b: u64) {
     }
 }
 
-#[cfg(not(all(target_os = "zkvm", target_vendor = "zisk")))]
+#[cfg(not(feature = "zisk_guest"))]
 #[inline(always)]
 pub fn ziskos_profile_2_arguments<const TAG_ID: u16>(_a: u64, _b: u64) {
     check_tag_id::<TAG_ID>();
 }
 
 /// Cost arguments
-#[cfg(all(target_os = "zkvm", target_vendor = "zisk"))]
+#[cfg(feature = "zisk_guest")]
 #[inline(always)]
 pub fn ziskos_profile_3_arguments<const TAG_ID: u16>(a: u64, b: u64, c: u64) {
     check_tag_id::<TAG_ID>();
@@ -325,7 +325,7 @@ pub fn ziskos_profile_3_arguments<const TAG_ID: u16>(a: u64, b: u64, c: u64) {
     }
 }
 
-#[cfg(not(all(target_os = "zkvm", target_vendor = "zisk")))]
+#[cfg(not(feature = "zisk_guest"))]
 #[inline(always)]
 pub fn ziskos_profile_3_arguments<const TAG_ID: u16>(_a: u64, _b: u64, _c: u64) {
     check_tag_id::<TAG_ID>();

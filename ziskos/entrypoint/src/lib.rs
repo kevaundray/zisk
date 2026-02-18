@@ -1,12 +1,18 @@
 #![allow(unexpected_cfgs)]
 #![allow(unused_imports)]
 
-#[cfg(all(target_os = "zkvm", target_vendor = "zisk"))]
+#[cfg(all(feature = "zisk_guest", feature = "zisk_host"))]
+compile_error!("features `zisk_guest` and `zisk_host` are mutually exclusive");
+
+#[cfg(not(any(feature = "zisk_guest", feature = "zisk_host")))]
+compile_error!("either feature `zisk_guest` or `zisk_host` must be enabled");
+
+#[cfg(feature = "zisk_guest")]
 use core::arch::asm;
-#[cfg(all(target_os = "zkvm", target_vendor = "zisk"))]
+#[cfg(feature = "zisk_guest")]
 mod fcall;
 mod profile;
-#[cfg(all(target_os = "zkvm", target_vendor = "zisk"))]
+#[cfg(feature = "zisk_guest")]
 pub use fcall::*;
 pub mod io;
 pub use profile::*;
@@ -14,11 +20,7 @@ pub mod syscalls;
 pub mod zisklib;
 pub mod ziskos_definitions;
 
-#[cfg(all(
-    not(all(target_os = "zkvm", target_vendor = "zisk")),
-    any(zisk_hints, zisk_hints_debug),
-    feature = "user-hints"
-))]
+#[cfg(all(not(feature = "zisk_guest"), any(zisk_hints, zisk_hints_debug), feature = "zisk_host"))]
 pub mod hints;
 
 #[macro_export]
@@ -45,12 +47,12 @@ macro_rules! entrypoint {
 #[allow(unused_imports)]
 use crate::ziskos_definitions::ziskos_config::*;
 
-#[cfg(all(target_os = "zkvm", target_vendor = "zisk"))]
+#[cfg(feature = "zisk_guest")]
 pub(crate) fn read_input() -> Vec<u8> {
     read_input_slice().to_vec()
 }
 
-#[cfg(not(all(target_os = "zkvm", target_vendor = "zisk")))]
+#[cfg(not(feature = "zisk_guest"))]
 pub(crate) fn read_input() -> Vec<u8> {
     use std::{fs::File, io::Read};
 
@@ -61,7 +63,7 @@ pub(crate) fn read_input() -> Vec<u8> {
     buffer
 }
 
-#[cfg(all(target_os = "zkvm", target_vendor = "zisk"))]
+#[cfg(feature = "zisk_guest")]
 pub fn read_input_slice<'a>() -> &'a [u8] {
     // Create a slice of the first 8 bytes to get the size
     let bytes = unsafe { core::slice::from_raw_parts((INPUT_ADDR as *const u8).add(8), 8) };
@@ -72,12 +74,12 @@ pub fn read_input_slice<'a>() -> &'a [u8] {
 }
 
 #[allow(unused)]
-#[cfg(not(all(target_os = "zkvm", target_vendor = "zisk")))]
+#[cfg(not(feature = "zisk_guest"))]
 pub fn read_input_slice() -> Box<[u8]> {
     read_input().into_boxed_slice()
 }
 
-#[cfg(all(target_os = "zkvm", target_vendor = "zisk"))]
+#[cfg(feature = "zisk_guest")]
 pub(crate) fn set_output(id: usize, value: u32) {
     use std::arch::asm;
     let addr_v: *mut u32;
@@ -101,12 +103,12 @@ pub(crate) fn set_output(id: usize, value: u32) {
     unsafe { core::ptr::write_volatile(addr_v, value) };
 }
 
-#[cfg(not(all(target_os = "zkvm", target_vendor = "zisk")))]
+#[cfg(not(feature = "zisk_guest"))]
 pub(crate) fn set_output(id: usize, value: u32) {
     println!("public {id}: {value:#010x}");
 }
 
-#[cfg(all(target_os = "zkvm", target_vendor = "zisk"))]
+#[cfg(feature = "zisk_guest")]
 mod ziskos {
     use crate::ziskos_definitions::ziskos_config::*;
     use core::arch::asm;
