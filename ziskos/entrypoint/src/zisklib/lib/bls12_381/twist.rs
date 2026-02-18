@@ -1,5 +1,6 @@
 //! Operations on the twist E': y² = x³ + 4·(1+u) of the BLS12-381 curve
 
+use alloc::vec::Vec;
 use crate::zisklib::{eq, fcall_msb_pos_256, lt};
 
 use super::{

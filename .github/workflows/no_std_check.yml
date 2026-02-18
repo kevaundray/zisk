@@ -1,0 +1,31 @@
+name: no_std check
+
+on:
+  pull_request:
+    branches:
+      - develop
+      - main
+      - "pre-develop-[0-9]+.[0-9]+.[0-9]+"
+    paths:
+      - 'ziskos/**'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref || github.run_id }}
+  cancel-in-progress: true
+
+jobs:
+  no-std-guest:
+    name: ziskos no_std guest build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout sources
+        uses: actions/checkout@v4
+
+      - name: Install riscv64 target
+        run: rustup target add riscv64imac-unknown-none-elf
+
+      - name: Check ziskos compiles for bare-metal RISC-V
+        run: cargo check -p ziskos --no-default-features --features zisk_guest --target riscv64imac-unknown-none-elf

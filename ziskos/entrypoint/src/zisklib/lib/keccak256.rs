@@ -1,7 +1,7 @@
 use crate::syscalls::syscall_keccak_f;
 
 #[cfg(zisk_hints_debug)]
-use std::os::raw::c_char;
+use core::ffi::c_char;
 
 #[cfg(all(not(feature = "zisk_guest"), zisk_hints))]
 extern "C" {
@@ -18,7 +18,7 @@ pub fn hint_log<S: AsRef<str>>(msg: S) {
     // On native we call external C function to log hints, since it controls if hints are paused or not
     #[cfg(not(feature = "zisk_guest"))]
     {
-        use std::ffi::CString;
+        use alloc::ffi::CString;
 
         if let Ok(c) = CString::new(msg.as_ref()) {
             unsafe { hint_log_c(c.as_ptr()) };

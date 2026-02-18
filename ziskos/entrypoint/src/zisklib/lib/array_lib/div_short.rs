@@ -1,3 +1,4 @@
+use alloc::vec::Vec;
 use crate::zisklib::fcall_division;
 
 use super::{add_short, mul_short, U256};

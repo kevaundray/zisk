@@ -27,7 +27,7 @@ zisk-build = { workspace = true }
 zisk-witness = { workspace = true }
 sha2 = { workspace = true }
 bincode = { workspace = true, features = ["std"] }
-serde = { workspace = true }
+serde = { workspace = true, features = ["std"] }
 
 [features]
 default = []

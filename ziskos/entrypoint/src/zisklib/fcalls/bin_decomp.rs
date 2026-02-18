@@ -1,3 +1,4 @@
+use alloc::vec::Vec;
 use cfg_if::cfg_if;
 
 cfg_if! {

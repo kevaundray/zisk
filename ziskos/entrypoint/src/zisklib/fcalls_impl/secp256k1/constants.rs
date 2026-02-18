@@ -1,33 +1,38 @@
-use lazy_static::lazy_static;
 use num_bigint::BigUint;
 
-lazy_static! {
-    pub static ref P: BigUint = BigUint::parse_bytes(
+pub static P: spin::Lazy<BigUint> = spin::Lazy::new(|| {
+    BigUint::parse_bytes(
         b"fffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2f",
-        16
+        16,
     )
-    .unwrap();
+    .unwrap()
+});
 
-    pub static ref P_HALF: BigUint = BigUint::parse_bytes(
+pub static P_HALF: spin::Lazy<BigUint> = spin::Lazy::new(|| {
+    BigUint::parse_bytes(
         b"7fffffffffffffffffffffffffffffffffffffffffffffffffffffff7ffffe17",
-        16
+        16,
     )
-    .unwrap();
+    .unwrap()
+});
 
-    pub static ref P_DIV_4: BigUint = BigUint::parse_bytes(
+pub static P_DIV_4: spin::Lazy<BigUint> = spin::Lazy::new(|| {
+    BigUint::parse_bytes(
         b"3fffffffffffffffffffffffffffffffffffffffffffffffffffffffbfffff0c",
-        16
+        16,
     )
-    .unwrap();
+    .unwrap()
+});
 
-    pub static ref NQR: BigUint = BigUint::from(3u64); // First non-quadratic residue in Fp
+pub static NQR: spin::Lazy<BigUint> = spin::Lazy::new(|| BigUint::from(3u64));
 
-    pub static ref N: BigUint = BigUint::parse_bytes(
+pub static N: spin::Lazy<BigUint> = spin::Lazy::new(|| {
+    BigUint::parse_bytes(
         b"fffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364141",
-        16
+        16,
     )
-    .unwrap();
-}
+    .unwrap()
+});
 
 pub const IDENTITY: [u64; 8] = [0u64; 8];
 

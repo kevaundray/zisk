@@ -20,7 +20,7 @@ cargo-zisk = { workspace = true }
 proofman = { workspace = true }
 proofman-util = { workspace = true }
 
-serde = { workspace = true }
+serde = { workspace = true, features = ["std"] }
 serde_json = { workspace = true }
 tokio = { workspace = true }
 tracing = { workspace = true }

@@ -1,18 +1,20 @@
-use lazy_static::lazy_static;
 use num_bigint::BigUint;
 
-lazy_static! {
-    pub static ref P: BigUint = BigUint::parse_bytes(
+pub static P: spin::Lazy<BigUint> = spin::Lazy::new(|| {
+    BigUint::parse_bytes(
         b"ffffffff00000001000000000000000000000000ffffffffffffffffffffffff",
-        16
+        16,
     )
-    .unwrap();
-    pub static ref N: BigUint = BigUint::parse_bytes(
+    .unwrap()
+});
+
+pub static N: spin::Lazy<BigUint> = spin::Lazy::new(|| {
+    BigUint::parse_bytes(
         b"ffffffff00000000ffffffffffffffffbce6faada7179e84f3b9cac2fc632551",
-        16
+        16,
     )
-    .unwrap();
-}
+    .unwrap()
+});
 
 pub const E_A: [u64; 4] =
     [0xFFFF_FFFF_FFFF_FFFC, 0x0000_0000_FFFF_FFFF, 0x0000_0000_0000_0000, 0xFFFF_FFFF_0000_0001];

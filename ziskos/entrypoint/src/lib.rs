@@ -1,5 +1,10 @@
+#![cfg_attr(feature = "zisk_guest", no_std)]
 #![allow(unexpected_cfgs)]
 #![allow(unused_imports)]
+
+#[cfg_attr(feature = "zisk_guest", macro_use)]
+extern crate alloc;
+use alloc::vec::Vec;
 
 #[cfg(all(feature = "zisk_guest", feature = "zisk_host"))]
 compile_error!("features `zisk_guest` and `zisk_host` are mutually exclusive");
@@ -81,7 +86,7 @@ pub fn read_input_slice() -> Box<[u8]> {
 
 #[cfg(feature = "zisk_guest")]
 pub(crate) fn set_output(id: usize, value: u32) {
-    use std::arch::asm;
+    use core::arch::asm;
     let addr_v: *mut u32;
     let arch_id_zisk: usize;
 

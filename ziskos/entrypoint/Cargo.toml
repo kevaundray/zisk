@@ -8,29 +8,25 @@ repository = { workspace = true }
 categories = { workspace = true }
 
 [dependencies]
-lib-c = { workspace = true }
-
-num-bigint = { workspace = true }
-num-integer = { workspace = true }
-num-traits = { workspace = true }
-
-precompiles-helpers = { workspace = true }
-
-lazy_static = "1.5.0"
+# no_std-compatible dependencies (always available)
 spin = "0.9"
 rand = { version = "0.8.5", default-features = false, features = ["small_rng"] }
 getrandom = { version = "0.2", features = ["custom"] }
 cfg-if = "1.0"
 tiny-keccak = { version = "2.0.0", features = ["keccak"] }
-serde = { workspace = true, features = ["derive"] }
-
+serde = { workspace = true, features = ["alloc"] }
 bincode = { workspace = true, features = ["alloc"] }
-sha2 = { workspace = true }
-fields = { git = "https://github.com/0xPolygonHermez/pil2-proofman.git", branch = "pre-develop-0.16.0", features = [
-    "verify",
-] }
 
 # Host-only dependencies (activated by zisk_host feature)
+lib-c = { workspace = true, optional = true }
+num-bigint = { workspace = true, optional = true }
+num-integer = { workspace = true, optional = true }
+num-traits = { workspace = true, optional = true }
+precompiles-helpers = { workspace = true, optional = true }
+sha2 = { workspace = true, optional = true }
+fields = { git = "https://github.com/0xPolygonHermez/pil2-proofman.git", branch = "pre-develop-0.16.0", features = [
+    "verify",
+], optional = true }
 bytes = { version = "1.11.0", optional = true }
 once_cell = { version = "1.21.3", optional = true }
 paste = { version = "1.0", optional = true }
@@ -42,7 +38,11 @@ ctor = { version = "0.2", optional = true }
 [features]
 default = ["zisk_host"]
 zisk_guest = []
-zisk_host = ["dep:zisk-common", "dep:bytes", "dep:paste", "dep:once_cell", "dep:ctor", "dep:anyhow", "dep:tokio"]
+zisk_host = [
+    "dep:zisk-common", "dep:bytes", "dep:paste", "dep:once_cell", "dep:ctor", "dep:anyhow", "dep:tokio",
+    "dep:num-bigint", "dep:num-integer", "dep:num-traits",
+    "dep:precompiles-helpers", "dep:lib-c", "dep:sha2", "dep:fields",
+]
 
 [lints.rust]
 unexpected_cfgs = { level = "warn", check-cfg = [

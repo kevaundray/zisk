@@ -1,7 +1,5 @@
 //! Operations on the BN254 curve E: y² = x³ + 3
 
-use num_traits::ops::bytes;
-
 use crate::{
     syscalls::{
         syscall_bn254_curve_add, syscall_bn254_curve_dbl, SyscallBn254CurveAddParams,

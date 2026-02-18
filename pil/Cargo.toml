@@ -11,7 +11,7 @@ categories = { workspace = true }
 proofman-common = { workspace = true }
 proofman-macros = { workspace = true }
 fields = { workspace = true }
-serde = { workspace = true }
+serde = { workspace = true, features = ["std"] }
 rayon = { workspace = true }
 serde_arrays = "0.2"
 

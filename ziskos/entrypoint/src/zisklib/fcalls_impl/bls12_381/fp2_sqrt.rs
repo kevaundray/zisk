@@ -1,4 +1,3 @@
-use lazy_static::lazy_static;
 use num_bigint::BigUint;
 use num_traits::{One, Zero};
 

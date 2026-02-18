@@ -22,7 +22,7 @@ ziskos-hints = { workspace = true }
 riscv = { workspace = true }
 
 rayon = { workspace = true }
-serde = { workspace = true }
+serde = { workspace = true, features = ["std"] }
 fields = { workspace = true }
 sha2 = { workspace = true }
 paste = { workspace = true }

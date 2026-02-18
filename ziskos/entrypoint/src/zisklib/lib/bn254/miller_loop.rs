@@ -1,5 +1,6 @@
 //! Miller Loop for the pairings over BN254
 
+use alloc::vec::Vec;
 use crate::zisklib::{eq, fcall_bn254_twist_add_line_coeffs, fcall_bn254_twist_dbl_line_coeffs};
 
 use super::{
