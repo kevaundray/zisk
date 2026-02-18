@@ -37,8 +37,9 @@ fields = { workspace = true }
 anyhow = { workspace = true }
 
 [features]
-default = ["hints"]
+default = ["hints", "zisk_host"]
 hints = []
+zisk_host = []
 
 [lints.rust]
 unexpected_cfgs = { level = "warn", check-cfg = [

@@ -40,7 +40,7 @@ tokio = { workspace = true, optional = true }
 ctor = { version = "0.2", optional = true }
 
 [features]
-default = []
+default = ["zisk_host"]
 zisk_guest = []
 zisk_host = ["dep:zisk-common", "dep:bytes", "dep:paste", "dep:once_cell", "dep:ctor", "dep:anyhow", "dep:tokio"]
 
