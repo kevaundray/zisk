@@ -15,7 +15,6 @@ mod metrics;
 use crate::hints::hint_buffer::{build_hint_buffer, HintBuffer};
 use anyhow::{anyhow, Result};
 use once_cell::sync::Lazy;
-use std::any;
 use std::cell::UnsafeCell;
 use std::path::PathBuf;
 use std::thread::{self, JoinHandle};
@@ -23,16 +22,13 @@ use std::time::{Duration, Instant};
 use std::{ffi::CStr, os::raw::c_char};
 use std::{
     io::{self, BufWriter, Write},
-    sync::{Arc, Mutex},
+    sync::Arc,
 };
 use tokio::sync::oneshot;
 use zisk_common::io::{StreamWrite, UnixSocketStreamWriter};
 
 #[cfg(zisk_hints_single_thread)]
 use std::thread::ThreadId;
-
-#[cfg(zisk_hints_single_thread)]
-use once_cell::sync::OnceCell;
 
 pub use bls12_381::*;
 pub use bn254::*;
@@ -73,21 +69,20 @@ impl HintFileWriterHandleCell {
     }
 }
 
-pub fn wait_for_hints_writer() -> Result<()> {
+fn wait_for_hints_writer() -> Result<()> {
     if let Some(handle) = HINT_WRITER_HANDLE.take() {
         HINT_BUFFER.close();
         match handle.join() {
             Ok(result) => {
                 if let Err(err) = result {
                     return Err(anyhow!(
-                        "Failed previous hints writer thread result, error: {}", err
+                        "Failed previous hints writer thread result, error: {}",
+                        err
                     ));
                 }
             }
             Err(e) => {
-                return Err(anyhow!(
-                    "Failed previous hints writer thread, error: {:?}", e
-                ));
+                return Err(anyhow!("Failed previous hints writer thread, error: {:?}", e));
             }
         }
     }
@@ -100,7 +95,6 @@ pub fn init_hints() {
     {
         let tid = std::thread::current().id();
         *MAIN_TID.lock().unwrap() = Some(tid);
-        println!("Initializing MAIN_TID to {:?}", tid);
     }
 
     #[cfg(zisk_hints_metrics)]
@@ -112,10 +106,7 @@ pub fn init_hints() {
     HINT_BUFFER.write_hint_start();
 }
 
-pub fn init_hints_file(
-    hints_file_path: PathBuf,
-    ready: Option<oneshot::Sender<()>>,
-) -> Result<()> {
+pub fn init_hints_file(hints_file_path: PathBuf, ready: Option<oneshot::Sender<()>>) -> Result<()> {
     wait_for_hints_writer()?;
 
     if let Some(tx) = ready {
@@ -143,16 +134,14 @@ pub fn init_hints_socket(
     // Open the connection
     socket_writer.open()?;
 
-    // Notify that socket is ready after client connects
+    // Notify that socket is ready
     if let Some(tx) = ready {
         let _ = tx.send(());
     }
 
     // Wait for client to connect with a timeout
     if let Err(e) = socket_writer.wait_for_client(CLIENT_CONNECT_TIMEOUT) {
-        return Err(anyhow!(
-            "Failed to wait for client to connect to hints socket, error: {}", e
-        ));
+        return Err(anyhow!("Failed to wait for client to connect to hints socket, error: {}", e));
     }
 
     init_hints();
@@ -181,20 +170,19 @@ pub fn close_hints() -> Result<()> {
         match handle.join() {
             Ok(result) => match result {
                 Ok(()) => Ok(()),
-                Err(e) => return Err(anyhow!(
-                    "Failed hints writer thread result, error: {}", e
-                )),
+                Err(e) => return Err(anyhow!("Failed hints writer thread result, error: {}", e)),
             },
-            Err(e) => Err(anyhow!(
-                "Failed hints writer thread, error: {:?}", e
-            )),
+            Err(e) => Err(anyhow!("Failed hints writer thread, error: {:?}", e)),
         }
     } else {
         Ok(())
     }
 }
 
-pub fn write_hints<W: Write + ?Sized>(writer: &mut W, debug_writer: Option<&mut dyn Write>) -> io::Result<()> {
+pub fn write_hints<W: Write + ?Sized>(
+    writer: &mut W,
+    debug_writer: Option<&mut dyn Write>,
+) -> io::Result<()> {
     // Write hints from the buffer
     HINT_BUFFER.drain_to_writer(writer, debug_writer)?;
 
@@ -233,9 +221,7 @@ impl UnixSocketWriter {
         let start = Instant::now();
         while !self.inner.is_client_connected() {
             if start.elapsed() >= timeout {
-                return Err(anyhow!(
-                    "Timeout waiting for client to connect to socket"
-                ));
+                return Err(anyhow!("Timeout waiting for client to connect to socket"));
             }
             thread::sleep(WAIT_FOR_CLIENT_RETRY_DELAY);
         }

@@ -1,10 +1,7 @@
 use bytes::{Bytes, BytesMut};
-use std::fs::File;
 use std::io::{self, Write};
 use std::sync::{Arc, Condvar, Mutex, MutexGuard};
-use zisk_common::{
-    CTRL_START, CTRL_END,
-};
+use zisk_common::{CTRL_END, CTRL_START};
 
 pub const DEFAULT_BUFFER_LEN: usize = 1 << 20; // 1 MiB
                                                // TODO: Set MAX_WRITE_LEN based on writer type (file or socket)
@@ -126,7 +123,7 @@ impl HintBuffer {
         W: Write + ?Sized,
         D: Write + ?Sized,
     {
-            // Write hints from the buffer to the writer and optionally to a debug writer
+        // Write hints from the buffer to the writer and optionally to a debug writer
         let mut write_all = |buf: &[u8]| -> io::Result<()> {
             writer.write_all(buf)?;
 
@@ -234,8 +231,8 @@ impl HintBuffer {
         }
 
         // Flush the writer and debug writer at the end
-            writer.flush()?;
-            if let Some(debug_writer) = debug_writer.as_deref_mut() {
+        writer.flush()?;
+        if let Some(debug_writer) = debug_writer.as_deref_mut() {
             debug_writer.flush()?;
         }
 

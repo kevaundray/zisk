@@ -143,7 +143,7 @@ macro_rules! define_hint_ptr {
 
                 let pad = (8 - (total_len & 7)) & 7;
 
-                let mut w = crate::hints::HINT_BUFFER.begin_hint(
+                let mut w = $crate::hints::HINT_BUFFER.begin_hint(
                     $hint_id,
                     total_len,
                     $is_result,
