@@ -1,5 +1,5 @@
-use alloc::vec::Vec;
 use crate::zisklib::fcall_division;
+use alloc::vec::Vec;
 
 use super::{add_short, mul_short, U256};
 

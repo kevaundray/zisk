@@ -1,7 +1,7 @@
 //! Pairing over BLS12-381 curve
 
-use alloc::vec::Vec;
 use crate::zisklib::lib::utils::{eq, gt, is_one};
+use alloc::vec::Vec;
 
 use super::{
     constants::{G1_IDENTITY, G2_IDENTITY, P_MINUS_ONE},

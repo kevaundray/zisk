@@ -1,7 +1,7 @@
-use alloc::vec::Vec;
 use crate::syscalls::{
     syscall_add256, syscall_arith256, SyscallAdd256Params, SyscallArith256Params,
 };
+use alloc::vec::Vec;
 
 use super::{rem_long, LongScratch, U256};
 

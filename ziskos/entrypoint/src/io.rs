@@ -2,8 +2,8 @@
 //!
 //! This module provides a high-level API for reading inputs and committing public outputs.
 
-use alloc::vec::Vec;
 use crate::{read_input, read_input_slice, set_output};
+use alloc::vec::Vec;
 use serde::{de::DeserializeOwned, Serialize};
 
 /// Read a deserializable object from the input stream.

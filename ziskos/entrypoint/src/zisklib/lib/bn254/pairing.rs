@@ -1,7 +1,7 @@
 //! Pairing over BN254
 
-use alloc::vec::Vec;
 use crate::zisklib::lib::utils::{eq, is_one, lt};
+use alloc::vec::Vec;
 
 use super::{
     constants::{G1_IDENTITY, G2_IDENTITY, P},

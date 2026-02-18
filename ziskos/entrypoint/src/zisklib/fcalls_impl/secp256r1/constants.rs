@@ -1,19 +1,13 @@
 use num_bigint::BigUint;
 
 pub static P: spin::Lazy<BigUint> = spin::Lazy::new(|| {
-    BigUint::parse_bytes(
-        b"ffffffff00000001000000000000000000000000ffffffffffffffffffffffff",
-        16,
-    )
-    .unwrap()
+    BigUint::parse_bytes(b"ffffffff00000001000000000000000000000000ffffffffffffffffffffffff", 16)
+        .unwrap()
 });
 
 pub static N: spin::Lazy<BigUint> = spin::Lazy::new(|| {
-    BigUint::parse_bytes(
-        b"ffffffff00000000ffffffffffffffffbce6faada7179e84f3b9cac2fc632551",
-        16,
-    )
-    .unwrap()
+    BigUint::parse_bytes(b"ffffffff00000000ffffffffffffffffbce6faada7179e84f3b9cac2fc632551", 16)
+        .unwrap()
 });
 
 pub const E_A: [u64; 4] =

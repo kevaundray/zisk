@@ -1,6 +1,5 @@
 //! Operations on the BLS12-381 curve E: y² = x³ + 4
 
-use alloc::vec::Vec;
 use crate::{
     syscalls::{
         syscall_bls12_381_curve_add, syscall_bls12_381_curve_dbl, SyscallBls12_381CurveAddParams,
@@ -8,6 +7,7 @@ use crate::{
     },
     zisklib::{eq, fcall_msb_pos_256, lt},
 };
+use alloc::vec::Vec;
 
 use super::{
     constants::{E_B, G1_IDENTITY, GAMMA, P},
