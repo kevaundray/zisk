@@ -192,25 +192,22 @@ mod ziskos {
             }
         }
     }
-    use lazy_static::lazy_static;
-    use std::sync::Mutex;
-    const PRNG_SEED: u64 = 0x123456789abcdef0;
-    use rand::{rngs::StdRng, Rng, SeedableRng};
+    use core::sync::atomic::{AtomicBool, Ordering};
+    use rand::rngs::SmallRng;
+    use rand::{Rng, SeedableRng};
+    use spin::Mutex;
 
-    lazy_static! {
-        /// A lazy static to generate a global random number generator.
-        static ref RNG: Mutex<StdRng> = Mutex::new(StdRng::seed_from_u64(PRNG_SEED));
-    }
-
-    /// A lazy static to print a warning once for using the `sys_rand` system call.
-    static SYS_RAND_WARNING: std::sync::Once = std::sync::Once::new();
+    static RNG: Mutex<Option<SmallRng>> = Mutex::new(None);
+    static SYS_RAND_WARNING: AtomicBool = AtomicBool::new(false);
 
     #[no_mangle]
     unsafe extern "C" fn sys_rand(recv_buf: *mut u8, words: usize) {
-        SYS_RAND_WARNING.call_once(|| {
-            println!("WARNING: Using insecure random number generator.");
-        });
-        let mut rng = RNG.lock().unwrap();
+        if !SYS_RAND_WARNING.swap(true, Ordering::Relaxed) {
+            let msg = b"WARNING: Using insecure random number generator.\n";
+            sys_write(1, msg.as_ptr(), msg.len());
+        }
+        let mut rng_guard = RNG.lock();
+        let rng = rng_guard.get_or_insert_with(|| SmallRng::seed_from_u64(0x123456789abcdef0));
         for i in 0..words {
             let element = recv_buf.add(i);
             *element = rng.gen();
