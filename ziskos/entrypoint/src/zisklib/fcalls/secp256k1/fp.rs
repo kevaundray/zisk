@@ -1,7 +1,7 @@
 use cfg_if::cfg_if;
 
 cfg_if! {
-    if #[cfg(all(target_os = "zkvm", target_vendor = "zisk"))] {
+    if #[cfg(feature = "zisk_guest")] {
         use core::arch::asm;
         use crate::{
             ziskos_fcall, ziskos_fcall_get, ziskos_fcall_param,
@@ -34,7 +34,7 @@ pub fn fcall_secp256k1_fp_inv(
     p_value: &[u64; 4],
     #[cfg(feature = "hints")] hints: &mut Vec<u64>,
 ) -> [u64; 4] {
-    #[cfg(not(all(target_os = "zkvm", target_vendor = "zisk")))]
+    #[cfg(not(feature = "zisk_guest"))]
     {
         let mut result: [u64; 4] = [0; 4];
         secp256k1_fp_inv_c(p_value, &mut result);
@@ -45,7 +45,7 @@ pub fn fcall_secp256k1_fp_inv(
         }
         result
     }
-    #[cfg(all(target_os = "zkvm", target_vendor = "zisk"))]
+    #[cfg(feature = "zisk_guest")]
     {
         ziskos_fcall_param!(p_value, 4);
         ziskos_fcall!(FCALL_SECP256K1_FP_INV_ID);
@@ -58,7 +58,7 @@ pub fn fcall_secp256k1_fp_inv_in_place(
     p_value: &[u64; 4],
     #[cfg(feature = "hints")] hints: &mut Vec<u64>,
 ) {
-    #[cfg(not(all(target_os = "zkvm", target_vendor = "zisk")))]
+    #[cfg(not(feature = "zisk_guest"))]
     {
         let mut result: [u64; 4] = [0; 4];
         secp256k1_fp_inv_c(p_value, &mut result);
@@ -68,7 +68,7 @@ pub fn fcall_secp256k1_fp_inv_in_place(
             hints.extend_from_slice(&result);
         }
     }
-    #[cfg(all(target_os = "zkvm", target_vendor = "zisk"))]
+    #[cfg(feature = "zisk_guest")]
     {
         ziskos_fcall_param!(p_value, 4);
         ziskos_fcall!(FCALL_SECP256K1_FP_INV_ID);
@@ -96,7 +96,7 @@ pub fn fcall_secp256k1_fp_sqrt(
     parity: u64,
     #[cfg(feature = "hints")] hints: &mut Vec<u64>,
 ) -> [u64; 5] {
-    #[cfg(not(all(target_os = "zkvm", target_vendor = "zisk")))]
+    #[cfg(not(feature = "zisk_guest"))]
     {
         let mut result: [u64; 5] = [0; 5];
         secp256k1_fp_sqrt(p_value, parity, &mut result);
@@ -107,7 +107,7 @@ pub fn fcall_secp256k1_fp_sqrt(
         }
         result
     }
-    #[cfg(all(target_os = "zkvm", target_vendor = "zisk"))]
+    #[cfg(feature = "zisk_guest")]
     {
         ziskos_fcall_param!(p_value, 4);
         ziskos_fcall_param!(parity, 1);

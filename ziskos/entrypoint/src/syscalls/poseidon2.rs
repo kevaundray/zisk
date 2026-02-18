@@ -1,12 +1,12 @@
 //! Poseidon2 system call interception
 
-#[cfg(all(target_os = "zkvm", target_vendor = "zisk"))]
+#[cfg(feature = "zisk_guest")]
 use core::arch::asm;
 
-#[cfg(all(target_os = "zkvm", target_vendor = "zisk"))]
+#[cfg(feature = "zisk_guest")]
 use crate::ziskos_syscall;
 
-#[cfg(not(all(target_os = "zkvm", target_vendor = "zisk")))]
+#[cfg(not(feature = "zisk_guest"))]
 use fields::{poseidon2_hash, Goldilocks, Poseidon16, PrimeField64};
 
 /// Executes the Poseidon2 permutation on the given state.
@@ -27,9 +27,9 @@ pub unsafe extern "C" fn syscall_poseidon2(
     state: *mut [u64; 16],
     #[cfg(feature = "hints")] hints: &mut Vec<u64>,
 ) {
-    #[cfg(all(target_os = "zkvm", target_vendor = "zisk"))]
+    #[cfg(feature = "zisk_guest")]
     ziskos_syscall!(0x812, state);
-    #[cfg(not(all(target_os = "zkvm", target_vendor = "zisk")))]
+    #[cfg(not(feature = "zisk_guest"))]
     {
         // Get a mutable reference to the state
         let state: &mut [u64; 16] = unsafe { &mut *(state) };

@@ -7,4 +7,4 @@ edition = "2024"
 byteorder = "1.5.0"
 sha2 = "0.10.8"
 serde = { version = "1.0", default-features = false, features = ["derive"] }
-ziskos = { path = "../../../ziskos/entrypoint" }
+ziskos = { path = "../../../ziskos/entrypoint", default-features = false, features = ["zisk_guest"] }

@@ -1,7 +1,7 @@
 use cfg_if::cfg_if;
 
 cfg_if! {
-    if #[cfg(all(target_os = "zkvm", target_vendor = "zisk"))] {
+    if #[cfg(feature = "zisk_guest")] {
         use core::arch::asm;
         use crate::{
             ziskos_fcall, ziskos_fcall_get, ziskos_fcall_param,
@@ -27,7 +27,7 @@ pub fn fcall_bn254_twist_add_line_coeffs(
     p2_value: &[u64; 16],
     #[cfg(feature = "hints")] hints: &mut Vec<u64>,
 ) -> ([u64; 8], [u64; 8]) {
-    #[cfg(not(all(target_os = "zkvm", target_vendor = "zisk")))]
+    #[cfg(not(feature = "zisk_guest"))]
     {
         let x1: [u64; 8] = p1_value[0..8].try_into().unwrap();
         let y1: [u64; 8] = p1_value[8..16].try_into().unwrap();
@@ -42,7 +42,7 @@ pub fn fcall_bn254_twist_add_line_coeffs(
         }
         (lambda, mu)
     }
-    #[cfg(all(target_os = "zkvm", target_vendor = "zisk"))]
+    #[cfg(feature = "zisk_guest")]
     {
         ziskos_fcall_param!(p1_value, 16);
         ziskos_fcall_param!(p2_value, 16);
@@ -85,7 +85,7 @@ pub fn fcall_bn254_twist_dbl_line_coeffs(
     p_value: &[u64; 16],
     #[cfg(feature = "hints")] hints: &mut Vec<u64>,
 ) -> ([u64; 8], [u64; 8]) {
-    #[cfg(not(all(target_os = "zkvm", target_vendor = "zisk")))]
+    #[cfg(not(feature = "zisk_guest"))]
     {
         let x1: [u64; 8] = p_value[0..8].try_into().unwrap();
         let y1: [u64; 8] = p_value[8..16].try_into().unwrap();
@@ -98,7 +98,7 @@ pub fn fcall_bn254_twist_dbl_line_coeffs(
         }
         (lambda, mu)
     }
-    #[cfg(all(target_os = "zkvm", target_vendor = "zisk"))]
+    #[cfg(feature = "zisk_guest")]
     {
         ziskos_fcall_param!(p_value, 16);
         ziskos_fcall!(FCALL_BN254_TWIST_DBL_LINE_COEFFS_ID);
