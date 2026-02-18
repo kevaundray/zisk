@@ -348,24 +348,6 @@ impl UnixSocketStreamWriter {
     /// Check if a client is currently connected.
     ///
     /// Returns `true` if a client is connected and ready to receive data.
-    ///
-    /// # Example
-    ///
-    /// ```no_run
-    /// use std::thread;
-    /// use std::time::Duration;
-    ///
-    /// let mut writer = UnixSocketStreamWriter::new("/tmp/my.sock")?;
-    /// writer.open()?;
-    ///
-    /// // Wait for client to connect
-    /// while !writer.is_client_connected() {
-    ///     thread::sleep(Duration::from_millis(10));
-    /// }
-    ///
-    /// // Now write will succeed
-    /// writer.write(b"Hello, client!")?;
-    /// ```
     pub fn is_client_connected(&mut self) -> bool {
         // Already have a connection
         if self.socket.is_some() {
