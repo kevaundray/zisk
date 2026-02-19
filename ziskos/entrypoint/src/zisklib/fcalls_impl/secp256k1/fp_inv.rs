@@ -12,9 +12,6 @@ cfg_if::cfg_if! {
             }
         }
     } else {
-        use lazy_static::lazy_static;
-        use num_bigint::BigUint;
-
         use crate::zisklib::fcalls_impl::utils::{biguint_from_u64_digits, n_u64_digits_from_biguint};
 
         use super::P;
