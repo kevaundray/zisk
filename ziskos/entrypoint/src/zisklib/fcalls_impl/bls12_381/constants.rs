@@ -8,6 +8,7 @@ pub(crate) static P: spin::Lazy<BigUint> = spin::Lazy::new(|| {
     .unwrap()
 });
 
+#[allow(dead_code)]
 pub static P_HALF: spin::Lazy<BigUint> = spin::Lazy::new(|| {
     BigUint::parse_bytes(
         b"d0088f51cbff34d258dd3db21a5d66bb23ba5c279c2895fb39869507b587b120f55ffff58a9ffffdcff7fffffffd555",
