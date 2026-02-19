@@ -46,4 +46,5 @@ unexpected_cfgs = { level = "warn", check-cfg = [
 'cfg(zisk_hints)',
 'cfg(zisk_hints_metrics)',
 'cfg(zisk_hints_debug)',
-'cfg(zisk_hints_single_thread)'] }
+'cfg(zisk_hints_single_thread)',
+'cfg(feature, values("zisk_guest"))'] }
