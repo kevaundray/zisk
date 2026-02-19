@@ -9,6 +9,7 @@ categories = { workspace = true }
 
 [dependencies]
 # no_std-compatible dependencies (always available)
+portable-atomic = { version = "1", default-features = false, features = ["unsafe-assume-single-core"], optional = true }
 spin = "0.9"
 rand = { version = "0.8.5", default-features = false, features = ["small_rng"] }
 getrandom = { version = "0.2", features = ["custom"] }
@@ -37,7 +38,7 @@ ctor = { version = "0.2", optional = true }
 
 [features]
 default = ["zisk_host"]
-zisk_guest = []
+zisk_guest = ["dep:portable-atomic", "spin/portable_atomic"]
 zisk_host = [
     "dep:zisk-common", "dep:bytes", "dep:paste", "dep:once_cell", "dep:ctor", "dep:anyhow", "dep:tokio",
     "dep:num-bigint", "dep:num-integer", "dep:num-traits",
