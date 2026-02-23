@@ -63,6 +63,9 @@ pub struct ZiskVerifyConstraints {
     #[clap(short = 'u', long, conflicts_with = "emulator")]
     pub unlock_mapped_memory: bool,
 
+    #[clap(short = 'n', long, default_value_t = false)]
+    pub no_auto_setup: bool,
+
     /// Verbosity (-v, -vv)
     #[arg(short = 'v', long, action = clap::ArgAction::Count, help = "Increase verbosity level")]
     pub verbose: u8, // Using u8 to hold the number of `-v`
@@ -142,9 +145,9 @@ impl ZiskVerifyConstraints {
             .build()?;
 
         let elf = ElfBinaryFromFile::new(&self.elf, false)?;
-        prover.setup(&elf)?;
+        let (pk, _) = prover.setup(&elf)?;
 
-        prover.verify_constraints_debug(stdin, self.debug.clone())
+        prover.verify_constraints_debug(&pk, stdin, self.debug.clone())
     }
 
     pub fn run_asm(
@@ -159,17 +162,18 @@ impl ZiskVerifyConstraints {
             .verbose(self.verbose)
             .shared_tables(self.shared_tables)
             .asm_path_opt(self.asm.clone())
+            .no_auto_setup(self.no_auto_setup)
             .base_port_opt(self.port)
             .unlock_mapped_memory(self.unlock_mapped_memory)
             .print_command_info()
             .build()?;
 
         let elf = ElfBinaryFromFile::new(&self.elf, hints_stream.is_some())?;
-        prover.setup(&elf)?;
+        let (pk, _) = prover.setup(&elf)?;
 
         if let Some(hints_stream) = hints_stream {
             prover.set_hints_stream(hints_stream)?;
         }
-        prover.verify_constraints_debug(stdin, self.debug.clone())
+        prover.verify_constraints_debug(&pk, stdin, self.debug.clone())
     }
 }

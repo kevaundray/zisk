@@ -70,7 +70,7 @@ pub struct ZiskStats {
     #[arg(short = 'v', long, action = clap::ArgAction::Count, help = "Increase verbosity level")]
     pub verbose: u8, // Using u8 to hold the number of `-v`
 
-    #[clap(short = 'n', long)]
+    #[clap(short = 'h', long)]
     pub number_threads_witness: Option<usize>,
 
     #[clap(short = 'x', long)]
@@ -88,6 +88,9 @@ pub struct ZiskStats {
 
     #[clap(short = 'j', long, default_value_t = false)]
     pub shared_tables: bool,
+
+    #[clap(short = 'n', long, default_value_t = false)]
+    pub no_auto_setup: bool,
 }
 
 impl ZiskStats {
@@ -161,9 +164,10 @@ impl ZiskStats {
             .build()?;
 
         let elf = ElfBinaryFromFile::new(&self.elf, false)?;
-        prover.setup(&elf)?;
+        let (pk, _) = prover.setup(&elf)?;
 
         prover.stats(
+            &pk,
             stdin,
             self.debug.clone(),
             self.minimal_memory,
@@ -183,19 +187,20 @@ impl ZiskStats {
             .verbose(self.verbose)
             .shared_tables(self.shared_tables)
             .asm_path_opt(self.asm.clone())
+            .no_auto_setup(self.no_auto_setup)
             .base_port_opt(self.port)
             .unlock_mapped_memory(self.unlock_mapped_memory)
             .print_command_info()
             .build()?;
 
         let elf = ElfBinaryFromFile::new(&self.elf, hints_stream.is_some())?;
-        prover.setup(&elf)?;
+        let (pk, _) = prover.setup(&elf)?;
 
         if let Some(hints_stream) = hints_stream {
             prover.set_hints_stream(hints_stream)?;
         }
         let mpi_node = self.mpi_node.map(|n| n as u32);
-        prover.stats(stdin, self.debug.clone(), self.minimal_memory, mpi_node)
+        prover.stats(&pk, stdin, self.debug.clone(), self.minimal_memory, mpi_node)
     }
 
     /// Prints stats individually and grouped, with aligned columns.

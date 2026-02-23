@@ -43,6 +43,10 @@ pub struct ZiskExecute {
     #[clap(short = 'H', long)]
     pub hints: Option<String>,
 
+    /// Force ROM setup
+    #[clap(short = 'n', long, default_value_t = false)]
+    pub no_auto_setup: bool,
+
     /// Setup folder path
     #[clap(short = 'k', long)]
     pub proving_key: Option<PathBuf>,
@@ -129,9 +133,8 @@ impl ZiskExecute {
             .build()?;
 
         let elf = ElfBinaryFromFile::new(&self.elf, false)?;
-
-        prover.setup(&elf)?;
-        prover.execute(stdin)
+        let (pk, _) = prover.setup(&elf)?;
+        prover.execute(&pk, stdin)
     }
 
     pub fn run_asm(
@@ -146,16 +149,17 @@ impl ZiskExecute {
             .verbose(self.verbose)
             .shared_tables(self.shared_tables)
             .asm_path_opt(self.asm.clone())
+            .no_auto_setup(self.no_auto_setup)
             .base_port_opt(self.port)
             .unlock_mapped_memory(self.unlock_mapped_memory)
             .print_command_info()
             .build()?;
 
         let elf = ElfBinaryFromFile::new(&self.elf, hints_stream.is_some())?;
-        prover.setup(&elf)?;
+        let (pk, _) = prover.setup(&elf)?;
         if let Some(hints_stream) = hints_stream {
             prover.set_hints_stream(hints_stream)?;
         }
-        prover.execute(stdin)
+        prover.execute(&pk, stdin)
     }
 }

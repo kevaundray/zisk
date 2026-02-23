@@ -91,7 +91,7 @@ pub struct ZiskProve {
     #[clap(short = 't', long)]
     pub max_streams: Option<usize>,
 
-    #[clap(short = 'n', long)]
+    #[clap(short = 'h', long)]
     pub number_threads_witness: Option<usize>,
 
     #[clap(short = 'x', long)]
@@ -108,6 +108,9 @@ pub struct ZiskProve {
 
     #[clap(short = 'r', long, default_value_t = false)]
     pub rma: bool,
+
+    #[clap(short = 'n', long, default_value_t = false)]
+    pub no_auto_setup: bool,
 
     #[clap(long, default_value_t = false)]
     pub snark: bool,
@@ -226,7 +229,7 @@ impl ZiskProve {
             .build()?;
 
         let elf = ElfBinaryFromFile::new(&self.elf, false)?;
-        prover.setup(&elf)?;
+        let (pk, _) = prover.setup(&elf)?;
 
         let proof_options = ProofOpts {
             aggregation: self.aggregation,
@@ -239,7 +242,7 @@ impl ZiskProve {
 
         let world_rank = prover.world_rank();
 
-        let mut prover = prover.prove(stdin).with_proof_options(proof_options);
+        let mut prover = prover.prove(&pk, stdin).with_proof_options(proof_options);
         if self.snark {
             prover = prover.plonk();
         }
@@ -267,13 +270,14 @@ impl ZiskProve {
             .shared_tables(self.shared_tables)
             .asm_path_opt(self.asm.clone())
             .base_port_opt(self.port)
+            .no_auto_setup(self.no_auto_setup)
             .unlock_mapped_memory(self.unlock_mapped_memory)
             .gpu(gpu_params)
             .print_command_info()
             .build()?;
 
         let elf = ElfBinaryFromFile::new(&self.elf, hints_stream.is_some())?;
-        prover.setup(&elf)?;
+        let (pk, _) = prover.setup(&elf)?;
 
         let proof_options = ProofOpts {
             aggregation: self.aggregation,
@@ -290,7 +294,7 @@ impl ZiskProve {
 
         let world_rank = prover.world_rank();
 
-        let mut prover = prover.prove(stdin).with_proof_options(proof_options);
+        let mut prover = prover.prove(&pk, stdin).with_proof_options(proof_options);
         if self.snark {
             prover = prover.plonk();
         }
