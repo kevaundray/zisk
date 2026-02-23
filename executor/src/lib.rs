@@ -47,6 +47,7 @@ pub type NestedDeviceMetricsList = HashMap<usize, DeviceMetricsList>;
 
 use asm_runner::AsmRunnerMO;
 use fields::PrimeField64;
+use proofman_common::ProofCtx;
 use std::{collections::HashMap, sync::Mutex, thread::JoinHandle};
 use zisk_common::{io::ZiskStdin, EmuTrace, ExecutorStatsHandle, StatsScope};
 
@@ -58,6 +59,7 @@ pub trait Emulator<F: PrimeField64>: Send + Sync {
         &self,
         zisk_rom: &ZiskRom,
         stdin: &Mutex<ZiskStdin>,
+        pctx: &ProofCtx<F>,
         sm_bundle: &StaticSMBundle<F>,
         use_hints: bool,
         stats: &ExecutorStatsHandle,
@@ -110,6 +112,7 @@ impl<F: PrimeField64> Emulator<F> for EmulatorKind {
         &self,
         zisk_rom: &ZiskRom,
         stdin: &Mutex<ZiskStdin>,
+        pctx: &ProofCtx<F>,
         sm_bundle: &StaticSMBundle<F>,
         use_hints: bool,
         stats: &ExecutorStatsHandle,
@@ -123,7 +126,7 @@ impl<F: PrimeField64> Emulator<F> for EmulatorKind {
     ) {
         match self {
             Self::Asm(e) => {
-                e.execute(zisk_rom, stdin, sm_bundle, use_hints, stats, caller_stats_scope)
+                e.execute(zisk_rom, stdin, pctx, sm_bundle, use_hints, stats, caller_stats_scope)
             }
             Self::Rust(e) => e.execute(zisk_rom, stdin, sm_bundle),
         }

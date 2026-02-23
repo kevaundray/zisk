@@ -3,6 +3,7 @@ use std::{collections::HashMap, sync::Mutex, thread::JoinHandle};
 use asm_runner::AsmRunnerMO;
 use data_bus::DataBusTrait;
 use fields::PrimeField64;
+use proofman_common::ProofCtx;
 use proofman_util::{timer_start_info, timer_stop_and_log_info};
 use rayon::prelude::*;
 use zisk_common::{
@@ -164,6 +165,7 @@ impl<F: PrimeField64> crate::Emulator<F> for EmulatorRust {
         &self,
         zisk_rom: &ZiskRom,
         stdin: &Mutex<ZiskStdin>,
+        _pctx: &ProofCtx<F>,
         sm_bundle: &StaticSMBundle<F>,
         _use_hints: bool,
         _stats: &ExecutorStatsHandle,

@@ -14,6 +14,7 @@ use asm_runner::{
 };
 use data_bus::DataBusTrait;
 use fields::PrimeField64;
+use proofman_common::ProofCtx;
 use sm_rom::RomSM;
 use zisk_common::{
     io::ZiskStdin, stats_begin, stats_end, ChunkId, EmuTrace, ExecutorStatsHandle, StatsScope,
@@ -96,6 +97,7 @@ impl EmulatorAsm {
         &self,
         zisk_rom: &ZiskRom,
         stdin: &Mutex<ZiskStdin>,
+        pctx: &ProofCtx<F>,
         sm_bundle: &StaticSMBundle<F>,
         use_hints: bool,
         stats: &ExecutorStatsHandle,
@@ -172,7 +174,7 @@ impl EmulatorAsm {
         });
 
         // Run the ROM histogram only on partition 0 as it is always computed by this partition
-        let has_rom_sm = true; //pctx.dctx_is_first_partition();
+        let has_rom_sm = pctx.dctx_is_first_partition();
 
         let _stats = stats.clone();
 
@@ -200,11 +202,14 @@ impl EmulatorAsm {
         // Store execute steps
         let steps = min_traces.iter().map(|trace| trace.steps).sum::<u64>();
 
-        // If the world rank is 0, wait for the ROM Histogram thread to finish and set the handler
-        if handle_rh.is_some() {
-            self.rom_sm.as_ref().unwrap().set_asm_runner_handler(
-                handle_rh.expect("Error during Assembly ROM Histogram thread execution"),
-            );
+        // If the world rank is 0, wait for the ROM Histogram thread to finish and collect the result
+        if has_rom_sm {
+            let rh_data = handle_rh
+                .expect("ROM Histogram thread was not spawned")
+                .join()
+                .expect("Error during ROM Histogram thread execution");
+
+            self.rom_sm.as_ref().unwrap().set_rh_data(rh_data);
         }
 
         stats_end!(stats, &_exec_scope);
@@ -308,6 +313,7 @@ impl<F: PrimeField64> crate::Emulator<F> for EmulatorAsm {
         &self,
         zisk_rom: &ZiskRom,
         stdin: &Mutex<ZiskStdin>,
+        pctx: &ProofCtx<F>,
         sm_bundle: &StaticSMBundle<F>,
         use_hints: bool,
         stats: &ExecutorStatsHandle,
@@ -319,6 +325,6 @@ impl<F: PrimeField64> crate::Emulator<F> for EmulatorAsm {
         Option<JoinHandle<AsmRunnerMO>>,
         u64,
     ) {
-        self.execute(zisk_rom, stdin, sm_bundle, use_hints, stats, caller_stats_scope)
+        self.execute(zisk_rom, stdin, pctx, sm_bundle, use_hints, stats, caller_stats_scope)
     }
 }

@@ -232,9 +232,9 @@ impl ProverEngine for EmuProver {
     }
 
     fn is_first_partition(&self) -> Result<bool> {
-         self.core_prover.backend.is_first_partition()
-     }
-     
+        self.core_prover.backend.is_first_partition()
+    }
+
     fn aggregate_proofs(
         &self,
         agg_proofs: Vec<AggProofs>,

@@ -9,6 +9,7 @@ use crate::{
 };
 use asm_runner::AsmRunnerMO;
 use fields::PrimeField64;
+use proofman_common::ProofCtx;
 use std::{sync::Mutex, thread::JoinHandle};
 use zisk_common::{io::ZiskStdin, EmuTrace, ExecutorStatsHandle, StatsScope};
 use zisk_core::ZiskRom;
@@ -74,6 +75,7 @@ impl RomExecutor {
     pub fn execute<F: PrimeField64>(
         &self,
         zisk_rom: &ZiskRom,
+        pctx: &ProofCtx<F>,
         sm_bundle: &StaticSMBundle<F>,
         use_hints: bool,
         stats: &ExecutorStatsHandle,
@@ -82,6 +84,7 @@ impl RomExecutor {
         let (min_traces, main_count, secn_count, handle_mo, steps) = self.emulator.execute(
             zisk_rom,
             &self.stdin,
+            pctx,
             sm_bundle,
             use_hints,
             stats,
