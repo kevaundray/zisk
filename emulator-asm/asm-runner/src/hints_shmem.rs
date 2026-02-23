@@ -286,6 +286,11 @@ impl StreamSink for HintsShmem {
         for res in separate.iter_mut() {
             while res.sem_available.try_wait().is_ok() {}
             while res.sem_read.try_wait().is_ok() {}
+
+            assert!(
+                res.control_reader.read_u64_at(0) == 0,
+                "Control reader position should be reset to 0"
+            );
         }
     }
 
