@@ -4195,7 +4195,7 @@ void server_reset_fast (void)
         // Sync control output shared memory so that the writer can see the precompile reads we have
         // done, and thus update the precompile_written_address if needed
         if (msync((void *)shmem_control_output_address, CONTROL_OUTPUT_SIZE, MS_SYNC) != 0) {
-            printf("ERROR: msync failed for shmem_control_output_address errno=%d=%s\n", errno, strerror(errno));
+            printf("ERROR: server_reset_fast() msync failed for shmem_control_output_address errno=%d=%s\n", errno, strerror(errno));
             fflush(stdout);
             fflush(stderr);
             exit(-1);
