@@ -62,7 +62,7 @@ impl EmulatorRust {
         Option<JoinHandle<AsmRunnerMO>>,
         u64,
     ) {
-        let min_traces = self.run_emulator(zisk_rom, Self::NUM_THREADS, &mut stdin.lock().unwrap());
+        let min_traces = self.run_emulator(zisk_rom, Self::NUM_THREADS, &stdin.lock().unwrap());
 
         // Store execute steps
         let steps = min_traces.iter().map(|trace| trace.steps).sum::<u64>();
@@ -78,7 +78,7 @@ impl EmulatorRust {
         &self,
         zisk_rom: &ZiskRom,
         num_threads: usize,
-        stdin: &mut ZiskStdin,
+        stdin: &ZiskStdin,
     ) -> Vec<EmuTrace> {
         // Call emulate with these options
         let input_data = stdin.read_bytes();

@@ -533,7 +533,7 @@ impl<T: ZiskBackend + 'static> Worker<T> {
     ) -> Result<Vec<ContributionsInfo>> {
         let phase = proofman::ProvePhase::Contributions;
 
-        let mut stdin = match input_source {
+        let stdin = match input_source {
             InputSourceDto::InputPath(inputs_uri) => ZiskStdin::from_file(inputs_uri)?,
             InputSourceDto::InputData(input_data) => ZiskStdin::from_vec(input_data),
             InputSourceDto::InputNull => ZiskStdin::null(),
@@ -542,7 +542,7 @@ impl<T: ZiskBackend + 'static> Worker<T> {
         match hints_source {
             HintsSourceDto::HintsPath(hints_uri) => {
                 let hints_stream = StreamSource::from_uri(hints_uri)?;
-                stdin.set_hints_stream(hints_stream);
+                pk.register_hints_stream(hints_stream)?;
             }
             HintsSourceDto::HintsStream(_hints_uri) => {
                 // For HintsStream, the worker will receive hint data via StreamData gRPC messages

@@ -139,7 +139,7 @@ impl ZiskExecute {
 
     pub fn run_asm(
         &mut self,
-        mut stdin: ZiskStdin,
+        stdin: ZiskStdin,
         hints_stream: Option<StreamSource>,
     ) -> Result<ZiskExecuteResult> {
         let prover = ProverClient::builder()
@@ -158,7 +158,7 @@ impl ZiskExecute {
         let elf = ElfBinaryFromFile::new(&self.elf, hints_stream.is_some())?;
         let (pk, _) = prover.setup(&elf)?;
         if let Some(hints_stream) = hints_stream {
-            stdin.set_hints_stream(hints_stream);
+            pk.register_hints_stream(hints_stream)?;
         }
         prover.execute(&pk, stdin)
     }

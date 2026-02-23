@@ -152,7 +152,7 @@ impl ZiskVerifyConstraints {
 
     pub fn run_asm(
         &mut self,
-        mut stdin: ZiskStdin,
+        stdin: ZiskStdin,
         hints_stream: Option<StreamSource>,
     ) -> Result<ZiskVerifyConstraintsResult> {
         let prover = ProverClient::builder()
@@ -172,7 +172,7 @@ impl ZiskVerifyConstraints {
         let (pk, _) = prover.setup(&elf)?;
 
         if let Some(hints_stream) = hints_stream {
-            stdin.set_hints_stream(hints_stream);
+            pk.register_hints_stream(hints_stream)?;
         }
         prover.verify_constraints_debug(&pk, stdin, self.debug.clone())
     }

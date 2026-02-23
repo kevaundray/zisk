@@ -24,6 +24,7 @@ use std::{
     time::Duration,
 };
 use tracing::info;
+use zisk_common::io::StreamSource;
 use zisk_common::ElfBinaryLike;
 use zisk_common::{io::ZiskStdin, ExecutorStatsHandle, StatsCostPerType, ZiskExecutionResult};
 use zisk_core::ZiskRom;
@@ -124,6 +125,27 @@ pub struct ZiskProgramPK {
     pub asm_services: Option<AsmServices>,
     pub rank_info: RankInfo,
     pub use_hints: bool,
+}
+
+impl ZiskProgramPK {
+    pub fn register_hints_stream(&self, stream: StreamSource) -> Result<()> {
+        if self.use_hints {
+            if let Some(asm_resources) = &self.asm_resources {
+                asm_resources
+                    .set_hints_stream_src(stream)
+                    .expect("Failed to set hints stream source");
+            } else {
+                return Err(anyhow::anyhow!(
+                    "ASM resources not initialized, cannot register hints stream"
+                ));
+            }
+        } else {
+            return Err(anyhow::anyhow!(
+                "Hints not enabled for this program, cannot register hints stream"
+            ));
+        }
+        Ok(())
+    }
 }
 
 impl Drop for ZiskProgramPK {

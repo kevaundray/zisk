@@ -112,13 +112,8 @@ impl EmulatorAsm {
         let asm_resources_guard = self.asm_resources.lock().unwrap();
         let asm_resources = asm_resources_guard.as_ref().expect("AsmResources not initialized");
 
-        let has_hints_stream = stdin.lock().unwrap().has_hints_stream();
+        let has_hints_stream = asm_resources.is_hints_stream_initialized();
         if use_hints && has_hints_stream {
-            let hints_stream =
-                stdin.lock().unwrap().take_hints_stream().expect("Hints stream not set");
-            asm_resources
-                .set_hints_stream_src(hints_stream)
-                .expect("Failed to set hints stream source");
             asm_resources.start_stream().expect("Failed to start hints stream");
         }
 
@@ -144,7 +139,7 @@ impl EmulatorAsm {
         });
 
         write_input(
-            &mut stdin.lock().unwrap(),
+            &stdin.lock().unwrap(),
             asm_resources.shmem_input_writer.lock().unwrap().as_ref().unwrap(),
         );
 
