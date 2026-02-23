@@ -4263,20 +4263,23 @@ void server_run (void)
         exit(-1);
     }
 
-    // Sync control input shared memory
-    if (msync((void *)shmem_control_input_address, CONTROL_INPUT_SIZE, MS_SYNC) != 0) {
-        printf("ERROR: msync failed for shmem_control_input_address errno=%d=%s\n", errno, strerror(errno));
-        fflush(stdout);
-        fflush(stderr);
-        exit(-1);
-    }
+    if (precompile_results_enabled)
+    {
+        // Sync control input shared memory
+        if (msync((void *)shmem_control_input_address, CONTROL_INPUT_SIZE, MS_SYNC) != 0) {
+            printf("ERROR: msync failed for shmem_control_input_address errno=%d=%s\n", errno, strerror(errno));
+            fflush(stdout);
+            fflush(stderr);
+            exit(-1);
+        }
 
-    // Sync precompile shared memory
-    if (msync((void *)shmem_precompile_address, MAX_PRECOMPILE_SIZE, MS_SYNC) != 0) {
-        printf("ERROR: msync failed for shmem_precompile_address errno=%d=%s\n", errno, strerror(errno));
-        fflush(stdout);
-        fflush(stderr);
-        exit(-1);
+        // Sync precompile shared memory
+        if (msync((void *)shmem_precompile_address, MAX_PRECOMPILE_SIZE, MS_SYNC) != 0) {
+            printf("ERROR: msync failed for shmem_precompile_address errno=%d=%s\n", errno, strerror(errno));
+            fflush(stdout);
+            fflush(stderr);
+            exit(-1);
+        }
     }
 
     /*******/
