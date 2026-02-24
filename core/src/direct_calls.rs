@@ -1,9 +1,6 @@
 use riscv::RiscvInstruction;
 
-pub fn dma_direct_calls(
-    riscv_instructions: &Vec<RiscvInstruction>,
-    dma_addrs: (u64, u64, u64, u64),
-) {
+pub fn dma_direct_calls(riscv_instructions: &[RiscvInstruction], dma_addrs: (u64, u64, u64, u64)) {
     let (memcpy_addr, memcmp_addr, memset_addr, memmove_addr) = dma_addrs;
 
     // Detect AUIPC + JALR patterns that jump to DMA functions
