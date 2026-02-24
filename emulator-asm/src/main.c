@@ -182,7 +182,7 @@ typedef enum {
 GenMethod gen_method = Fast;
 
 // Returns the acronym of the generation method, used for logging and file naming
-const char * gen_method_achronym(GenMethod method)
+const char * gen_method_acronym(GenMethod method)
 {
     switch (method)
     {
@@ -678,7 +678,7 @@ int main(int argc, char *argv[])
     if (redirect_output_to_file)
     {
         char redirect_output_file[256];
-        snprintf(redirect_output_file, sizeof(redirect_output_file), "/tmp/%s_%s_output.txt", shm_prefix, gen_method_achronym(gen_method));
+        snprintf(redirect_output_file, sizeof(redirect_output_file), "/tmp/%s_%s_output.txt", shm_prefix, gen_method_acronym(gen_method));
 
         // Redirect stdout to file
         FILE * file_pointer = freopen(redirect_output_file, "w", stdout);
