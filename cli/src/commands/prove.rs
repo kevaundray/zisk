@@ -1,4 +1,4 @@
-use crate::ux::{print_banner, print_banner_field};
+use crate::ux::{print_banner, print_banner_command, print_banner_field};
 use anyhow::Result;
 
 use colored::Colorize;
@@ -125,6 +125,10 @@ impl ZiskProve {
 
         print_banner();
 
+        print_banner_command("Prove");
+
+        print_banner_field("Elf", self.elf.display());
+
         let mut gpu_params = None;
         if self.preallocate
             || self.max_streams.is_some()
@@ -138,9 +142,8 @@ impl ZiskProve {
             gpu_params = Some(gpu_params_new);
         }
 
-        if let Some(inputs) = &self.inputs {
-            print_banner_field("Input", inputs);
-        }
+        let inputs_str = self.inputs.clone().unwrap_or_else(|| "None".dimmed().to_string());
+        print_banner_field("Input", inputs_str);
 
         if let Some(hints) = &self.hints {
             print_banner_field("Prec. Hints", hints);

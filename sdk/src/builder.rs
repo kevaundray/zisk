@@ -297,12 +297,7 @@ impl<X> ProverClientBuilder<EmuB, X> {
         let proving_key_snark = get_proving_key_snark(self.proving_key_snark.as_ref());
 
         if self.print_command_info {
-            Self::print_emu_command_info(
-                self.witness,
-                self.verify_constraints,
-                &proving_key,
-                &proving_key_snark,
-            );
+            Self::print_emu_command_info(&proving_key, &proving_key_snark);
         }
 
         let emu = if self.verifier {
@@ -324,20 +319,7 @@ impl<X> ProverClientBuilder<EmuB, X> {
         Ok(ZiskProver::<Emu>::new(emu))
     }
 
-    fn print_emu_command_info(
-        witness: bool,
-        verify_constraints: bool,
-        proving_key: &Path,
-        proving_key_snark: &Path,
-    ) {
-        if witness {
-            println!("{: >12} StatsConstraints", "Command".bright_green().bold());
-        } else if verify_constraints {
-            println!("{: >12} VerifyConstraints", "Command".bright_green().bold());
-        } else {
-            println!("{: >12} Prove", "Command".bright_green().bold());
-        }
-
+    fn print_emu_command_info(proving_key: &Path, proving_key_snark: &Path) {
         println!(
             "{: >12} {}",
             "Emulator".bright_green().bold(),
@@ -415,12 +397,7 @@ impl<X> ProverClientBuilder<AsmB, X> {
         let proving_key_snark = get_proving_key_snark(self.proving_key_snark.as_ref());
 
         if self.print_command_info {
-            Self::print_asm_command_info(
-                self.witness,
-                self.verify_constraints,
-                &proving_key,
-                &proving_key_snark,
-            );
+            Self::print_asm_command_info(&proving_key, &proving_key_snark);
         }
 
         let asm = if self.verifier {
@@ -445,20 +422,7 @@ impl<X> ProverClientBuilder<AsmB, X> {
         Ok(ZiskProver::<Asm>::new(asm))
     }
 
-    fn print_asm_command_info(
-        witness: bool,
-        verify_constraints: bool,
-        proving_key: &Path,
-        proving_key_snark: &Path,
-    ) {
-        if witness {
-            println!("{: >12} StatsConstraints", "Command".bright_green().bold());
-        } else if verify_constraints {
-            println!("{: >12} VerifyConstraints", "Command".bright_green().bold());
-        } else {
-            println!("{: >12} Prove", "Command".bright_green().bold());
-        }
-
+    fn print_asm_command_info(proving_key: &Path, proving_key_snark: &Path) {
         println!("{: >12} {}", "Proving Key".bright_green().bold(), proving_key.display());
 
         println!("{: >12} {}", "SNARK Key".bright_green().bold(), proving_key_snark.display());

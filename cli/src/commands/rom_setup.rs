@@ -44,8 +44,16 @@ impl ZiskRomSetup {
         print_banner();
 
         print_banner_field("Command", "Rom Setup");
+        print_banner_field("Elf", self.elf.display());
+        if self.hints {
+            print_banner_field("Hints", "Enabled".yellow());
+        }
 
         let proving_key = get_proving_key(self.proving_key.as_ref());
+
+        print_banner_field("Proving Key", proving_key.display());
+
+        println!();
 
         let mpi_ctx = Arc::new(MpiCtx::new());
         let mut pctx = ProofCtx::create_ctx(proving_key, false, self.verbose.into(), mpi_ctx)?;

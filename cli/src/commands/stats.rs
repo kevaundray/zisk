@@ -11,7 +11,7 @@ use zisk_common::{ExecutorStatsHandle, Stats};
 use zisk_pil::*;
 use zisk_sdk::ProverClient;
 
-use crate::ux::{print_banner, print_banner_field};
+use crate::ux::{print_banner, print_banner_command, print_banner_field};
 
 #[derive(Parser)]
 #[command(author, about, long_about = None, version = ZISK_VERSION_MESSAGE)]
@@ -102,9 +102,12 @@ impl ZiskStats {
 
         print_banner();
 
-        if let Some(inputs) = &self.inputs {
-            print_banner_field("Input", inputs);
-        }
+        print_banner_command("Stats");
+
+        print_banner_field("Elf", self.elf.display());
+
+        let inputs_str = self.inputs.clone().unwrap_or_else(|| "None".dimmed().to_string());
+        print_banner_field("Input", inputs_str);
 
         if let Some(hints) = &self.hints {
             print_banner_field("Prec. Hints", hints);
