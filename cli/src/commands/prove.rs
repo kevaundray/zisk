@@ -289,7 +289,7 @@ impl ZiskProve {
         };
 
         if let Some(hints_stream) = hints_stream {
-            prover.set_hints_stream(hints_stream)?;
+            pk.register_hints_stream(hints_stream)?;
         }
 
         let world_rank = prover.world_rank();

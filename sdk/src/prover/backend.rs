@@ -15,7 +15,7 @@ use colored::Colorize;
 use executor::ZiskExecutor;
 use fields::Goldilocks;
 use proofman::{
-    AggProofs, ExecutionInfo, ProofInfo, ProofMan, ProvePhase, ProvePhaseInputs, ProvePhaseResult,
+    AggProofs, ExecutionInfo, ProofMan, ProvePhase, ProvePhaseInputs, ProvePhaseResult,
     SnarkProtocol, SnarkWrapper,
 };
 use proofman_common::{ProofCtx, ProofOptions, RowInfo};
@@ -24,10 +24,7 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Arc;
 use zisk_common::stats_mark;
-use zisk_common::{
-    io::{StreamSource, ZiskStdin},
-    ElfBinaryLike, ExecutorStatsHandle, ZiskExecutionResult,
-};
+use zisk_common::{io::ZiskStdin, ElfBinaryLike, ExecutorStatsHandle, ZiskExecutionResult};
 
 pub(crate) struct ProverBackend {
     proofman: Option<ProofMan<Goldilocks>>,
@@ -102,13 +99,6 @@ impl ProverBackend {
         })?;
         executor.set_stdin(stdin);
         Ok(())
-    }
-
-    pub fn set_hints_stream(&self, hints_stream: StreamSource) -> Result<()> {
-        let executor = self.executor.as_ref().ok_or_else(|| {
-            anyhow::anyhow!("Executor is not initialized. Please initialize it before use.")
-        })?;
-        executor.set_hints_stream_src(hints_stream)
     }
 
     pub fn execution_result(&self) -> Result<(ZiskExecutionResult, ExecutorStatsHandle)> {
@@ -340,10 +330,12 @@ impl ProverBackend {
 
         let compressed = matches!(mode, ProofMode::VadcopFinalCompressed);
 
+        proofman.set_partition(1, vec![0], 0)?;
+
         proofman.set_barrier();
         let proof = proofman
             .generate_proof_from_lib(
-                ProvePhaseInputs::Full(ProofInfo::new(None, 1, vec![0], 0)),
+                ProvePhaseInputs::Full(),
                 ProofOptions::new(
                     false,
                     proof_options.aggregation,
@@ -532,6 +524,29 @@ impl ProverBackend {
         proofman
             .generate_proof_from_lib(phase_inputs, options, phase.clone())
             .map_err(|e| anyhow::anyhow!("Error generating proof in phase {:?}: {}", phase, e))
+    }
+
+    pub(crate) fn set_partition(
+        &self,
+        total_compute_units: usize,
+        allocation: Vec<u32>,
+        rank_id: usize,
+    ) -> Result<()> {
+        let proofman = self
+            .proofman
+            .as_ref()
+            .ok_or_else(|| anyhow::anyhow!("Cannot set partition in verifier mode"))?;
+
+        Ok(proofman.set_partition(total_compute_units, allocation, rank_id)?)
+    }
+
+    pub(crate) fn is_first_partition(&self) -> Result<bool> {
+        let proofman = self
+            .proofman
+            .as_ref()
+            .ok_or_else(|| anyhow::anyhow!("Cannot set partition in verifier mode"))?;
+
+        Ok(proofman.is_first_partition())
     }
 
     pub(crate) fn get_execution_info(&self) -> Result<ExecutionInfo> {

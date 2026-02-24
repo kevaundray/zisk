@@ -2,10 +2,7 @@
 //!
 //! It is responsible for computing witnesses for ROM-related execution plans,
 
-use std::{
-    sync::{atomic::AtomicU64, Arc},
-    thread::JoinHandle,
-};
+use std::sync::{atomic::AtomicU64, Arc};
 
 use crate::{rom_counter::RomCounter, RomSM};
 use asm_runner::AsmRunnerRH;
@@ -41,7 +38,7 @@ pub struct RomInstance {
     counter_stats: Mutex<Option<CounterStats>>,
 
     /// Optional handle for the ROM assembly runner thread.
-    handle_rh: Mutex<Option<JoinHandle<AsmRunnerRH>>>,
+    handle_rh: Mutex<Option<AsmRunnerRH>>,
 
     /// Cached result from the assembly runner thread.
     asm_result: Mutex<Option<AsmRunnerRH>>,
@@ -61,7 +58,7 @@ impl RomInstance {
         ictx: InstanceCtx,
         bios_inst_count: Arc<Vec<AtomicU64>>,
         prog_inst_count: Arc<Vec<AtomicU64>>,
-        handle_rh: Option<JoinHandle<AsmRunnerRH>>,
+        handle_rh: Option<AsmRunnerRH>,
     ) -> Self {
         Self {
             zisk_rom,
@@ -121,10 +118,8 @@ impl<F: PrimeField64> Instance<F> for RomInstance {
             // Check if we already have the result cached
             if self.asm_result.lock().unwrap().is_none() {
                 // Join the thread and cache the result
-                let handle_rh = self.handle_rh.lock().unwrap().take().unwrap();
-                let result_rh =
-                    handle_rh.join().expect("Error during Rom Histogram thread execution");
-                *self.asm_result.lock().unwrap() = Some(result_rh);
+                let rh_data = self.handle_rh.lock().unwrap().take().unwrap();
+                *self.asm_result.lock().unwrap() = Some(rh_data);
             }
 
             // Use the cached result

@@ -24,11 +24,9 @@ use std::{
     time::Duration,
 };
 use tracing::info;
+use zisk_common::io::StreamSource;
 use zisk_common::ElfBinaryLike;
-use zisk_common::{
-    io::{StreamSource, ZiskStdin},
-    ExecutorStatsHandle, StatsCostPerType, ZiskExecutionResult,
-};
+use zisk_common::{io::ZiskStdin, ExecutorStatsHandle, StatsCostPerType, ZiskExecutionResult};
 use zisk_core::ZiskRom;
 
 pub struct ZiskExecuteResult {
@@ -127,6 +125,27 @@ pub struct ZiskProgramPK {
     pub asm_services: Option<AsmServices>,
     pub rank_info: RankInfo,
     pub use_hints: bool,
+}
+
+impl ZiskProgramPK {
+    pub fn register_hints_stream(&self, stream: StreamSource) -> Result<()> {
+        if self.use_hints {
+            if let Some(asm_resources) = &self.asm_resources {
+                asm_resources
+                    .set_hints_stream_src(stream)
+                    .expect("Failed to set hints stream source");
+            } else {
+                return Err(anyhow::anyhow!(
+                    "ASM resources not initialized, cannot register hints stream"
+                ));
+            }
+        } else {
+            return Err(anyhow::anyhow!(
+                "Hints not enabled for this program, cannot register hints stream"
+            ));
+        }
+        Ok(())
+    }
 }
 
 impl Drop for ZiskProgramPK {
@@ -720,8 +739,6 @@ pub trait ProverEngine {
 
     fn register_program(&self, pk: &ZiskProgramPK) -> Result<()>;
 
-    fn set_hints_stream(&self, hints_stream: StreamSource) -> Result<()>;
-
     fn executed_steps(&self) -> u64;
 
     fn get_execution_info(&self) -> Result<ExecutionInfo>;
@@ -806,6 +823,15 @@ pub trait ProverEngine {
         phase: ProvePhase,
     ) -> Result<ZiskPhaseResult>;
 
+    fn set_partition(
+        &self,
+        total_compute_units: usize,
+        allocation: Vec<u32>,
+        rank_id: usize,
+    ) -> Result<()>;
+
+    fn is_first_partition(&self) -> Result<bool>;
+
     fn aggregate_proofs(
         &self,
         agg_proofs: Vec<AggProofs>,
@@ -842,10 +868,6 @@ impl<C: ZiskBackend> ZiskProver<C> {
 
     pub fn register_program(&self, pk: &ZiskProgramPK) -> Result<()> {
         self.prover.register_program(pk)
-    }
-
-    pub fn set_hints_stream(&self, hints_stream: StreamSource) -> Result<()> {
-        self.prover.set_hints_stream(hints_stream)
     }
 
     /// Get the world rank of the prover. The world rank is the rank of the prover in the global MPI context.
@@ -982,6 +1004,19 @@ impl<C: ZiskBackend> ZiskProver<C> {
         phase: ProvePhase,
     ) -> Result<ZiskPhaseResult> {
         self.prover.prove_phase(phase_inputs, options, phase)
+    }
+
+    pub fn set_partition(
+        &self,
+        total_compute_units: usize,
+        allocation: Vec<u32>,
+        rank_id: usize,
+    ) -> Result<()> {
+        self.prover.set_partition(total_compute_units, allocation, rank_id)
+    }
+
+    pub fn is_first_partition(&self) -> Result<bool> {
+        self.prover.is_first_partition()
     }
 
     pub fn aggregate_proofs(

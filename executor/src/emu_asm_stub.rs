@@ -7,11 +7,9 @@ use crate::{DeviceMetricsList, NestedDeviceMetricsList, StaticSMBundle};
 use asm_runner::AsmRunnerMO;
 
 use crate::AsmResources;
-use anyhow::Result;
 use fields::PrimeField64;
 use proofman_common::ProofCtx;
 use sm_rom::RomSM;
-use zisk_common::io::StreamSource;
 use zisk_common::{io::ZiskStdin, EmuTrace, ExecutorStatsHandle, StatsScope};
 use zisk_core::ZiskRom;
 
@@ -56,10 +54,6 @@ impl EmulatorAsm {
     }
 
     pub fn get_chunk_size(&self) -> u64 {
-        unimplemented!("AsmRunner is only supported on Linux x86_64 platforms.");
-    }
-
-    pub fn set_hints_stream_src(&self, _stream: StreamSource) -> Result<()> {
         unimplemented!("AsmRunner is only supported on Linux x86_64 platforms.");
     }
 

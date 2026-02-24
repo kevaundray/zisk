@@ -172,7 +172,7 @@ impl ZiskVerifyConstraints {
         let (pk, _) = prover.setup(&elf)?;
 
         if let Some(hints_stream) = hints_stream {
-            prover.set_hints_stream(hints_stream)?;
+            pk.register_hints_stream(hints_stream)?;
         }
         prover.verify_constraints_debug(&pk, stdin, self.debug.clone())
     }

@@ -158,7 +158,7 @@ impl ZiskExecute {
         let elf = ElfBinaryFromFile::new(&self.elf, hints_stream.is_some())?;
         let (pk, _) = prover.setup(&elf)?;
         if let Some(hints_stream) = hints_stream {
-            prover.set_hints_stream(hints_stream)?;
+            pk.register_hints_stream(hints_stream)?;
         }
         prover.execute(&pk, stdin)
     }

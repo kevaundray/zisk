@@ -6,6 +6,7 @@ use asm_runner::HintsShmem;
 #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
 use asm_runner::{MOOutputShmem, MTOutputShmem, RHOutputShmem, SharedMemoryWriter};
 use precompiles_hints::HintsProcessor;
+use std::sync::atomic::{AtomicBool, Ordering};
 use zisk_common::io::{StreamSource, ZiskStream};
 
 /// Encapsulates assembly-related resources including shared memory and hints stream.
@@ -32,6 +33,8 @@ pub struct AsmResources {
 
     /// Pipeline for handling precompile hints.
     pub hints_stream: Option<Arc<Mutex<ZiskStream>>>,
+
+    pub hints_stream_initialized: Arc<AtomicBool>,
 }
 
 impl std::fmt::Debug for AsmResources {
@@ -91,6 +94,7 @@ impl AsmResources {
 
         Self {
             hints_stream,
+            hints_stream_initialized: Arc::new(AtomicBool::new(false)),
             #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
             asm_shmem_mt: Arc::new(Mutex::new(asm_shmem_mt)),
             #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
@@ -115,15 +119,22 @@ impl AsmResources {
 
     pub fn set_hints_stream_src(&self, stream: StreamSource) -> Result<()> {
         if let Some(hints_stream) = &self.hints_stream {
-            hints_stream.lock().unwrap().set_hints_stream_src(stream)
+            hints_stream.lock().unwrap().set_hints_stream_src(stream)?;
         } else {
-            Err(anyhow::anyhow!("Hints stream not initialized"))
+            return Err(anyhow::anyhow!("Hints stream not initialized"));
         }
+        self.hints_stream_initialized.store(true, Ordering::SeqCst);
+        Ok(())
+    }
+
+    pub fn is_hints_stream_initialized(&self) -> bool {
+        self.hints_stream_initialized.load(Ordering::SeqCst)
     }
 
     pub fn reset(&self) {
         if let Some(hints_stream) = &self.hints_stream {
             hints_stream.lock().unwrap().reset();
+            self.hints_stream_initialized.store(false, Ordering::SeqCst);
         }
     }
 }

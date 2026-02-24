@@ -11,7 +11,7 @@ use proofman::{AggProofs, ExecutionInfo, ProofMan, ProvePhase, ProvePhaseInputs,
 use proofman_common::{initialize_logger, ParamsGPU, ProofOptions, RankInfo, RowInfo};
 use std::path::PathBuf;
 use std::sync::Arc;
-use zisk_common::io::{StreamSource, ZiskStdin};
+use zisk_common::io::ZiskStdin;
 use zisk_common::ElfBinaryLike;
 use zisk_common::ExecutorStatsHandle;
 use zisk_core::Riscv2zisk;
@@ -79,10 +79,6 @@ impl ProverEngine for EmuProver {
 
     fn register_program(&self, pk: &ZiskProgramPK) -> Result<()> {
         self.core_prover.backend.register_program(pk)
-    }
-
-    fn set_hints_stream(&self, _: StreamSource) -> Result<()> {
-        unreachable!("EMU prover does not support precompile hints");
     }
 
     fn setup(&self, elf: &impl ElfBinaryLike) -> Result<(ZiskProgramPK, ZiskProgramVK)> {
@@ -224,6 +220,19 @@ impl ProverEngine for EmuProver {
         phase: ProvePhase,
     ) -> Result<ZiskPhaseResult> {
         self.core_prover.backend.prove_phase(phase_inputs, options, phase)
+    }
+
+    fn set_partition(
+        &self,
+        total_compute_units: usize,
+        allocation: Vec<u32>,
+        rank_id: usize,
+    ) -> Result<()> {
+        self.core_prover.backend.set_partition(total_compute_units, allocation, rank_id)
+    }
+
+    fn is_first_partition(&self) -> Result<bool> {
+        self.core_prover.backend.is_first_partition()
     }
 
     fn aggregate_proofs(

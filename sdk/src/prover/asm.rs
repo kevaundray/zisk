@@ -16,7 +16,7 @@ use rom_setup::{generate_assembly, get_output_path, DEFAULT_CACHE_PATH};
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
-use zisk_common::io::{StreamSource, ZiskStdin};
+use zisk_common::io::ZiskStdin;
 use zisk_common::ElfBinaryLike;
 use zisk_common::ExecutorStatsHandle;
 use zisk_core::Riscv2zisk;
@@ -91,10 +91,6 @@ impl ProverEngine for AsmProver {
 
     fn register_program(&self, pk: &ZiskProgramPK) -> Result<()> {
         self.core_prover.backend.register_program(pk)
-    }
-
-    fn set_hints_stream(&self, hints_stream: StreamSource) -> Result<()> {
-        self.core_prover.backend.set_hints_stream(hints_stream)
     }
 
     fn executed_steps(&self) -> u64 {
@@ -306,6 +302,19 @@ impl ProverEngine for AsmProver {
         phase: ProvePhase,
     ) -> Result<ZiskPhaseResult> {
         self.core_prover.backend.prove_phase(phase_inputs, options, phase)
+    }
+
+    fn set_partition(
+        &self,
+        total_compute_units: usize,
+        allocation: Vec<u32>,
+        rank_id: usize,
+    ) -> Result<()> {
+        self.core_prover.backend.set_partition(total_compute_units, allocation, rank_id)
+    }
+
+    fn is_first_partition(&self) -> Result<bool> {
+        self.core_prover.backend.is_first_partition()
     }
 
     fn aggregate_proofs(
