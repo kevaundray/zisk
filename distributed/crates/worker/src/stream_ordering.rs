@@ -115,9 +115,8 @@ impl Drop for StreamOrderingActor {
     fn drop(&mut self) {
         // Drop the sender first so the thread's recv() returns Err and exits
         self.sender.take();
-        // Then join to ensure the thread shuts down cleanly before we return
-        if let Some(handle) = self.thread_handle.take() {
-            let _ = handle.join();
-        }
+
+        // Drop the ordering thread, it will terminate promptly once the channel is closed.
+        self.thread_handle.take();
     }
 }

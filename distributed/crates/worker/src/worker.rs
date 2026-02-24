@@ -365,8 +365,14 @@ impl<T: ZiskBackend + 'static> Worker<T> {
         if let Some(handle) = self.current_computation.take() {
             handle.abort();
         }
-        // Drop the actor: closes the channel, which signals the ordering thread to exit
-        self.stream_actor = None;
+
+        // Drop the actor on a blocking thread: closes the channel, which signals the ordering
+        // thread to exit, without blocking the Tokio runtime worker thread.
+        if let Some(stream_actor) = self.stream_actor.take() {
+            tokio::task::spawn_blocking(move || {
+                drop(stream_actor);
+            });
+        }
     }
 
     pub fn new_job(
