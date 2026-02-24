@@ -117,7 +117,7 @@ impl<F: PrimeField64> Instance<F> for RomInstance {
         if self.is_asm_execution() {
             // Check if we already have the result cached
             if self.asm_result.lock().unwrap().is_none() {
-                // Join the thread and cache the result
+                // Retrieve the data from the assembly runner
                 let rh_data = self.rh_data.lock().unwrap().take().unwrap();
                 *self.asm_result.lock().unwrap() = Some(rh_data);
             }
