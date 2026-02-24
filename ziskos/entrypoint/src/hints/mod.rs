@@ -29,6 +29,8 @@ use zisk_common::io::{StreamWrite, UnixSocketStreamWriter};
 
 #[cfg(zisk_hints_single_thread)]
 use std::thread::ThreadId;
+#[cfg(zisk_hints_single_thread)]
+use std::sync::Mutex;
 
 pub use bls12_381::*;
 pub use bn254::*;
