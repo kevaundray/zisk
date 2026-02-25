@@ -228,7 +228,7 @@ impl MemBusHelpers {
     }
 
     /// Generates multiple aligned memory double load operations from a slice of values. This function
-    /// is usefull for memcmp when are aligned because the words must be the same. At same time do dst
+    /// is useful for memcmp when are aligned because the words must be the same. At same time do dst
     /// and src read. The address must be 8-byte aligned.
     pub fn mem_double_aligned_read_from_slice<P: MemProcessor>(
         dst: u32,
@@ -319,7 +319,7 @@ impl MemBusHelpers {
     }
 
     /// Generates aligned memory reads from an unaligned read slice using the specified source offset.
-    /// This function is usefull for memcmp, because at same time read src and dst like memcpy but only
+    /// This function is useful for memcmp, because at same time read src and dst like memcpy but only
     /// with reads. The number of dst reads generated is `values.len() - 1` because the last value is not
     /// enough to create a full 8-byte dst read. The address must be 8-byte aligned.
     pub fn mem_aligned_read_from_read_unaligned_slice<P: MemProcessor>(

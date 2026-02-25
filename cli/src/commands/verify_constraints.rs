@@ -3,7 +3,6 @@ use anyhow::Result;
 
 use clap::Parser;
 use colored::Colorize;
-use std::panic;
 use std::path::PathBuf;
 use tracing::warn;
 use zisk_build::ZISK_VERSION_MESSAGE;
@@ -80,16 +79,16 @@ pub struct ZiskVerifyConstraints {
 
 impl ZiskVerifyConstraints {
     pub fn run(&mut self) -> Result<()> {
-        panic::set_hook(Box::new(|panic_info| {
-            eprintln!("\x1B[31mPANIC DETECTED");
-            eprintln!("{} at {:?}", panic_info, panic_info.location());
+        // panic::set_hook(Box::new(|panic_info| {
+        //     eprintln!("\x1B[31mPANIC DETECTED");
+        //     eprintln!("{} at {:?}", panic_info, panic_info.location());
 
-            // Backtrace
-            let bt = std::backtrace::Backtrace::force_capture();
-            eprintln!("Backtrace:\n{}", bt);
+        //     // Backtrace
+        //     let bt = std::backtrace::Backtrace::force_capture();
+        //     eprintln!("Backtrace:\n{}", bt);
 
-            std::process::exit(101);
-        }));
+        //     std::process::exit(101);
+        // }));
 
         // Check if the deprecated alias was used
         if std::env::args().any(|arg| arg == "--input") {

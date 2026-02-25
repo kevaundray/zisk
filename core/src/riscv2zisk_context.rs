@@ -2056,8 +2056,6 @@ pub fn add_zisk_code(rom: &mut ZiskRom, addr: u64, data: &[u8], _dma_addrs: (u64
     // Convert data vector to RISCV instructions
     let riscv_instructions = riscv_interpreter(addr, &code_vector);
 
-    // dma_direct_calls(&riscv_instructions, _dma_addrs);
-
     // Create a context to convert RISCV instructions to ZisK instructions, using rom.insts
     let mut ctx = Riscv2ZiskContext {
         insts: &mut rom.insts,

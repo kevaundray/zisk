@@ -93,17 +93,14 @@ where
                 .collect()
         }
         (Some(f_idx), Some(l_idx)) if f_idx == l_idx => {
-            // Same vector is both first and last (edge case: huge operation)
-            // Just put it first (or last, doesn't matter)
-            if f_idx == 0 {
-                inputs.iter().flatten().collect()
-            } else {
-                std::iter::once(&inputs[f_idx])
-                    .chain(inputs[..f_idx].iter())
-                    .chain(inputs[f_idx + 1..].iter())
-                    .flatten()
-                    .collect()
-            }
+            // Same vector is both first and last: all constrained inputs belong to one
+            // large ("huge") DMA operation that spans from its first to its last element.
+            // The only case in which this can happen is when there is a single collector and,
+            // therefore, the length of the collector’s input list is 1. Within a collector,
+            // the number of inputs does not necessarily have to be 1.
+            assert!(f_idx == 0);
+            assert!(inputs.len() == 1);
+            inputs.iter().flatten().collect()
         }
         (Some(f_idx), Some(l_idx)) if f_idx == 0 && l_idx == inputs.len() - 1 => {
             // Already in correct order

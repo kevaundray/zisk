@@ -4,7 +4,7 @@ use std::io::{BufWriter, Write};
 
 use crate::{get_ops_costs, StatsCosts, MAIN_COST};
 
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub struct CallerInfo {
     pub calls: usize,
     pub steps: usize,
