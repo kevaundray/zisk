@@ -34,6 +34,7 @@ const int BLAKE2BR_PERMUTATION_ID = 127;
 const int DMA_BUS_ID = 8000;
 const int DMA_ROM_ID = 8001;
 const int DMA_PRE_POST_TABLE_ID = 8002;
+const int DMA_BYTE_CMP_TABLE_ID = 8003;
 
 // Ranges
 const int DUAL_RANGE_7_BITS_ID = 77;

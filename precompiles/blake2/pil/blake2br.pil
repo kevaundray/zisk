@@ -10,7 +10,7 @@ require "opids.pil"
 
 // We use little-endian representation
 
-airtemplate Blake2br(const int N = 2**20, const int operation_bus_id = OPERATION_BUS_ID) {
+airtemplate Blake2br(const int N = 2**20) {
     /*
        ═══════════════════════════════════════════════════════════════════════════
        BLAKE2B ROUND FUNCTION SPECIFICATION
@@ -520,7 +520,8 @@ airtemplate Blake2br(const int N = 2**20, const int operation_bus_id = OPERATION
     col witness bits(1) in_use_clk_0; // 1 at the first clock cycle of the Blake2br operation, 0 otherwise
     in_use_clk_0 <== CLK_0 * in_use;
 
-    lookup_proves(operation_bus_id, [OP_BLAKE2BR, 0, 0, step_addr'(ADDR_OP), 0, 0, 0, 0, step_addr'(STEP_MAIN)], mul: in_use_clk_0);
+    proves_operation(op: OP_BLAKE2BR, b: [step_addr'(ADDR_OP), 0], main_step: step_addr'(STEP_MAIN), 
+                     mul: in_use_clk_0);
 
     function pack_bits(const expr a[]): expr {
         const int len = length(a);
