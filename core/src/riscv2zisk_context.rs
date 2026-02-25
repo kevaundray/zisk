@@ -14,10 +14,11 @@ use crate::{
 };
 
 use std::collections::HashMap;
-// The CSR precompiled addresses are defined in the `ZiskOS` `ziskos/entrypoint/src` files
-// because legacy versions of Rust do not support constant parameters in `asm!` macros.
 
-const CSR_PRECOMPILED: [&str; 25] = [
+// The CSR precompiled addresses are defined in the `definitions/src/syscall.rs` file
+// because legacy versions of Rust do not support constant parameters in `asm!` macros.
+// Important: The order should be the same as in such file.
+const CSR_PRECOMPILED: [&str; 26] = [
     "keccak",
     "arith256",
     "arith256_mod",
@@ -35,7 +36,7 @@ const CSR_PRECOMPILED: [&str; 25] = [
     "bls12_381_complex_add",
     "bls12_381_complex_sub",
     "bls12_381_complex_mul",
-    "add256",
+    "add256", // Note: Constant CSR_PRECOMPILED_ADD256 needs to be updated if this is moved
     "poseidon2",
     "dma_memcpy",
     "dma_memcmp",
@@ -43,6 +44,7 @@ const CSR_PRECOMPILED: [&str; 25] = [
     "dma_memset",
     "secp256r1_add",
     "secp256r1_dbl",
+    "blake2",
 ];
 const CSR_PRECOMPILED_ADDR_START: u32 = 0x800;
 const CSR_PRECOMPILED_ADDR_END: u32 = CSR_PRECOMPILED_ADDR_START + CSR_PRECOMPILED.len() as u32;

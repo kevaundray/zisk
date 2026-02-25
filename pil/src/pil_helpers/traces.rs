@@ -16,7 +16,7 @@ use std::fmt;
 #[allow(dead_code)]
 type FieldExtension<F> = [F; 3];
 
-pub const PILOUT_HASH: &str = "afb474f9c9b38252b8443eabb79061a3d02ed2fc237a247a09c9d26d3c420e6b";
+pub const PILOUT_HASH: &str = "8974008e4b3256f291a870e441a2b9657b4bcf255884d6dd0a084a430436a715";
 
 pub const MERKLE_TREE_ARITY: u64 = 4;
 
@@ -88,11 +88,13 @@ pub const SHA_256_F_AIR_IDS: &[usize] = &[29];
 
 pub const POSEIDON_2_AIR_IDS: &[usize] = &[30];
 
-pub const SPECIFIED_RANGES_AIR_IDS: &[usize] = &[31];
+pub const BLAKE_2_BR_AIR_IDS: &[usize] = &[31];
 
-pub const VIRTUAL_TABLE_0_AIR_IDS: &[usize] = &[32];
+pub const SPECIFIED_RANGES_AIR_IDS: &[usize] = &[32];
 
-pub const VIRTUAL_TABLE_1_AIR_IDS: &[usize] = &[33];
+pub const VIRTUAL_TABLE_0_AIR_IDS: &[usize] = &[33];
+
+pub const VIRTUAL_TABLE_1_AIR_IDS: &[usize] = &[34];
 
 
 //PUBLICS
@@ -567,37 +569,51 @@ pub type Poseidon2Trace<F> = GenericTrace<Poseidon2TraceRow<F>, 131072, 0, 30>;
 pub type Poseidon2TracePacked<F> = GenericTrace<Poseidon2TraceRowPacked<F>, 131072, 0, 30>;
 
 
+trace_row!(Blake2brFixedRow<F> {
+ CLK_0: F, MSG_IDX: F, __L1__: F,
+});
+pub type Blake2brFixed<F> = GenericTrace<Blake2brFixedRow<F>, 262144, 0, 31>;
+
+trace_row!(Blake2brTraceRow<F> {
+ in_use:bit, round_idx:ubit(4), round_idx_sel:[bit; 10], sigma_idx:ubit(4), m_limbs:[[u16; 2]; 2], ms:[u32; 2], perm_active:bit, g_active:bit, va_limbs:[[u16; 2]; 2], vc_limbs:[[u16; 2]; 2], vb:[[bit; 32]; 2], vd:[[bit; 32]; 2], step_addr:ubit(40), in_use_clk_0:bit,
+});
+pub type Blake2brTrace<F> = GenericTrace<Blake2brTraceRow<F>, 262144, 0, 31>;
+
+
+pub type Blake2brTracePacked<F> = GenericTrace<Blake2brTraceRowPacked<F>, 262144, 0, 31>;
+
+
 trace_row!(SpecifiedRangesFixedRow<F> {
  OPID: [F; 29], VALS: [F; 29], __L1__: F,
 });
-pub type SpecifiedRangesFixed<F> = GenericTrace<SpecifiedRangesFixedRow<F>, 1048576, 0, 31>;
+pub type SpecifiedRangesFixed<F> = GenericTrace<SpecifiedRangesFixedRow<F>, 1048576, 0, 32>;
 
 trace_row!(SpecifiedRangesTraceRow<F> {
  mul:[F; 29],
 });
-pub type SpecifiedRangesTrace<F> = GenericTrace<SpecifiedRangesTraceRow<F>, 1048576, 0, 31>;
+pub type SpecifiedRangesTrace<F> = GenericTrace<SpecifiedRangesTraceRow<F>, 1048576, 0, 32>;
 
 
 trace_row!(VirtualTable0FixedRow<F> {
  UID: [F; 8], column: [F; 43], __L1__: F,
 });
-pub type VirtualTable0Fixed<F> = GenericTrace<VirtualTable0FixedRow<F>, 2097152, 0, 32>;
+pub type VirtualTable0Fixed<F> = GenericTrace<VirtualTable0FixedRow<F>, 2097152, 0, 33>;
 
 trace_row!(VirtualTable0TraceRow<F> {
  multiplicity:[F; 8],
 });
-pub type VirtualTable0Trace<F> = GenericTrace<VirtualTable0TraceRow<F>, 2097152, 0, 32>;
+pub type VirtualTable0Trace<F> = GenericTrace<VirtualTable0TraceRow<F>, 2097152, 0, 33>;
 
 
 trace_row!(VirtualTable1FixedRow<F> {
  UID: [F; 8], column: [F; 64], __L1__: F,
 });
-pub type VirtualTable1Fixed<F> = GenericTrace<VirtualTable1FixedRow<F>, 2097152, 0, 33>;
+pub type VirtualTable1Fixed<F> = GenericTrace<VirtualTable1FixedRow<F>, 2097152, 0, 34>;
 
 trace_row!(VirtualTable1TraceRow<F> {
  multiplicity:[F; 8],
 });
-pub type VirtualTable1Trace<F> = GenericTrace<VirtualTable1TraceRow<F>, 2097152, 0, 33>;
+pub type VirtualTable1Trace<F> = GenericTrace<VirtualTable1TraceRow<F>, 2097152, 0, 34>;
 
 
 trace_row!(RomRomTraceRow<F> {
@@ -794,6 +810,10 @@ values!(Poseidon2AirGroupValues<F> {
  gsum_result: FieldExtension<F>,
 });
 
+values!(Blake2brAirGroupValues<F> {
+ gsum_result: FieldExtension<F>,
+});
+
 values!(SpecifiedRangesAirGroupValues<F> {
  gsum_result: FieldExtension<F>,
 });
@@ -956,5 +976,10 @@ pub const PACKED_INFO: &[(usize, usize, PackedInfoConst)] = &[
         is_packed: true,
         num_packed_words: 17,
         unpack_info: &[1, 1, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 40],
+    }),
+    (0, 31, PackedInfoConst {
+        is_packed: true,
+        num_packed_words: 7,
+        unpack_info: &[1, 4, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 4, 16, 16, 16, 16, 32, 32, 1, 1, 16, 16, 16, 16, 16, 16, 16, 16, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 40, 1],
     }),
 ];

@@ -74,6 +74,8 @@ pub const OPERATION_BUS_SECP256R1_ADD_DATA_SIZE: usize =
     OPERATION_PRECOMPILED_BUS_DATA_SIZE + 2 * INDIRECTION_SIZE + 2 * POINT_256_BITS_SIZE;
 pub const OPERATION_BUS_SECP256R1_DBL_DATA_SIZE: usize =
     OPERATION_PRECOMPILED_BUS_DATA_SIZE + POINT_256_BITS_SIZE;
+pub const OPERATION_BUS_BLAKE2_DATA_SIZE: usize =
+    OPERATION_PRECOMPILED_BUS_DATA_SIZE + 2 * INDIRECTION_SIZE + 33 * DATA_64_BITS_SIZE;
 
 // bus_data_size + 4 params (&a, &b, cin, &c, a, b)
 pub const OPERATION_BUS_ADD_256_DATA_SIZE: usize = OPERATION_PRECOMPILED_BUS_DATA_SIZE
@@ -94,8 +96,7 @@ pub const OPERATION_BUS_DMA_INPUTCPY_DATA_SIZE: usize = OPERATION_PRECOMPILED_BU
 // 5 bus_precompiled_data + encoded (fill_byte encoded)
 pub const OPERATION_BUS_DMA_XMEMSET_DATA_SIZE: usize = OPERATION_PRECOMPILED_BUS_DATA_SIZE + 1;
 
-// 4 bus_data + 5 addr + 4 x 384 = 4 + 5 + 4 * 6 = 33
-pub const MAX_OPERATION_DATA_SIZE: usize = OPERATION_BUS_ARITH_384_MOD_DATA_SIZE;
+pub const MAX_OPERATION_DATA_SIZE: usize = OPERATION_BUS_BLAKE2_DATA_SIZE;
 
 /// Index of the operation value in the operation data payload.
 pub const OP: usize = 0;
@@ -143,6 +144,7 @@ pub type OperationDmaXMemCmpData<D> = [D; OPERATION_BUS_DMA_XMEMCMP_DATA_SIZE];
 pub type OperationDmaXMemSetData<D> = [D; OPERATION_BUS_DMA_XMEMSET_DATA_SIZE];
 pub type OperationSecp256r1AddData<D> = [D; OPERATION_BUS_SECP256R1_ADD_DATA_SIZE];
 pub type OperationSecp256r1DblData<D> = [D; OPERATION_BUS_SECP256R1_DBL_DATA_SIZE];
+pub type OperationBlake2Data<D> = [D; OPERATION_BUS_BLAKE2_DATA_SIZE];
 
 pub enum ExtOperationData<D> {
     OperationData(OperationData<D>),
@@ -173,6 +175,7 @@ pub enum ExtOperationData<D> {
     OperationDmaXMemCmpData(OperationDmaXMemCmpData<D>),
     OperationSecp256r1AddData(OperationSecp256r1AddData<D>),
     OperationSecp256r1DblData(OperationSecp256r1DblData<D>),
+    OperationBlake2Data(OperationBlake2Data<D>),
 }
 
 // impl<D: Copy + Into<u8>> TryFrom<&[D]> for ExtOperationData<D> {
@@ -199,6 +202,11 @@ impl<D: Copy + Into<u64>> TryFrom<&[D]> for ExtOperationData<D> {
                 let array: OperationPoseidon2Data<D> =
                     data.try_into().map_err(|_| "Invalid OperationPoseidon2Data size")?;
                 Ok(ExtOperationData::OperationPoseidon2Data(array))
+            }
+            ZiskOp::BLAKE2 => {
+                let array: OperationBlake2Data<D> =
+                    data.try_into().map_err(|_| "Invalid OperationBlake2Data size")?;
+                Ok(ExtOperationData::OperationBlake2Data(array))
             }
             ZiskOp::ARITH256 => {
                 let array: OperationArith256Data<D> =
@@ -405,6 +413,16 @@ impl OperationBusData<u64> {
                 ExtOperationData::OperationPoseidon2Data(data)
             }
 
+            ZiskOperationType::Blake2 => {
+                let mut data =
+                    unsafe { uninit_array::<OPERATION_BUS_BLAKE2_DATA_SIZE>().assume_init() };
+                data[0..OPERATION_PRECOMPILED_BUS_DATA_SIZE]
+                    .copy_from_slice(&[op, op_type, a, b, step]);
+                data[OPERATION_PRECOMPILED_BUS_DATA_SIZE..]
+                    .copy_from_slice(&ctx.precompiled.input_data);
+                ExtOperationData::OperationBlake2Data(data)
+            }
+
             ZiskOperationType::ArithEq => match inst.op {
                 ZiskOp::ARITH256 => {
                     let mut data = unsafe {
@@ -598,6 +616,7 @@ impl OperationBusData<u64> {
                 }
                 _ => ExtOperationData::OperationData([op, op_type, a, b]),
             },
+
             ZiskOperationType::Dma => match inst.op {
                 ZiskOp::DMA_MEMCPY => {
                     let mut data = unsafe {
@@ -704,6 +723,15 @@ impl OperationBusData<u64> {
                 buffer[OPERATION_PRECOMPILED_BUS_DATA_SIZE..OPERATION_BUS_POSEIDON2_DATA_SIZE]
                     .copy_from_slice(&ctx.precompiled.input_data);
                 &buffer[..OPERATION_BUS_POSEIDON2_DATA_SIZE]
+            }
+
+            ZiskOperationType::Blake2 => {
+                debug_assert_eq!(ctx.precompiled.input_data.len(), 35);
+                buffer[0..OPERATION_PRECOMPILED_BUS_DATA_SIZE]
+                    .copy_from_slice(&[op, op_type, a, b, step]);
+                buffer[OPERATION_PRECOMPILED_BUS_DATA_SIZE..OPERATION_BUS_BLAKE2_DATA_SIZE]
+                    .copy_from_slice(&ctx.precompiled.input_data);
+                &buffer[..OPERATION_BUS_BLAKE2_DATA_SIZE]
             }
 
             ZiskOperationType::ArithEq => match inst.op {
@@ -872,6 +900,7 @@ impl OperationBusData<u64> {
                     &buffer[..OPERATION_BUS_DATA_SIZE]
                 }
             },
+
             ZiskOperationType::BigInt => match inst.op {
                 ZiskOp::ADD256 => {
                     let len =
@@ -887,6 +916,7 @@ impl OperationBusData<u64> {
                     &buffer[..OPERATION_BUS_DATA_SIZE]
                 }
             },
+
             ZiskOperationType::Dma => match inst.op {
                 ZiskOp::DMA_MEMCPY
                 | ZiskOp::DMA_MEMCMP
@@ -953,6 +983,7 @@ impl OperationBusData<u64> {
             ExtOperationData::OperationDmaXMemCmpData(d) => d[OP] as u8,
             ExtOperationData::OperationSecp256r1AddData(d) => d[OP] as u8,
             ExtOperationData::OperationSecp256r1DblData(d) => d[OP] as u8,
+            ExtOperationData::OperationBlake2Data(d) => d[OP] as u8,
         }
     }
 
@@ -994,6 +1025,7 @@ impl OperationBusData<u64> {
             ExtOperationData::OperationDmaXMemCmpData(d) => d[OP_TYPE],
             ExtOperationData::OperationSecp256r1AddData(d) => d[OP_TYPE],
             ExtOperationData::OperationSecp256r1DblData(d) => d[OP_TYPE],
+            ExtOperationData::OperationBlake2Data(d) => d[OP_TYPE],
         }
     }
 
@@ -1035,6 +1067,7 @@ impl OperationBusData<u64> {
             ExtOperationData::OperationDmaXMemCmpData(d) => d[A],
             ExtOperationData::OperationSecp256r1AddData(d) => d[A],
             ExtOperationData::OperationSecp256r1DblData(d) => d[A],
+            ExtOperationData::OperationBlake2Data(d) => d[A],
         }
     }
 
@@ -1076,6 +1109,7 @@ impl OperationBusData<u64> {
             ExtOperationData::OperationDmaXMemCmpData(d) => d[B],
             ExtOperationData::OperationSecp256r1AddData(d) => d[B],
             ExtOperationData::OperationSecp256r1DblData(d) => d[B],
+            ExtOperationData::OperationBlake2Data(d) => d[B],
         }
     }
 }
