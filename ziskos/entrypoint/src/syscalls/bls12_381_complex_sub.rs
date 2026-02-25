@@ -41,7 +41,7 @@ pub extern "C" fn syscall_bls12_381_complex_sub(
     #[cfg(feature = "hints")] hints: &mut Vec<u64>,
 ) {
     #[cfg(feature = "zisk_guest")]
-    ziskos_syscall!(0x80F, params);
+    ziskos_syscall!(zisk_definitions::SYSCALL_BLS12_381_COMPLEX_SUB_ID, params);
     #[cfg(not(feature = "zisk_guest"))]
     {
         let f1 = [params.f1.x, params.f1.y].concat().try_into().unwrap();

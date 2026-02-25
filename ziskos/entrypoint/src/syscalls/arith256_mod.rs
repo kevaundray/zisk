@@ -41,7 +41,7 @@ pub extern "C" fn syscall_arith256_mod(
     #[cfg(feature = "hints")] hints: &mut Vec<u64>,
 ) {
     #[cfg(feature = "zisk_guest")]
-    ziskos_syscall!(0x802, params);
+    ziskos_syscall!(zisk_definitions::SYSCALL_ARITH256_MOD_ID, params);
     #[cfg(not(feature = "zisk_guest"))]
     {
         precompiles_helpers::arith256_mod(params.a, params.b, params.c, params.module, params.d);

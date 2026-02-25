@@ -40,7 +40,7 @@ pub extern "C" fn syscall_secp256k1_add(
     #[cfg(feature = "hints")] hints: &mut Vec<u64>,
 ) {
     #[cfg(feature = "zisk_guest")]
-    ziskos_syscall!(0x803, params);
+    ziskos_syscall!(zisk_definitions::SYSCALL_SECP256K1_ADD_ID, params);
     #[cfg(not(feature = "zisk_guest"))]
     {
         let p1 = [params.p1.x, params.p1.y].concat().try_into().unwrap();

@@ -17,6 +17,7 @@ cfg-if = "1.0"
 tiny-keccak = { version = "2.0.0", features = ["keccak"] }
 serde = { workspace = true, features = ["alloc"] }
 bincode = { workspace = true, features = ["alloc"] }
+zisk-definitions = { path = "../../definitions" }
 
 # Host-only dependencies (activated by zisk_host feature)
 lib-c = { workspace = true, optional = true }
@@ -39,6 +40,7 @@ ctor = { version = "0.2", optional = true }
 [features]
 default = ["zisk_host"]
 zisk_guest = ["dep:portable-atomic", "spin/portable_atomic"]
+inputcpy = []
 zisk_host = [
     "dep:zisk-common", "dep:bytes", "dep:paste", "dep:once_cell", "dep:ctor", "dep:anyhow", "dep:tokio",
     "dep:num-bigint", "dep:num-integer", "dep:num-traits",

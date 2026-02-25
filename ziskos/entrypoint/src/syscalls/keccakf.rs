@@ -28,7 +28,7 @@ pub unsafe extern "C" fn syscall_keccak_f(
     #[cfg(feature = "hints")] hints: &mut Vec<u64>,
 ) {
     #[cfg(feature = "zisk_guest")]
-    ziskos_syscall!(0x800, state);
+    ziskos_syscall!(zisk_definitions::SYSCALL_KECCAKF_ID, state);
     #[cfg(not(feature = "zisk_guest"))]
     {
         // Call keccakf

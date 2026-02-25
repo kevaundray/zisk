@@ -15,6 +15,8 @@ compile_error!("either feature `zisk_guest` or `zisk_host` must be enabled");
 #[cfg(feature = "zisk_guest")]
 use core::arch::asm;
 #[cfg(feature = "zisk_guest")]
+mod dma;
+#[cfg(feature = "zisk_guest")]
 mod fcall;
 mod profile;
 #[cfg(feature = "zisk_guest")]
