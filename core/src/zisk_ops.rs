@@ -23,7 +23,7 @@ use std::{
 use tiny_keccak::keccakf;
 
 use crate::{
-    sha256f, blake2br, EmulationMode, InstContext, Mem, ZiskOperationType, ZiskRequiredOperation,
+    blake2br, sha256f, EmulationMode, InstContext, Mem, ZiskOperationType, ZiskRequiredOperation,
     EXTRA_PARAMS_ADDR, M64, REG_A0, SYS_ADDR,
 };
 

@@ -25,7 +25,7 @@ pub extern "C" fn syscall_blake2b_round(
     #[cfg(feature = "hints")] hints: &mut Vec<u64>,
 ) {
     #[cfg(all(target_os = "zkvm", target_vendor = "zisk"))]
-    ziskos_syscall!(0x817, params);
+    ziskos_syscall!(zisk_definitions::SYSCALL_BLAKE2B_ROUND_ID, params);
 
     #[cfg(not(all(target_os = "zkvm", target_vendor = "zisk")))]
     {

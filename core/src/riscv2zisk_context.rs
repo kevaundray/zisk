@@ -15,7 +15,7 @@ use crate::{
 
 use std::collections::HashMap;
 
-// The CSR precompiled addresses are defined in the `ziskos/entrypoint/src/syscall.rs` file
+// The CSR precompiled addresses are defined in the `definitions/src/syscall.rs` file
 // because legacy versions of Rust do not support constant parameters in `asm!` macros.
 // Important: The order should be the same as in such file.
 const CSR_PRECOMPILED: [&str; 26] = [

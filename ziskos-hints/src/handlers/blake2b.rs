@@ -13,7 +13,7 @@ pub fn blake2b_compress_hint(data: &[u64]) -> Result<Vec<u64>> {
     let mut state: [u64; 8] = data[STATE_OFFSET..STATE_OFFSET + STATE_SIZE].try_into().unwrap();
     let message = data[MESSAGE_OFFSET..MESSAGE_OFFSET + MESSAGE_SIZE].try_into().unwrap();
     let offset = data[OFFSET_OFFSET..OFFSET_OFFSET + OFFSET_SIZE].try_into().unwrap();
-    let final_block = data[FINAL_BLOCK_OFFSET] as u64 != 0;
+    let final_block = data[FINAL_BLOCK_OFFSET] != 0;
 
     let mut hints = Vec::new();
     zisklib::blake2b_compress(rounds, &mut state, message, offset, final_block, &mut hints);
