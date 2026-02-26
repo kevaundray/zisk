@@ -11,6 +11,11 @@ pub unsafe extern "C" fn hint_custom(
         return;
     }
 
+    #[cfg(zisk_hints_single_thread)]
+    if crate::hints::check_main_thread() {
+        return;
+    }
+
     let mut w = HINT_BUFFER.begin_hint(hint_id, data_len, is_result != 0);
 
     w.write_hint_data_ptr(data_ptr, data_len);

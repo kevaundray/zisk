@@ -272,13 +272,13 @@ To generate hints from the guest program you need to follow these steps and requ
 4. **Enable hints at compile time**: Compile your guest program with `RUSTFLAGS='--cfg zisk_hints'` for the native target to activate hint code generation and FFI helper functions in the `ziskos` crate.
 5. **Ensure deterministic execution**: Verify that both the native execution that generates hints and the guest compiled for the `zkvm/zisk` target execute deterministically and produce/consume hints in the exact same order. See [Deterministic Execution Requirement](#54-deterministic-execution-requirement).
 
-To illustrate these steps, consider the `zisk-reth` guest program, which executes and verifies Ethereum Mainnet blocks using the ZisK zkVM:
+To illustrate these steps, consider the `zec-reth` guest program, which executes and verifies Ethereum Mainnet blocks using the ZisK zkVM:
 
 https://github.com/0xPolygonHermez/zisk-eth-client/tree/main-reth/bin/guest
 
 ### 5.1 Emit Hint Requests
 
-`zisk-reth` relies on `reth` crates, which expose a `Crypto` trait that allows a guest program to override precompile implementations. This enables zkVM-optimized implementations while also emitting hints so the computation can be performed outside the zkVM.
+`zec-reth` relies on `reth` crates, which expose a `Crypto` trait that allows a guest program to override precompile implementations. This enables zkVM-optimized implementations while also emitting hints so the computation can be performed outside the zkVM.
 
 For example, the SHA-256 implementation for the `Crypto` trait can be found here:
 
@@ -302,13 +302,13 @@ After the hint generation, execution continues in the native target code to comp
 To start hints generation from your guest program you must call one of the following functions from the `ziskos::hints` crate:
 
 ```rust
-pub fn init_hints_file(hints_file_path: PathBuf) -> io::Result<()>
+pub fn init_hints_file(hints_file_path: PathBuf, ready: Option<oneshot::Sender<()>>) -> Result<()>
 ```
 
 This function stores the generated hints in the file specified by the `hints_file_path` parameter.
 
 ```rust
-pub fn init_hints_socket(socket_path: PathBuf,ready: Option<oneshot::Sender<()>>) -> io::Result<()>
+pub fn init_hints_socket(socket_path: PathBuf, ready: Option<oneshot::Sender<()>>) -> io::Result<()>
 ```
 
 This function sends the hints through the Unix socket specified by the `socket_path` parameter.
@@ -365,6 +365,7 @@ Using threads or iterating over non-deterministically ordered data structures ma
 ### 5.5 FFI Hints Helper Functions
 
 | Code | Function |
+| ---- | -------- |
 | `0x0100` | `fn hint_sha256(f: *const u8, len: usize);` |
 | `0x0200` | `fn hint_bn254_g1_add(p1: *const u8, p2: *const u8);`|
 | `0x0201` | `fn hint_bn254_g1_mul(point: *const u8, scalar: *const u8);` |
