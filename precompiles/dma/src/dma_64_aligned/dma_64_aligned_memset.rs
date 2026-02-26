@@ -5,7 +5,6 @@ use fields::PrimeField64;
 use pil_std_lib::Std;
 use proofman_common::{AirInstance, FromTrace, ProofmanResult};
 use proofman_util::{timer_start_trace, timer_stop_and_log_trace};
-use rayon::iter::{IntoParallelRefMutIterator, ParallelIterator};
 use zisk_common::SegmentId;
 use zisk_pil::Dma64AlignedMemSetAirValues;
 
