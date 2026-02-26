@@ -1,4 +1,4 @@
-use crate::hints::{macros::define_hint_ptr, HINT_BUFFER};
+use crate::hints::HINT_BUFFER;
 
 #[no_mangle]
 pub unsafe extern "C" fn hint_custom(

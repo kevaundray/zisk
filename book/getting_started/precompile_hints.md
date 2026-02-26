@@ -368,7 +368,7 @@ Using threads or iterating over non-deterministically ordered data structures ma
 
 | Code | Function |
 | ---- | -------- |
-| `0x0100` | `fn hint_sha256(f: *const u8, len: usize);` |
+| `0x0100` | `fn hint_sha256(f_ptr: *const u8, f_len: usize);` |
 | `0x0200` | `fn hint_bn254_g1_add(p1: *const u8, p2: *const u8);`|
 | `0x0201` | `fn hint_bn254_g1_mul(point: *const u8, scalar: *const u8);` |
 | `0x0205` | `fn hint_bn254_pairing_check(pairs: *const u8, num_pairs: usize);` |
