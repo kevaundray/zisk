@@ -213,16 +213,14 @@ impl<F: PrimeField64> Dma64AlignedModule<F> for Dma64AlignedInputCpySM<F> {
             row_offset += rows_used;
         }
 
+        // padding
         let padding_size = num_rows.saturating_sub(row_offset);
         air_values.padding_size = F::from_u32(padding_size as u32);
 
-        // padding
         if padding_size > 0 {
-            self.process_empty_slice(&mut trace_rows[row_offset]);
-            let empty_row = trace_rows[row_offset];
-            trace_rows[row_offset + 1..].par_iter_mut().for_each(|row| {
-                *row = empty_row;
-            });
+            for padding_row in trace_rows.iter_mut().take(num_rows).skip(row_offset) {
+                self.process_empty_slice(padding_row);
+            }
             air_values.segment_last_seq_end = F::ONE;
             air_values.segment_last_dst64 = F::ZERO;
             air_values.segment_last_main_step = F::ZERO;

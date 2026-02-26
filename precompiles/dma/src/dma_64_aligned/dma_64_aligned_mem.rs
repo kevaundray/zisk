@@ -78,10 +78,10 @@ impl<F: PrimeField64> Dma64AlignedMemSM<F> {
         let mut src64 = ((input.src + 7) >> 3) + skip_count as u32;
         let mut seq_end = false;
         let addr_incr_by_row = self.op_x_rows as u32;
-        let is_memcpy = input.op == ZiskOp::DMA_XMEMCPY;
+        let is_memcpy = input.op == ZiskOp::DMA_XMEMCPY || input.op == ZiskOp::DMA_MEMCPY;
         let is_memeq = input.op == ZiskOp::DMA_MEMCMP || input.op == ZiskOp::DMA_XMEMCMP;
         let is_memset = input.op == ZiskOp::DMA_XMEMSET;
-        let fill_byte = if is_memset { (input.encoded & 0xFF) as u8 } else { 0 };
+        let fill_byte = if is_memset { DmaInfo::get_fill_byte(input.encoded) } else { 0 };
 
         for (irow, row) in trace.iter_mut().enumerate().take(rows) {
             row.set_main_step(input.step);
@@ -91,7 +91,6 @@ impl<F: PrimeField64> Dma64AlignedMemSM<F> {
                 row.set_sel_memcpy_count_load(input.op == ZiskOp::DMA_MEMCPY);
             }
             row.set_sel_memset(is_memset);
-            row.set_fill_byte(fill_byte);
             row.set_previous_seq_end(irow == 0 && input.skip_rows == 0);
 
             // calculate the first aligned address
@@ -104,25 +103,32 @@ impl<F: PrimeField64> Dma64AlignedMemSM<F> {
             row.set_count64(count64 as u32);
             let use_count = if count64 <= self.op_x_rows {
                 seq_end = true;
-                for index in count64..self.op_x_rows {
-                    if index > 0 {
-                        row.set_sel_op_from_1(index - 1, false);
-                    }
-                }
                 count64
             } else {
                 count64 -= self.op_x_rows;
                 self.op_x_rows
             };
             row.set_seq_end(seq_end);
-            for index in 0..use_count {
-                if index > 0 {
-                    row.set_sel_op_from_1(index - 1, true);
+            if !is_memset {
+                for index in 0..use_count {
+                    if index > 0 {
+                        row.set_sel_op_from_1(index - 1, true);
+                    }
+                    let value = input.src_values[src_values_index];
+                    row.set_value(index, 0, value as u32);
+                    row.set_value(index, 1, (value >> 32) as u32);
+                    src_values_index += 1;
                 }
-                let value = input.src_values[src_values_index];
-                row.set_value(index, 0, value as u32);
-                row.set_value(index, 1, (value >> 32) as u32);
-                src_values_index += 1;
+            } else {
+                let fill_bytes = fill_byte as u32 * 0x01010101;
+                row.set_fill_byte(fill_byte);
+                for index in 0..use_count {
+                    if index > 0 {
+                        row.set_sel_op_from_1(index - 1, true);
+                    }
+                    row.set_value(index, 0, fill_bytes);
+                    row.set_value(index, 1, fill_bytes);
+                }
             }
         }
 
@@ -136,6 +142,7 @@ impl<F: PrimeField64> Dma64AlignedMemSM<F> {
                 air_values.last_count_chunk[0] = F::ZERO;
                 air_values.last_count_chunk[1] = F::ZERO;
                 air_values.segment_last_flags = F::ZERO;
+                air_values.segment_last_fill_byte = F::ZERO;
             } else {
                 air_values.segment_last_seq_end = F::ZERO;
                 air_values.segment_last_src64 = F::from_u32(src64 - addr_incr_by_row);
@@ -152,6 +159,7 @@ impl<F: PrimeField64> Dma64AlignedMemSM<F> {
                     ZiskOp::DMA_XMEMSET => F_SEL_MEMSET,
                     _ => panic!("Invalid operation 0x{:02X}", input.op),
                 } as u16);
+                air_values.segment_last_fill_byte = F::from_u8(fill_byte);
             }
         }
         rows
@@ -227,13 +235,14 @@ impl<F: PrimeField64> Dma64AlignedModule<F> for Dma64AlignedMemSM<F> {
         }
 
         // padding
+        let padding_size = num_rows.saturating_sub(row_offset);
+        air_values.padding_size = F::from_u32(padding_size as u32);
+
         if row_offset < num_rows {
-            air_values.padding_size = F::from_u32((num_rows - row_offset) as u32);
-            self.process_empty_slice(&mut trace_rows[row_offset]);
-            let empty_row = trace_rows[row_offset];
-            trace_rows[row_offset + 1..].par_iter_mut().for_each(|row| {
-                *row = empty_row;
-            });
+            for padding_row in trace_rows.iter_mut().take(num_rows).skip(row_offset) {
+                self.process_empty_slice(padding_row);
+            }
+
             air_values.segment_last_seq_end = F::ONE;
             air_values.segment_last_src64 = F::ZERO;
             air_values.segment_last_dst64 = F::ZERO;
@@ -242,6 +251,7 @@ impl<F: PrimeField64> Dma64AlignedModule<F> for Dma64AlignedMemSM<F> {
             air_values.last_count_chunk[0] = F::ZERO;
             air_values.last_count_chunk[1] = F::ZERO;
             air_values.segment_last_flags = F::ZERO;
+            air_values.segment_last_fill_byte = F::ZERO;
         }
 
         // add range check of count to check that it's a positive 32-bits number
@@ -263,6 +273,7 @@ impl<F: PrimeField64> Dma64AlignedModule<F> for Dma64AlignedMemSM<F> {
             air_values.segment_previous_main_step = F::ZERO;
             air_values.segment_previous_count64 = F::ZERO;
             air_values.segment_previous_flags = F::ZERO;
+            air_values.segment_previous_fill_byte = F::ZERO;
         } else {
             assert!(segment_id > 0);
             air_values.segment_previous_seq_end = F::ZERO;
@@ -280,6 +291,7 @@ impl<F: PrimeField64> Dma64AlignedModule<F> for Dma64AlignedMemSM<F> {
                 ZiskOp::DMA_XMEMSET => F_SEL_MEMSET,
                 _ => panic!("Invalid operation 0x{:02X}", first_input.op),
             } as u16);
+            air_values.segment_previous_fill_byte = F::from_u8(trace_rows[0].get_fill_byte());
         }
         timer_stop_and_log_trace!(DMA_64_ALIGNED_TRACE);
         let from_trace = FromTrace::new(&mut trace).with_air_values(&mut air_values);

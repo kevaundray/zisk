@@ -75,10 +75,11 @@ impl<F: PrimeField64> Dma64AlignedMemSetSM<F> {
         let mut seq_end = false;
         let addr_incr_by_row = self.op_x_rows as u32;
 
+        let fill_byte = DmaInfo::get_fill_byte(input.encoded);
         for (irow, row) in trace.iter_mut().enumerate().take(rows) {
             row.set_main_step(input.step);
             row.set_sel_memset(true);
-            row.set_fill_byte(input.fill_byte);
+            row.set_fill_byte(fill_byte);
             row.set_previous_seq_end(irow == 0 && input.skip_rows == 0);
 
             // calculate the first aligned address
@@ -111,6 +112,7 @@ impl<F: PrimeField64> Dma64AlignedMemSetSM<F> {
                 air_values.last_count_chunk[0] = F::ZERO;
                 air_values.last_count_chunk[1] = F::ZERO;
                 air_values.segment_last_flags = F::ZERO;
+                air_values.segment_last_fill_byte = F::ZERO;
             } else {
                 air_values.segment_last_seq_end = F::ZERO;
                 air_values.segment_last_dst64 = F::from_u32(dst64 - addr_incr_by_row);
@@ -120,6 +122,7 @@ impl<F: PrimeField64> Dma64AlignedMemSetSM<F> {
                 air_values.last_count_chunk[0] = F::from_u16(last_count as u16);
                 air_values.last_count_chunk[1] = F::from_u16((last_count >> 16) as u16);
                 air_values.segment_last_flags = F::from_u16(F_SEL_MEMSET as u16);
+                air_values.segment_last_fill_byte = F::from_u8(fill_byte);
             }
         }
         rows
@@ -132,14 +135,6 @@ impl<F: PrimeField64> Dma64AlignedMemSetSM<F> {
     /// * `input` - The operation data to process.
     #[inline(always)]
     pub fn process_empty_slice(&self, trace: &mut Dma64AlignedMemSetTraceRow<F>) {
-        trace.set_main_step(0);
-        trace.set_sel_memset(false);
-        trace.set_fill_byte(0);
-        trace.set_dst64(0);
-        trace.set_count64(0);
-        for index in 0..self.op_x_rows - 1 {
-            trace.set_sel_op_from_1(index, false);
-        }
         trace.set_seq_end(true);
         trace.set_previous_seq_end(true);
     }
@@ -204,13 +199,13 @@ impl<F: PrimeField64> Dma64AlignedModule<F> for Dma64AlignedMemSetSM<F> {
         }
 
         // padding
+        let padding_size = num_rows.saturating_sub(row_offset);
+        air_values.padding_size = F::from_u32(padding_size as u32);
+
         if row_offset < num_rows {
-            air_values.padding_size = F::from_u32((num_rows - row_offset) as u32);
-            self.process_empty_slice(&mut trace_rows[row_offset]);
-            let empty_row = trace_rows[row_offset];
-            trace_rows[row_offset + 1..].par_iter_mut().for_each(|row| {
-                *row = empty_row;
-            });
+            for padding_row in trace_rows.iter_mut().take(num_rows).skip(row_offset) {
+                self.process_empty_slice(padding_row);
+            }
             air_values.segment_last_seq_end = F::ONE;
             air_values.segment_last_dst64 = F::ZERO;
             air_values.segment_last_main_step = F::ZERO;
@@ -218,6 +213,7 @@ impl<F: PrimeField64> Dma64AlignedModule<F> for Dma64AlignedMemSetSM<F> {
             air_values.last_count_chunk[0] = F::ZERO;
             air_values.last_count_chunk[1] = F::ZERO;
             air_values.segment_last_flags = F::ZERO;
+            air_values.segment_last_fill_byte = F::ZERO;
         }
 
         // add range check of count to check that it's a positive 32-bits number
@@ -238,6 +234,7 @@ impl<F: PrimeField64> Dma64AlignedModule<F> for Dma64AlignedMemSetSM<F> {
             air_values.segment_previous_main_step = F::ZERO;
             air_values.segment_previous_count64 = F::ZERO;
             air_values.segment_previous_flags = F::ZERO;
+            air_values.segment_previous_fill_byte = F::ZERO;
         } else {
             assert!(segment_id > 0);
             air_values.segment_previous_seq_end = F::ZERO;
@@ -247,6 +244,7 @@ impl<F: PrimeField64> Dma64AlignedModule<F> for Dma64AlignedMemSetSM<F> {
             air_values.segment_previous_count64 =
                 F::from_u32(trace_rows[0].get_count64() + self.op_x_rows as u32);
             air_values.segment_previous_flags = F::from_u16(F_SEL_MEMSET as u16);
+            air_values.segment_previous_fill_byte = F::from_u8(trace_rows[0].get_fill_byte());
         }
         timer_stop_and_log_trace!(DMA_64_ALIGNED_TRACE);
         let from_trace = FromTrace::new(&mut trace).with_air_values(&mut air_values);

@@ -16,7 +16,6 @@ pub struct Dma64AlignedInput {
     pub step: u64,
     pub encoded: u64,
     pub src_values: Vec<u64>,
-    pub fill_byte: u8,
 }
 
 impl Dma64AlignedInput {
@@ -77,7 +76,6 @@ impl Dma64AlignedInput {
                 }
                 _ => op,
             },
-            fill_byte: 0,
         }
     }
     pub fn from_memset(
@@ -103,7 +101,6 @@ impl Dma64AlignedInput {
             encoded,
             src_values: vec![],
             op,
-            fill_byte: DmaInfo::get_fill_byte(encoded),
         }
     }
     pub fn from_memcmp(
@@ -144,7 +141,6 @@ impl Dma64AlignedInput {
                 }
                 _ => op,
             },
-            fill_byte: 0,
         }
     }
 

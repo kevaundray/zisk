@@ -207,13 +207,13 @@ impl<F: PrimeField64> Dma64AlignedModule<F> for Dma64AlignedMemCpySM<F> {
         }
 
         // padding
+        let padding_size = num_rows.saturating_sub(row_offset);
+        air_values.padding_size = F::from_u32(padding_size as u32);
+
         if row_offset < num_rows {
-            air_values.padding_size = F::from_u32((num_rows - row_offset) as u32);
-            self.process_empty_slice(&mut trace_rows[row_offset]);
-            let empty_row = trace_rows[row_offset];
-            trace_rows[row_offset + 1..].par_iter_mut().for_each(|row| {
-                *row = empty_row;
-            });
+            for padding_row in trace_rows.iter_mut().take(num_rows).skip(row_offset) {
+                self.process_empty_slice(padding_row);
+            }
             air_values.segment_last_seq_end = F::ONE;
             air_values.segment_last_src64 = F::ZERO;
             air_values.segment_last_dst64 = F::ZERO;
