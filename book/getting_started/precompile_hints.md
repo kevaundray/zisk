@@ -359,6 +359,8 @@ If you want to display metrics in the console about the number of hints generate
 
 To enable hint support when executing the guest inside the zkVM (ELF guest), you must pass the `--hints` flag when generating the assembly ROM using the `cargo-zisk rom-setup` command.
 
+**NOTE:** Hint processing is not supported when executing the guest ELF file in emulation mode.
+
 ### 5.4 Deterministic Execution Requirement
 
 An important requirement of the hints generation flow is that the native execution that generates the hints must be fully deterministic and always produce hints in the exact same order.
