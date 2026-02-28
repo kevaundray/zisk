@@ -27,24 +27,24 @@ use std::{
 use tracing::info;
 use zisk_common::io::StreamSource;
 use zisk_common::ElfBinaryLike;
-use zisk_common::{io::ZiskStdin, ExecutorStatsHandle, StatsCostPerType, ZiskExecutionResult};
+use zisk_common::{io::ZiskStdin, ExecutorStatsHandle, StatsCostPerType, ZiskExecutorSummary};
 use zisk_core::ZiskRom;
 
 pub struct ZiskExecuteResult {
-    pub execution: ZiskExecutionResult,
+    pub total_duration: Duration,
+    pub executor_summary: ZiskExecutorSummary,
     pub planning_info: PlanningInfo,
-    pub duration: Duration,
     pub publics: ZiskPublics,
 }
 
 impl ZiskExecuteResult {
     pub fn new(
-        execution: ZiskExecutionResult,
+        total_duration: Duration,
+        executor_summary: ZiskExecutorSummary,
         planning_info: PlanningInfo,
-        duration: Duration,
         publics: &[u8],
     ) -> Self {
-        Self { execution, planning_info, duration, publics: ZiskPublics::new(publics) }
+        Self { total_duration, executor_summary, planning_info, publics: ZiskPublics::new(publics) }
     }
 
     pub fn get_publics(&self) -> &ZiskPublics {
@@ -58,24 +58,24 @@ impl ZiskExecuteResult {
     }
 
     pub fn get_execution_steps(&self) -> u64 {
-        self.execution.steps
+        self.executor_summary.steps
     }
 
     pub fn get_execution_total_cost(&self) -> u64 {
-        self.execution.cost_per_type.total_cost()
+        self.executor_summary.cost_per_type.total_cost()
     }
 
     pub fn get_execution_cost_per_type(&self) -> &StatsCostPerType {
-        &self.execution.cost_per_type
+        &self.executor_summary.cost_per_type
     }
 
     pub fn get_duration(&self) -> Duration {
-        self.duration
+        self.total_duration
     }
 }
 
 pub struct ZiskVerifyConstraintsResult {
-    pub execution: ZiskExecutionResult,
+    pub executor_summary: ZiskExecutorSummary,
     pub duration: Duration,
     pub stats: ExecutorStatsHandle,
     pub publics: ZiskPublics,
@@ -83,12 +83,12 @@ pub struct ZiskVerifyConstraintsResult {
 
 impl ZiskVerifyConstraintsResult {
     pub fn new(
-        execution: ZiskExecutionResult,
+        execution: ZiskExecutorSummary,
         duration: Duration,
         stats: ExecutorStatsHandle,
         publics: &[u8],
     ) -> Self {
-        Self { execution, duration, stats, publics: ZiskPublics::new(publics) }
+        Self { executor_summary: execution, duration, stats, publics: ZiskPublics::new(publics) }
     }
 
     pub fn get_publics(&self) -> &ZiskPublics {
@@ -102,15 +102,15 @@ impl ZiskVerifyConstraintsResult {
     }
 
     pub fn get_execution_steps(&self) -> u64 {
-        self.execution.steps
+        self.executor_summary.steps
     }
 
     pub fn get_execution_total_cost(&self) -> u64 {
-        self.execution.cost_per_type.total_cost()
+        self.executor_summary.cost_per_type.total_cost()
     }
 
     pub fn get_execution_cost_per_type(&self) -> &StatsCostPerType {
-        &self.execution.cost_per_type
+        &self.executor_summary.cost_per_type
     }
 
     pub fn get_duration(&self) -> Duration {
@@ -634,8 +634,8 @@ impl ZiskProofWithPublicValues {
 }
 
 pub struct ZiskProveResult {
-    execution: ZiskExecutionResult,
-    duration: Duration,
+    pub executor_summary: ZiskExecutorSummary,
+    pub duration: Duration,
     stats: ExecutorStatsHandle,
     proof_id: Option<String>,
     proof_with_publics: ZiskProofWithPublicValues,
@@ -643,22 +643,22 @@ pub struct ZiskProveResult {
 
 impl ZiskProveResult {
     pub fn new(
-        execution: ZiskExecutionResult,
+        execution: ZiskExecutorSummary,
         duration: Duration,
         stats: ExecutorStatsHandle,
         proof_id: Option<String>,
         proof_with_publics: ZiskProofWithPublicValues,
     ) -> Self {
-        Self { execution, duration, stats, proof_id, proof_with_publics }
+        Self { executor_summary: execution, duration, stats, proof_id, proof_with_publics }
     }
 
     pub fn new_null(
-        execution: ZiskExecutionResult,
+        execution: ZiskExecutorSummary,
         duration: Duration,
         stats: ExecutorStatsHandle,
     ) -> Self {
         Self {
-            execution,
+            executor_summary: execution,
             duration,
             stats,
             proof_id: None,
@@ -679,15 +679,15 @@ impl ZiskProveResult {
     }
 
     pub fn get_execution_steps(&self) -> u64 {
-        self.execution.steps
+        self.executor_summary.steps
     }
 
     pub fn get_execution_total_cost(&self) -> u64 {
-        self.execution.cost_per_type.total_cost()
+        self.executor_summary.cost_per_type.total_cost()
     }
 
     pub fn get_execution_cost_per_type(&self) -> &StatsCostPerType {
-        &self.execution.cost_per_type
+        &self.executor_summary.cost_per_type
     }
 
     pub fn get_proof_id(&self) -> Option<&String> {

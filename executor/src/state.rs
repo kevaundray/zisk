@@ -10,7 +10,7 @@ use std::{
         Arc, Mutex, RwLock,
     },
 };
-use zisk_common::{BusDevice, EmuTrace, ExecutorStatsHandle, Instance, Plan, ZiskExecutionResult};
+use zisk_common::{BusDevice, EmuTrace, ExecutorStatsHandle, Instance, Plan, ZiskExecutorSummary};
 use zisk_core::ZiskRom;
 
 /// Type alias for chunk collectors: (chunk_id, collector)
@@ -36,7 +36,7 @@ pub struct ExecutionState<F: PrimeField64> {
     pub collectors_by_instance: Arc<RwLock<HashMap<usize, Vec<Option<ChunkCollector>>>>>,
 
     /// Execution result, including the number of executed steps.
-    pub execution_result: Mutex<ZiskExecutionResult>,
+    pub execution_result: Mutex<ZiskExecutorSummary>,
 
     /// Statistics collected during the execution.
     pub stats: ExecutorStatsHandle,
@@ -58,7 +58,7 @@ impl<F: PrimeField64> ExecutionState<F> {
             main_instances: RwLock::new(HashMap::new()),
             secn_instances: RwLock::new(HashMap::new()),
             collectors_by_instance: Arc::new(RwLock::new(HashMap::new())),
-            execution_result: Mutex::new(ZiskExecutionResult::default()),
+            execution_result: Mutex::new(ZiskExecutorSummary::default()),
             stats: ExecutorStatsHandle::new(),
             is_rom_initialized: AtomicBool::new(false),
             use_hints: AtomicBool::new(false),
@@ -95,7 +95,7 @@ impl<F: PrimeField64> ExecutionState<F> {
 
     /// Resets all internal state to default values.
     pub fn reset(&self) {
-        *self.execution_result.lock().unwrap() = ZiskExecutionResult::default();
+        *self.execution_result.lock().unwrap() = ZiskExecutorSummary::default();
         *self.min_traces.write().unwrap() = None;
         *self.secn_planning.write().unwrap() = Vec::new();
         self.main_instances.write().unwrap().clear();
@@ -105,12 +105,12 @@ impl<F: PrimeField64> ExecutionState<F> {
     }
 
     /// Gets a clone of the execution result.
-    pub fn get_execution_result(&self) -> ZiskExecutionResult {
+    pub fn get_execution_result(&self) -> ZiskExecutorSummary {
         self.execution_result.lock().unwrap().clone()
     }
 
     /// Sets the execution result.
-    pub fn set_execution_result(&self, result: ZiskExecutionResult) {
+    pub fn set_execution_result(&self, result: ZiskExecutorSummary) {
         *self.execution_result.lock().unwrap() = result;
     }
 

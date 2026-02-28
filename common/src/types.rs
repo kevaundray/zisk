@@ -2,6 +2,7 @@ use anyhow::Result;
 use std::fmt;
 use std::fs;
 use std::path::Path;
+use std::time::Duration;
 use std::time::Instant;
 
 /// Type representing a chunk identifier.
@@ -143,14 +144,31 @@ impl fmt::Display for StatsCostPerType {
 }
 
 #[derive(Debug, Default, Clone)]
-pub struct ZiskExecutionResult {
+pub struct ZiskExecutorTime {
+    /// Total executor duration of the entire execution process.
+    pub total_duration: Duration,
+    /// Duration of the execution phase.
+    pub execution_duration: Duration,
+    /// Duration of the counting and planning phase for main state machines.
+    pub count_and_plan_duration: Duration,
+    /// Duration of the counting and planning phase for memory operations from ASM runner.
+    pub count_and_plan_mo_duration: Duration,
+}
+
+#[derive(Debug, Default, Clone)]
+pub struct ZiskExecutorSummary {
     pub steps: u64,
+    pub executor_time: ZiskExecutorTime,
     pub cost_per_type: StatsCostPerType,
 }
 
-impl ZiskExecutionResult {
-    pub fn new(executed_steps: u64, cost_per_type: StatsCostPerType) -> Self {
-        Self { steps: executed_steps, cost_per_type }
+impl ZiskExecutorSummary {
+    pub fn new(
+        executed_steps: u64,
+        execution_time: ZiskExecutorTime,
+        cost_per_type: StatsCostPerType,
+    ) -> Self {
+        Self { steps: executed_steps, executor_time: execution_time, cost_per_type }
     }
 }
 

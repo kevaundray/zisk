@@ -34,7 +34,7 @@ use std::{
 use witness::WitnessComponent;
 use zisk_common::{
     io::ZiskStdin, stats_begin, stats_end, BusDeviceMetrics, ChunkId, ExecutorStatsHandle,
-    StatsCostPerType, StatsType, ZiskExecutionResult,
+    StatsCostPerType, StatsType, ZiskExecutorSummary, ZiskExecutorTime,
 };
 use zisk_core::ZiskRom;
 use zisk_pil::ZiskPublicValues;
@@ -112,7 +112,7 @@ impl<F: PrimeField64> ZiskExecutor<F> {
 
     /// Gets the execution result and stats.
     #[allow(clippy::type_complexity)]
-    pub fn get_execution_result(&self) -> (ZiskExecutionResult, ExecutorStatsHandle) {
+    pub fn get_execution_result(&self) -> (ZiskExecutorSummary, ExecutorStatsHandle) {
         (self.state.get_execution_result(), self.state.get_stats())
     }
 
@@ -130,6 +130,7 @@ impl<F: PrimeField64> WitnessComponent<F> for ZiskExecutor<F> {
         sctx: Arc<SetupCtx<F>>,
         global_ids: &RwLock<Vec<usize>>,
     ) -> ProofmanResult<()> {
+        let start_total = Instant::now();
         self.state.reset();
 
         stats_begin!(self.state.stats, 0, _exec_scope, "EXECUTE", 0);
@@ -139,6 +140,7 @@ impl<F: PrimeField64> WitnessComponent<F> for ZiskExecutor<F> {
 
         // Phase 1: Execute ROM to collect minimal traces
         timer_start_info!(COMPUTE_MINIMAL_TRACE);
+        let start_partial = Instant::now();
 
         let zisk_rom = self
             .state
@@ -153,12 +155,15 @@ impl<F: PrimeField64> WitnessComponent<F> for ZiskExecutor<F> {
             &_exec_scope,
         );
 
+        let execution_duration = start_partial.elapsed();
         timer_stop_and_log_info!(COMPUTE_MINIMAL_TRACE);
 
         // Phase 2: Plan main instances
         stats_begin!(self.state.stats, &_exec_scope, _main_plan_scope, "MAIN_PLAN", 0);
 
         timer_start_info!(PLAN);
+        let start_partial = Instant::now();
+
         let main_output = self.planner.plan_main::<F>(&output.min_traces, output.main_count);
         *self.state.min_traces.write().unwrap() = Some(output.min_traces);
 
@@ -175,10 +180,12 @@ impl<F: PrimeField64> WitnessComponent<F> for ZiskExecutor<F> {
         let mut secn_planning =
             self.planner.plan_secondary(self.registry.sm_bundle(), &mut secn_count);
 
+        let count_and_plan_duration = start_partial.elapsed();
         timer_stop_and_log_info!(PLAN);
 
         timer_start_info!(PLAN_MEM_CPP);
         stats_end!(self.state.stats, &_secn_plan_scope);
+        let start_partial = Instant::now();
 
         // Handle memory operations from ASM runner
         if let Some(handle_mo) = output.handle_mo {
@@ -198,6 +205,7 @@ impl<F: PrimeField64> WitnessComponent<F> for ZiskExecutor<F> {
             stats_end!(self.state.stats, &_mo_add_scope);
         }
 
+        let count_and_plan_mo_duration = start_partial.elapsed();
         timer_stop_and_log_info!(PLAN_MEM_CPP);
 
         // Phase 4: Configure and assign secondary instances
@@ -255,8 +263,15 @@ impl<F: PrimeField64> WitnessComponent<F> for ZiskExecutor<F> {
             cost_per_type.add_cost(StatsType::Tables, cost);
         }
 
+        let zisk_execution_time = ZiskExecutorTime {
+            execution_duration,
+            count_and_plan_duration,
+            count_and_plan_mo_duration,
+            total_duration: start_total.elapsed(),
+        };
         // Store the execution result
-        let execution_result = ZiskExecutionResult::new(output.steps, cost_per_type);
+        let execution_result =
+            ZiskExecutorSummary::new(output.steps, zisk_execution_time, cost_per_type);
 
         // Store the execution result
         self.state.set_execution_result(execution_result);

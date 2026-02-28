@@ -7,7 +7,7 @@ use zisk_build::ZISK_VERSION_MESSAGE;
 use zisk_common::ElfBinaryFromFile;
 use zisk_sdk::{ProverClient, ZiskExecuteResult};
 
-use crate::ux::{print_banner, print_banner_command, print_banner_field};
+use crate::ux::{print_banner, print_banner_command, print_banner_field, print_execution_summary};
 use zisk_common::io::{StreamSource, ZiskStdin};
 
 #[derive(Parser)]
@@ -120,7 +120,12 @@ impl ZiskExecute {
         let result =
             if emulator { self.run_emu(stdin)? } else { self.run_asm(stdin, hints_stream)? };
 
-        info!("Execution completed in {:.2?}, steps: {}", result.duration, result.execution.steps);
+        info!("{}", "--- EXECUTE SUMMARY ------------------------".bright_green().bold());
+        print_execution_summary(
+            &result.executor_summary.executor_time,
+            result.total_duration,
+            result.executor_summary.steps,
+        );
 
         Ok(())
     }

@@ -1,10 +1,10 @@
-use crate::ux::{print_banner, print_banner_command, print_banner_field};
+use crate::ux::{print_banner, print_banner_command, print_banner_field, print_execution_summary};
 use anyhow::Result;
 
 use clap::Parser;
 use colored::Colorize;
 use std::path::PathBuf;
-use tracing::warn;
+use tracing::{info, warn};
 use zisk_build::ZISK_VERSION_MESSAGE;
 use zisk_common::io::{StreamSource, ZiskStdin};
 use zisk_common::ElfBinaryFromFile;
@@ -133,16 +133,14 @@ impl ZiskVerifyConstraints {
         let result =
             if emulator { self.run_emu(stdin)? } else { self.run_asm(stdin, hints_stream)? };
 
-        tracing::info!("");
-        tracing::info!(
+        info!(
             "{}",
             "--- VERIFY CONSTRAINTS SUMMARY ------------------------".bright_green().bold()
         );
-        tracing::info!("    ► Statistics");
-        tracing::info!(
-            "      time: {:.2} seconds, steps: {}",
-            result.duration.as_secs_f32(),
-            result.execution.steps
+        print_execution_summary(
+            &result.executor_summary.executor_time,
+            result.duration,
+            result.executor_summary.steps,
         );
 
         Ok(())

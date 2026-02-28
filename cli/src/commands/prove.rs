@@ -1,10 +1,10 @@
-use crate::ux::{print_banner, print_banner_command, print_banner_field};
+use crate::ux::{print_banner, print_banner_command, print_banner_field, print_execution_summary};
 use anyhow::Result;
 
 use colored::Colorize;
 use proofman_common::ParamsGPU;
 use std::path::PathBuf;
-use tracing::warn;
+use tracing::{info, warn};
 use zisk_build::ZISK_VERSION_MESSAGE;
 use zisk_common::io::{StreamSource, ZiskStdin};
 use zisk_common::ElfBinaryFromFile;
@@ -182,12 +182,7 @@ impl ZiskProve {
         };
 
         if world_rank == 0 {
-            let elapsed = result.get_duration().as_secs_f64();
-            tracing::info!("");
-            tracing::info!(
-                "{}",
-                "--- PROVE SUMMARY ------------------------".bright_green().bold()
-            );
+            info!("{}", "--- PROVE SUMMARY ------------------------".bright_green().bold());
 
             if let Some(proof_id) = &result.get_proof_id() {
                 let output_dir = match result.get_proof() {
@@ -202,13 +197,12 @@ impl ZiskProve {
                     }
                 };
                 result.save_proof_with_publics(output_dir)?;
-                tracing::info!("      Proof ID: {}", proof_id);
+                info!("Proof ID: {}", proof_id);
             }
-            tracing::info!("    ► Statistics");
-            tracing::info!(
-                "      time: {} seconds, steps: {}",
-                elapsed,
-                result.get_execution_steps()
+            print_execution_summary(
+                &result.executor_summary.executor_time,
+                result.duration,
+                result.executor_summary.steps,
             );
         }
 

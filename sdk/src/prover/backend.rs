@@ -24,7 +24,7 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Arc;
 use zisk_common::stats_mark;
-use zisk_common::{io::ZiskStdin, ElfBinaryLike, ExecutorStatsHandle, ZiskExecutionResult};
+use zisk_common::{io::ZiskStdin, ElfBinaryLike, ExecutorStatsHandle, ZiskExecutorSummary};
 
 pub(crate) struct ProverBackend {
     proofman: Option<ProofMan<Goldilocks>>,
@@ -101,7 +101,7 @@ impl ProverBackend {
         Ok(())
     }
 
-    pub fn execution_result(&self) -> Result<(ZiskExecutionResult, ExecutorStatsHandle)> {
+    pub fn execution_result(&self) -> Result<(ZiskExecutorSummary, ExecutorStatsHandle)> {
         let executor = self.executor.as_ref().ok_or_else(|| {
             anyhow::anyhow!("Executor is not initialized. Please initialize it before use.")
         })?;
@@ -142,7 +142,7 @@ impl ProverBackend {
 
         let publics = proofman.get_publics();
 
-        Ok(ZiskExecuteResult::new(result, planning_info, elapsed, &publics))
+        Ok(ZiskExecuteResult::new(elapsed, result, planning_info, &publics))
     }
 
     pub(crate) fn stats(
@@ -197,7 +197,7 @@ impl ProverBackend {
             )
             .map_err(|e| anyhow::anyhow!("Error generating execution: {}", e))?;
 
-        let (_, stats): (ZiskExecutionResult, ExecutorStatsHandle) =
+        let (_, stats): (ZiskExecutorSummary, ExecutorStatsHandle) =
             executor.get_execution_result();
 
         Ok((rank_info.world_rank, rank_info.n_processes, Some(stats)))
