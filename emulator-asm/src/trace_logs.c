@@ -9,7 +9,6 @@
 #include "constants.hpp"
 #include "globals.hpp"
 #include "asm_provided.hpp"
-#include "globals.hpp"
 
 /*****************/
 /* LOG FUNCTIONS */
@@ -265,7 +264,7 @@ void log_main_trace(void)
     printf("Trace=%p chunk=%p size=%lu\n", trace, chunk, (uint64_t)chunk - (uint64_t)trace);
 }
 
-void buffer2file (const void * buffer_address, size_t buffer_length, const char * file_name)
+static void buffer2file (const void * buffer_address, size_t buffer_length, const char * file_name)
 {
     if (!file_name)
     {
@@ -588,7 +587,14 @@ void save_mem_op_to_files(void)
     for (uint64_t c=0; c<number_of_chunks; c++)
     {
         char file_name[256];
-        sprintf(file_name, "/tmp/mem_count_data_%lu.bin", c);
+        int file_name_len = snprintf(file_name, sizeof(file_name), "/tmp/mem_count_data_%lu.bin", c);
+        if (file_name_len < 0 || (size_t)file_name_len >= sizeof(file_name))
+        {
+            fprintf(stderr, "ERROR: Failed to construct file name for chunk=%lu\n", c);
+            fflush(stdout);
+            fflush(stderr);
+            exit(-1);
+        }
 
         uint64_t i=0;
         uint64_t mem_op_trace_size = chunk[i];

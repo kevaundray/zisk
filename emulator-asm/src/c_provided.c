@@ -117,6 +117,7 @@ extern int _print_regs()
     printf("\treg[34]=%lu=0x%lx=@%p\n", reg_34, reg_34, &reg_34);
     printf("\n");
 #endif
+    return 0;
 }
 
 /************/
@@ -189,6 +190,7 @@ extern int _print_pc (uint64_t pc, uint64_t c)
     printf("\n");
     fflush(stdout);
     print_pc_counter++;
+    return 0;
 }
 
 /**************/

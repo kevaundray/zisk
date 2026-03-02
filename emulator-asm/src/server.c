@@ -112,7 +112,7 @@ void server_setup (void)
         }
 
         // Open the input shared memory as read-only
-        shmem_input_fd = shm_open(shmem_input_name, O_RDONLY | O_EXCL, 0666);
+        shmem_input_fd = shm_open(shmem_input_name, O_RDONLY, 0666);
         if (shmem_input_fd < 0)
         {
             printf("ERROR: Failed calling input RO shm_open(%s) as read-only errno=%d=%s\n", shmem_input_name, errno, strerror(errno));
@@ -195,7 +195,7 @@ void server_setup (void)
         }
 
         // Open the precompile shared memory as read-only
-        shmem_precompile_fd = shm_open(shmem_precompile_name, O_RDONLY | O_EXCL, 0666);
+        shmem_precompile_fd = shm_open(shmem_precompile_name, O_RDONLY, 0666);
         if (shmem_precompile_fd < 0)
         {
             printf("ERROR: Failed calling precompile RO shm_open(%s) as read-only errno=%d=%s\n", shmem_precompile_name, errno, strerror(errno));
@@ -266,7 +266,7 @@ void server_setup (void)
         }
 
         // Open the control input shared memory as read-only
-        shmem_control_input_fd = shm_open(shmem_control_input_name, O_RDONLY | O_EXCL, 0666);
+        shmem_control_input_fd = shm_open(shmem_control_input_name, O_RDONLY, 0666);
         if (shmem_control_input_fd < 0)
         {
             printf("ERROR: Failed calling precompile RO shm_open(%s) as read-only errno=%d=%s\n", shmem_control_input_name, errno, strerror(errno));
