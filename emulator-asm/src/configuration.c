@@ -187,7 +187,7 @@ void parse_arguments(int argc, char *argv[])
             if (strcmp(argv[i], "--help") == 0)
             {
                 print_usage();
-                continue;
+                exit(0);
             }
             if (strcmp(argv[i], "-i") == 0)
             {
@@ -212,13 +212,13 @@ void parse_arguments(int argc, char *argv[])
                 i++;
                 if (i >= argc)
                 {
-                    printf("ERROR: Detected argument -i in the last position; please provide shared mem prefix after it\n");
+                    printf("ERROR: Detected argument --shm_prefix in the last position; please provide shared mem prefix after it\n");
                     print_usage();
                     exit(-1);
                 }
                 if (strlen(argv[i]) > MAX_SHM_PREFIX_LENGTH)
                 {
-                    printf("ERROR: Detected argument -i but next argument is too long\n");
+                    printf("ERROR: Detected argument --shm_prefix but next argument is too long\n");
                     print_usage();
                     exit(-1);
                 }
@@ -230,7 +230,7 @@ void parse_arguments(int argc, char *argv[])
                 i++;
                 if (i >= argc)
                 {
-                    printf("ERROR: Detected argument -c in the last position; please provide chunk number after it\n");
+                    printf("ERROR: Detected argument --chunk in the last position; please provide chunk number after it\n");
                     print_usage();
                     exit(-1);
                 }
@@ -270,7 +270,7 @@ void parse_arguments(int argc, char *argv[])
                 i++;
                 if (i >= argc)
                 {
-                    printf("ERROR: Detected argument -mt in the last position; please provide number of MT requests after it\n");
+                    printf("ERROR: Detected argument --mt in the last position; please provide number of MT requests after it\n");
                     print_usage();
                     exit(-1);
                 }
