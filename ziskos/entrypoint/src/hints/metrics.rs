@@ -15,7 +15,7 @@ pub(crate) fn register_hint(hint_id: u32, hint_name: String) {
     HINTS_METRICS
         .write()
         .expect("HINTS_METRICS poisoned")
-        .insert(hint_id, HintRegisterInfo { hint_name, count: 0 });
+        .insert(hint_id, HintRegisterInfo { hint_name, count: 0, size: 0  });
 }
 
 pub(crate) fn inc_hint_count(hint_id: u32, hint_size: u64) {
