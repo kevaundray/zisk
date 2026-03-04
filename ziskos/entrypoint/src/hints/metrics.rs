@@ -38,12 +38,17 @@ pub(crate) fn print_metrics() {
     }
     for (_, info) in hints.iter() {
         if info.count > 0 {
+            let percentage = if total_size == 0 {
+                0.0
+            } else {
+                ((info.size as f64 * 100.0) / total_size as f64 * 10.0).round() / 10.0
+            };
             println!(
-                "  {}: {}, {} bytes ({}%)",
+                "  {}: {}, {} bytes ({:.1}%)",
                 info.hint_name,
                 info.count,
                 info.size,
-                info.size * 100 / total_size
+                percentage
             );
         }
     }
