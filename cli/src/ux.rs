@@ -1,5 +1,7 @@
 use colored::Colorize;
 use sysinfo::System;
+use tracing::info;
+use zisk_common::ZiskExecutorTime;
 
 pub fn print_banner() {
     println!();
@@ -50,6 +52,31 @@ pub fn print_banner() {
     // );
 }
 
-pub fn print_banner_field(label: &str, value: &str) {
+pub fn print_banner_command(command: impl std::fmt::Display) {
+    print_banner_field("Command", command);
+}
+
+pub fn print_banner_field(label: &str, value: impl std::fmt::Display) {
     println!("{} {}", format!("{: >12}", label).bright_green().bold(), value);
+}
+
+pub fn print_execution_summary(
+    executor_time: &ZiskExecutorTime,
+    total_duration: std::time::Duration,
+    steps: u64,
+) {
+    info!("Execution completed in {:.2?}, steps: {}", total_duration, steps);
+    info!(
+        "Execution summary: {} {:.2?} + {} {:.2?} + {} {:.2?} + {} {:.2?}",
+        "Proofman".dimmed(),
+        total_duration - executor_time.total_duration,
+        "Execution".dimmed(),
+        executor_time.execution_duration,
+        "Count&Plan".dimmed(),
+        executor_time.count_and_plan_duration,
+        "Count&Plan MO".dimmed(),
+        executor_time.count_and_plan_mo_duration,
+    );
+
+    /*●⎿✔◼✽*/
 }

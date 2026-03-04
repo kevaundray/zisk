@@ -529,6 +529,12 @@ impl<T: ZiskBackend + 'static> WorkerNodeGrpc<T> {
             return Err(anyhow!("Expected ContributionParams for Partial Contribution task"));
         };
 
+        self.worker.set_partition(
+            params.job_compute_units as usize,
+            params.worker_allocation.clone(),
+            params.rank_id as usize,
+        )?;
+
         let job_id = JobId::from(request.job_id);
         let input_source = match params.input_source {
             Some(InputSource::InputPath(ref inputs_uris)) => {
@@ -681,6 +687,7 @@ impl<T: ZiskBackend + 'static> WorkerNodeGrpc<T> {
                 worker_index: ch.worker_index,
                 airgroup_id: ch.airgroup_id as usize,
                 challenge: ch.challenge,
+                aggregated: false,
             })
             .collect();
 
@@ -732,9 +739,11 @@ impl<T: ZiskBackend + 'static> WorkerNodeGrpc<T> {
             final_proof: agg_params.final_proof,
             compressed: agg_params.compressed,
         };
-        self.worker.set_current_computation(
-            self.worker.handle_aggregate(job, agg_params, computation_tx.clone()).await,
-        );
+        self.worker.set_current_computation(self.worker.handle_aggregate(
+            job,
+            agg_params,
+            computation_tx.clone(),
+        ));
 
         Ok(())
     }
@@ -744,22 +753,19 @@ impl<T: ZiskBackend + 'static> WorkerNodeGrpc<T> {
             return Err(anyhow!("Stream data received without current job context"));
         }
 
-        let job = self.worker.current_job().clone().unwrap().clone();
+        let job = self.worker.current_job().unwrap();
         let current_job_id = job.lock().await.job_id.clone();
 
         let stream_data_dto: StreamDataDto = stream_data.into();
-        let job_id = stream_data_dto.job_id.clone();
 
-        if current_job_id != job_id {
+        if current_job_id != stream_data_dto.job_id {
             return Err(anyhow!(
                 "Job ID mismatch in StreamData: expected {}, got {}",
                 current_job_id.as_string(),
-                job_id
+                stream_data_dto.job_id
             ));
         }
 
-        self.worker.process_stream_data(stream_data_dto).await?;
-
-        Ok(())
+        self.worker.route_stream_data(stream_data_dto).await
     }
 }

@@ -1,10 +1,10 @@
-use crate::ux::{print_banner, print_banner_field};
+use crate::ux::{print_banner, print_banner_command, print_banner_field, print_execution_summary};
 use anyhow::Result;
 
 use colored::Colorize;
 use proofman_common::ParamsGPU;
 use std::path::PathBuf;
-use tracing::warn;
+use tracing::{info, warn};
 use zisk_build::ZISK_VERSION_MESSAGE;
 use zisk_common::io::{StreamSource, ZiskStdin};
 use zisk_common::ElfBinaryFromFile;
@@ -91,7 +91,7 @@ pub struct ZiskProve {
     #[clap(short = 't', long)]
     pub max_streams: Option<usize>,
 
-    #[clap(short = 'n', long)]
+    #[clap(short = 'h', long)]
     pub number_threads_witness: Option<usize>,
 
     #[clap(short = 'x', long)]
@@ -109,6 +109,9 @@ pub struct ZiskProve {
     #[clap(short = 'r', long, default_value_t = false)]
     pub rma: bool,
 
+    #[clap(short = 'n', long, default_value_t = false)]
+    pub no_auto_setup: bool,
+
     #[clap(long, default_value_t = false)]
     pub snark: bool,
 }
@@ -121,6 +124,10 @@ impl ZiskProve {
         }
 
         print_banner();
+
+        print_banner_command("Prove");
+
+        print_banner_field("Elf", self.elf.display());
 
         let mut gpu_params = None;
         if self.preallocate
@@ -135,9 +142,8 @@ impl ZiskProve {
             gpu_params = Some(gpu_params_new);
         }
 
-        if let Some(inputs) = &self.inputs {
-            print_banner_field("Input", inputs);
-        }
+        let inputs_str = self.inputs.clone().unwrap_or_else(|| "None".dimmed().to_string());
+        print_banner_field("Input", inputs_str);
 
         if let Some(hints) = &self.hints {
             print_banner_field("Prec. Hints", hints);
@@ -176,12 +182,7 @@ impl ZiskProve {
         };
 
         if world_rank == 0 {
-            let elapsed = result.get_duration().as_secs_f64();
-            tracing::info!("");
-            tracing::info!(
-                "{}",
-                "--- PROVE SUMMARY ------------------------".bright_green().bold()
-            );
+            info!("{}", "--- PROVE SUMMARY ------------------------".bright_green().bold());
 
             if let Some(proof_id) = &result.get_proof_id() {
                 let output_dir = match result.get_proof() {
@@ -196,13 +197,12 @@ impl ZiskProve {
                     }
                 };
                 result.save_proof_with_publics(output_dir)?;
-                tracing::info!("      Proof ID: {}", proof_id);
+                info!("Proof ID: {}", proof_id);
             }
-            tracing::info!("    ► Statistics");
-            tracing::info!(
-                "      time: {} seconds, steps: {}",
-                elapsed,
-                result.get_execution_steps()
+            print_execution_summary(
+                &result.executor_summary.executor_time,
+                result.duration,
+                result.executor_summary.steps,
             );
         }
 
@@ -226,7 +226,7 @@ impl ZiskProve {
             .build()?;
 
         let elf = ElfBinaryFromFile::new(&self.elf, false)?;
-        prover.setup(&elf)?;
+        let (pk, _) = prover.setup(&elf)?;
 
         let proof_options = ProofOpts {
             aggregation: self.aggregation,
@@ -239,7 +239,7 @@ impl ZiskProve {
 
         let world_rank = prover.world_rank();
 
-        let mut prover = prover.prove(stdin).with_proof_options(proof_options);
+        let mut prover = prover.prove(&pk, stdin).with_proof_options(proof_options);
         if self.snark {
             prover = prover.plonk();
         }
@@ -267,13 +267,14 @@ impl ZiskProve {
             .shared_tables(self.shared_tables)
             .asm_path_opt(self.asm.clone())
             .base_port_opt(self.port)
+            .no_auto_setup(self.no_auto_setup)
             .unlock_mapped_memory(self.unlock_mapped_memory)
             .gpu(gpu_params)
             .print_command_info()
             .build()?;
 
         let elf = ElfBinaryFromFile::new(&self.elf, hints_stream.is_some())?;
-        prover.setup(&elf)?;
+        let (pk, _) = prover.setup(&elf)?;
 
         let proof_options = ProofOpts {
             aggregation: self.aggregation,
@@ -285,12 +286,12 @@ impl ZiskProve {
         };
 
         if let Some(hints_stream) = hints_stream {
-            prover.set_hints_stream(hints_stream)?;
+            pk.register_hints_stream(hints_stream)?;
         }
 
         let world_rank = prover.world_rank();
 
-        let mut prover = prover.prove(stdin).with_proof_options(proof_options);
+        let mut prover = prover.prove(&pk, stdin).with_proof_options(proof_options);
         if self.snark {
             prover = prover.plonk();
         }

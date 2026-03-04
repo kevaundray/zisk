@@ -2,6 +2,7 @@ use anyhow::Result;
 use std::fmt;
 use std::fs;
 use std::path::Path;
+use std::time::Duration;
 use std::time::Instant;
 
 /// Type representing a chunk identifier.
@@ -143,14 +144,31 @@ impl fmt::Display for StatsCostPerType {
 }
 
 #[derive(Debug, Default, Clone)]
-pub struct ZiskExecutionResult {
+pub struct ZiskExecutorTime {
+    /// Total executor duration of the entire execution process.
+    pub total_duration: Duration,
+    /// Duration of the execution phase.
+    pub execution_duration: Duration,
+    /// Duration of the counting and planning phase for main state machines.
+    pub count_and_plan_duration: Duration,
+    /// Duration of the counting and planning phase for memory operations from ASM runner.
+    pub count_and_plan_mo_duration: Duration,
+}
+
+#[derive(Debug, Default, Clone)]
+pub struct ZiskExecutorSummary {
     pub steps: u64,
+    pub executor_time: ZiskExecutorTime,
     pub cost_per_type: StatsCostPerType,
 }
 
-impl ZiskExecutionResult {
-    pub fn new(executed_steps: u64, cost_per_type: StatsCostPerType) -> Self {
-        Self { steps: executed_steps, cost_per_type }
+impl ZiskExecutorSummary {
+    pub fn new(
+        executed_steps: u64,
+        execution_time: ZiskExecutorTime,
+        cost_per_type: StatsCostPerType,
+    ) -> Self {
+        Self { steps: executed_steps, executor_time: execution_time, cost_per_type }
     }
 }
 
@@ -168,6 +186,81 @@ pub struct Stats {
     pub witness_duration: u128,
     /// Number of chunks
     pub num_chunks: usize,
+}
+
+impl Stats {
+    /// Creates stats for an instance with no collection phase.
+    ///
+    /// Used for main instances and ROM instances with ASM emulator that skip collection.
+    /// Sets `collect_duration` to 0 and `num_chunks` to 0.
+    pub fn new_no_collection(airgroup_id: usize, air_id: usize) -> Self {
+        Self {
+            airgroup_id,
+            air_id,
+            collect_start_time: Instant::now(),
+            collect_duration: 0,
+            witness_start_time: Instant::now(),
+            witness_duration: 0,
+            num_chunks: 0,
+        }
+    }
+
+    /// Creates stats for an instance with a pending collection phase.
+    ///
+    /// Used when collection is about to start. The `collect_duration` will be
+    /// updated later via `set_collect_duration` when collection completes.
+    pub fn new_pending_collection(airgroup_id: usize, air_id: usize, num_chunks: usize) -> Self {
+        Self {
+            airgroup_id,
+            air_id,
+            collect_start_time: Instant::now(),
+            collect_duration: 0,
+            witness_start_time: Instant::now(),
+            witness_duration: 0,
+            num_chunks,
+        }
+    }
+
+    /// Creates stats for an instance with completed collection.
+    ///
+    /// Used when collection has finished and we know the actual timing.
+    pub fn new_with_collection(
+        airgroup_id: usize,
+        air_id: usize,
+        num_chunks: usize,
+        collect_start_time: Instant,
+        collect_duration: u64,
+    ) -> Self {
+        Self {
+            airgroup_id,
+            air_id,
+            collect_start_time,
+            collect_duration,
+            witness_start_time: Instant::now(),
+            witness_duration: 0,
+            num_chunks,
+        }
+    }
+
+    /// Creates stats for a main instance (no collection, witness already computed).
+    ///
+    /// Used when witness computation has finished and we know the timing.
+    /// Main instances don't have a collection phase.
+    pub fn new_main_completed(
+        airgroup_id: usize,
+        air_id: usize,
+        witness_start_time: Instant,
+    ) -> Self {
+        Self {
+            airgroup_id,
+            air_id,
+            collect_start_time: Instant::now(),
+            collect_duration: 0,
+            witness_start_time,
+            witness_duration: witness_start_time.elapsed().as_millis(),
+            num_chunks: 0,
+        }
+    }
 }
 
 pub trait ElfBinaryLike {
