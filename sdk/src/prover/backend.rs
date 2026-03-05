@@ -15,8 +15,8 @@ use colored::Colorize;
 use executor::ZiskExecutor;
 use fields::Goldilocks;
 use proofman::{
-    AggProofs, AggProofsRegister, ExecutionInfo, ProofMan, ProvePhase, ProvePhaseInputs,
-    ProvePhaseResult, SnarkProtocol, SnarkWrapper,
+    AggProofs, AggProofsRegister, ProofMan, ProvePhase, ProvePhaseInputs, ProvePhaseResult,
+    SnarkProtocol, SnarkWrapper, WitnessInfo,
 };
 use proofman_common::{ProofCtx, ProofOptions, RowInfo};
 use proofman_util::VadcopFinalProof;
@@ -24,6 +24,7 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Arc;
 use zisk_common::stats_mark;
+use zisk_common::ZiskExecutorTime;
 use zisk_common::{io::ZiskStdin, ElfBinaryLike, ExecutorStatsHandle, ZiskExecutorSummary};
 
 pub(crate) struct ProverBackend {
@@ -549,12 +550,21 @@ impl ProverBackend {
         Ok(proofman.is_first_partition())
     }
 
-    pub(crate) fn get_execution_info(&self) -> Result<ExecutionInfo> {
+    pub(crate) fn get_execution_info(&self) -> Result<(WitnessInfo, ZiskExecutorTime)> {
         let proofman = self
             .proofman
             .as_ref()
             .ok_or_else(|| anyhow::anyhow!("Cannot get execution info in verifier mode"))?;
-        Ok(proofman.get_execution_info())
+
+        let witness_info = proofman.get_witness_info();
+
+        let executor = self.executor.as_ref().ok_or_else(|| {
+            anyhow::anyhow!("Executor is not initialized. Please initialize it before use.")
+        })?;
+
+        let (execution_result, _) = executor.get_execution_result();
+
+        Ok((witness_info, execution_result.executor_time))
     }
 
     pub(crate) fn register_aggregated_proofs(

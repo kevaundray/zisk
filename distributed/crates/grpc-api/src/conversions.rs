@@ -419,16 +419,29 @@ impl From<ExecuteTaskResponse> for ExecuteTaskResponseDto {
                         challenge: c.challenge,
                     })
                     .collect();
-                let exec_info = challenges_list.execution_info.unwrap();
-                let execution_info = ExecutionInfoDto {
-                    execution_time: exec_info.execution_time,
-                    publics: exec_info.publics,
-                    proof_values: exec_info.proof_values,
-                    summary_info: exec_info.summary_info,
+                let witness_info = challenges_list.witness_info.unwrap();
+                let witness_info = WitnessInfoDto {
+                    witness_time: witness_info.witness_time,
+                    publics: witness_info.publics,
+                    proof_values: witness_info.proof_values,
+                    summary_info: witness_info.summary_info,
                 };
+                let exec_time = challenges_list.zisk_execution_time.unwrap();
+                let zisk_executor_time = ZiskExecutorTimeDto {
+                    task_received_time: exec_time.task_received_time,
+                    total_duration: exec_time.total_duration,
+                    execution_duration: exec_time.execution_duration,
+                    count_and_plan_duration: exec_time.count_and_plan_duration,
+                    count_and_plan_mo_duration: exec_time.count_and_plan_mo_duration,
+                    asm_execution_duration: exec_time.asm_execution_duration.map(|asm_info| {
+                        AsmExecutionInfoDto { time: asm_info.time, mhz: asm_info.mhz }
+                    }),
+                };
+
                 Some(ExecuteTaskResponseResultDataDto::Challenges(ContributionsResultDataDto {
-                    execution_info,
+                    witness_info,
                     challenges,
+                    zisk_executor_time,
                 }))
             }
             Some(execute_task_response::ResultData::Proofs(proof_list)) => {

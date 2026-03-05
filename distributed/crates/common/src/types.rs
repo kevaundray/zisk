@@ -6,7 +6,7 @@
 
 use borsh::{BorshDeserialize, BorshSerialize};
 use chrono::{DateTime, Utc};
-use proofman::{ContributionsInfo, ExecutionInfo};
+use proofman::{ContributionsInfo, WitnessInfo};
 use serde::{Deserialize, Serialize};
 use std::{
     collections::HashMap,
@@ -14,6 +14,7 @@ use std::{
     ops::Range,
 };
 use tracing::error;
+use zisk_common::ZiskExecutorTime;
 
 use crate::{HintsModeDto, HintsSourceDto, InputSourceDto, InputsModeDto};
 
@@ -239,6 +240,7 @@ impl Debug for JobStats {
 pub struct Job {
     pub job_id: JobId,
     pub start_times: HashMap<JobPhase, DateTime<Utc>>,
+    pub task_received_time: Option<DateTime<Utc>>,
     pub duration_ms: Option<u64>,
     pub state: JobState,
     pub data_id: DataId,
@@ -252,7 +254,7 @@ pub struct Job {
     pub results: HashMap<JobPhase, HashMap<WorkerId, JobResult>>,
     pub stats: HashMap<JobPhase, JobStats>,
     pub challenges: Option<Vec<ContributionsInfo>>,
-    pub execution_info: Option<ExecutionInfo>,
+    pub witness_info: Option<WitnessInfo>,
     pub execution_mode: JobExecutionMode,
     pub final_proof: Option<Vec<u64>>,
     pub executed_steps: Option<u64>,
@@ -285,8 +287,9 @@ impl Job {
             partitions,
             results: HashMap::new(),
             stats: HashMap::new(),
+            task_received_time: None,
             challenges: None,
-            execution_info: None,
+            witness_info: None,
             execution_mode,
             final_proof: None,
             executed_steps: None,
@@ -389,7 +392,9 @@ pub struct AggProofData {
 #[derive(Debug, Clone)]
 pub struct ContributionsResult {
     pub challenges: Vec<ContributionsInfo>,
-    pub execution_info: ExecutionInfo,
+    pub witness_info: WitnessInfo,
+    pub zisk_executor_time: ZiskExecutorTime,
+    pub task_received_time: Option<chrono::DateTime<chrono::Utc>>,
 }
 
 #[derive(Debug, Clone)]

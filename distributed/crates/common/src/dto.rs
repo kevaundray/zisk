@@ -204,11 +204,34 @@ pub struct ProveParamsDto {
 }
 
 #[derive(Clone)]
-pub struct ExecutionInfoDto {
-    pub execution_time: f32,
+pub struct WitnessInfoDto {
+    /// Witness computation time in milliseconds
+    pub witness_time: f32,
     pub publics: Vec<u64>,
     pub proof_values: Vec<u64>,
     pub summary_info: String,
+}
+
+#[derive(Clone)]
+pub struct ZiskExecutorTimeDto {
+    /// Total duration in milliseconds
+    pub total_duration: f32,
+    /// Execution duration in milliseconds
+    pub execution_duration: f32,
+    /// Count and plan duration in milliseconds
+    pub count_and_plan_duration: f32,
+    /// Count and plan memory operations duration in milliseconds
+    pub count_and_plan_mo_duration: f32,
+    /// ASM execution info (time in milliseconds)
+    pub asm_execution_duration: Option<AsmExecutionInfoDto>,
+    /// Time when task was received by worker (milliseconds since UNIX epoch, f64 for precision)
+    pub task_received_time: f64,
+}
+
+#[derive(Clone)]
+pub struct AsmExecutionInfoDto {
+    pub time: f32,
+    pub mhz: f32,
 }
 
 #[derive(Clone)]
@@ -246,7 +269,8 @@ pub struct ExecuteTaskResponseDto {
 
 pub struct ContributionsResultDataDto {
     pub challenges: Vec<ChallengesDto>,
-    pub execution_info: ExecutionInfoDto,
+    pub witness_info: WitnessInfoDto,
+    pub zisk_executor_time: ZiskExecutorTimeDto,
 }
 
 pub enum ExecuteTaskResponseResultDataDto {

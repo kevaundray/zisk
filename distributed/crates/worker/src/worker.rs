@@ -10,6 +10,7 @@ use tokio::sync::{mpsc, Mutex};
 use tokio::task::JoinHandle;
 use zisk_common::io::{StreamProcessor, StreamSource, ZiskStdin};
 use zisk_common::ElfBinaryFromFile;
+use zisk_common::ZiskExecutorTime;
 use zisk_distributed_common::{AggregationParams, DataCtx, InputSourceDto, JobPhase, WorkerState};
 use zisk_distributed_common::{ComputeCapacity, JobId, WorkerId};
 use zisk_distributed_common::{HintsSourceDto, StreamDataDto, StreamMessageKind};
@@ -17,8 +18,8 @@ use zisk_sdk::{Asm, Emu, ProverClient, ZiskBackend, ZiskProgramPK, ZiskProver};
 
 use crate::stream_ordering::StreamOrderingActor;
 
-use proofman::ExecutionInfo;
 use proofman::ProvePhaseInputs;
+use proofman::WitnessInfo;
 use proofman_common::ParamsGPU;
 use proofman_common::ProofOptions;
 use proofman_common::{json_to_debug_instances_map, DebugInfo};
@@ -27,13 +28,31 @@ use tracing::{error, info};
 
 use crate::config::ProverServiceConfigDto;
 
+/// Message structures for MPI broadcast to ensure type safety
+#[derive(borsh::BorshSerialize, borsh::BorshDeserialize)]
+struct ContributionsMessage {
+    job_id: JobId,
+    phase_inputs: ProvePhaseInputs,
+    options: ProofOptions,
+    input_source: InputSourceDto,
+    hints_source: HintsSourceDto,
+}
+
+#[derive(borsh::BorshSerialize, borsh::BorshDeserialize)]
+struct ProveMessage {
+    job_id: JobId,
+    phase_inputs: ProvePhaseInputs,
+    options: ProofOptions,
+}
+
 /// Result from computation tasks
 #[derive(Debug)]
 pub enum ComputationResult {
     Challenge {
         job_id: JobId,
         success: bool,
-        result: Result<(ExecutionInfo, Vec<ContributionsInfo>)>,
+        result: Result<(WitnessInfo, ZiskExecutorTime, Vec<ContributionsInfo>)>,
+        task_received_time: Option<chrono::DateTime<chrono::Utc>>,
     },
     Proofs {
         job_id: JobId,
@@ -232,6 +251,7 @@ pub struct JobContext {
     pub total_compute_units: u32, // Total compute units for the whole job
     pub phase: JobPhase,
     pub executed_steps: u64,
+    pub task_received_time: Option<chrono::DateTime<chrono::Utc>>,
 }
 
 pub struct Worker<T: ZiskBackend + 'static> {
@@ -375,6 +395,8 @@ impl<T: ZiskBackend + 'static> Worker<T> {
         }
     }
 
+    #[allow(clippy::type_complexity)]
+    #[allow(clippy::too_many_arguments)]
     pub fn new_job(
         &mut self,
         job_id: JobId,
@@ -383,6 +405,7 @@ impl<T: ZiskBackend + 'static> Worker<T> {
         total_workers: u32,
         allocation: Vec<u32>,
         total_compute_units: u32,
+        task_received_time: Option<chrono::DateTime<chrono::Utc>>,
     ) -> Arc<Mutex<JobContext>> {
         let current_job = Arc::new(Mutex::new(JobContext {
             job_id: job_id.clone(),
@@ -393,6 +416,7 @@ impl<T: ZiskBackend + 'static> Worker<T> {
             total_compute_units,
             phase: JobPhase::Contributions,
             executed_steps: 0,
+            task_received_time,
         }));
         self.current_job = Some(current_job.clone());
 
@@ -418,14 +442,15 @@ impl<T: ZiskBackend + 'static> Worker<T> {
 
             let options = self.get_proof_options(false);
 
-            borsh::to_vec(&(
-                JobPhase::Contributions,
-                job.job_id.clone(),
+            let message = ContributionsMessage {
+                job_id: job.job_id.clone(),
                 phase_inputs,
                 options,
-                job.data_ctx.input_source.clone(),
-            ))
-            .unwrap()
+                input_source: job.data_ctx.input_source.clone(),
+                hints_source: job.data_ctx.hints_source.clone(),
+            };
+
+            borsh::to_vec(&(JobPhase::Contributions, message)).unwrap()
         };
 
         self.prover.mpi_broadcast(&mut serialized)?;
@@ -449,13 +474,14 @@ impl<T: ZiskBackend + 'static> Worker<T> {
     ) -> Result<()> {
         let mut serialized = {
             let job = job.lock().await;
-            let job_id = job.job_id.clone();
 
             let phase_inputs = proofman::ProvePhaseInputs::Internal(challenges);
 
             let options = self.get_proof_options(false);
 
-            borsh::to_vec(&(JobPhase::Prove, job_id, phase_inputs, options)).unwrap()
+            let message = ProveMessage { job_id: job.job_id.clone(), phase_inputs, options };
+
+            borsh::to_vec(&(JobPhase::Prove, message)).unwrap()
         };
 
         self.prover.mpi_broadcast(&mut serialized)?;
@@ -503,17 +529,20 @@ impl<T: ZiskBackend + 'static> Worker<T> {
 
             let mut guard = job.blocking_lock();
             guard.executed_steps = prover.executed_steps();
+            let task_received_time = guard.task_received_time;
             drop(guard);
 
-            let execution_info =
-                prover.get_execution_info().unwrap_or_else(|_| ExecutionInfo::default());
+            let (witness_info, zisk_execution_time) = prover
+                .get_execution_info()
+                .unwrap_or_else(|_| (WitnessInfo::default(), ZiskExecutorTime::default()));
 
             match result {
                 Ok(data) => {
                     let _ = tx.send(ComputationResult::Challenge {
                         job_id,
                         success: true,
-                        result: Ok((execution_info, data)),
+                        result: Ok((witness_info, zisk_execution_time, data)),
+                        task_received_time,
                     });
                 }
                 Err(error) => {
@@ -522,6 +551,7 @@ impl<T: ZiskBackend + 'static> Worker<T> {
                         job_id,
                         success: false,
                         result: Err(error),
+                        task_received_time,
                     });
                 }
             }
@@ -838,32 +868,30 @@ impl<T: ZiskBackend + 'static> Worker<T> {
 
         match phase {
             JobPhase::Contributions => {
-                let (job_id, phase_inputs, options, input_source_dto, hints_source_dto): (
-                    JobId,
-                    ProvePhaseInputs,
-                    ProofOptions,
-                    InputSourceDto,
-                    HintsSourceDto,
-                ) = borsh::from_slice(&bytes[1..]).unwrap();
+                let message: ContributionsMessage = borsh::from_slice(&bytes[1..]).unwrap();
 
                 let result = Self::execute_contribution_task(
-                    job_id,
+                    message.job_id,
                     &self.prover,
-                    phase_inputs,
-                    input_source_dto,
-                    hints_source_dto,
+                    message.phase_inputs,
+                    message.input_source,
+                    message.hints_source,
                     &self.pk,
-                    options,
+                    message.options,
                 );
                 if let Err(e) = result {
                     error!("Error during Contributions MPI broadcast execution: {}. Waiting for new job...", e);
                 }
             }
             JobPhase::Prove => {
-                let (job_id, phase_inputs, options): (JobId, ProvePhaseInputs, ProofOptions) =
-                    borsh::from_slice(&bytes[1..]).unwrap();
+                let message: ProveMessage = borsh::from_slice(&bytes[1..]).unwrap();
 
-                let result = Self::execute_prove_task(job_id, &self.prover, phase_inputs, options);
+                let result = Self::execute_prove_task(
+                    message.job_id,
+                    &self.prover,
+                    message.phase_inputs,
+                    message.options,
+                );
                 if let Err(e) = result {
                     error!(
                         "Error during Prove MPI broadcast execution: {}. Waiting for new job...",

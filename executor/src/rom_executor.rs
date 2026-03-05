@@ -7,11 +7,11 @@ use crate::{
     AsmResources, DeviceMetricsList, Emulator, EmulatorKind, NestedDeviceMetricsList,
     StaticSMBundle,
 };
-use asm_runner::AsmRunnerMO;
+use asm_runner::{AsmRunnerMO, AsmRunnerRH};
 use fields::PrimeField64;
 use proofman_common::ProofCtx;
 use std::{sync::Mutex, thread::JoinHandle};
-use zisk_common::{io::ZiskStdin, EmuTrace, ExecutorStatsHandle, StatsScope};
+use zisk_common::{io::ZiskStdin, AsmExecutionInfo, EmuTrace, ExecutorStatsHandle, StatsScope};
 use zisk_core::ZiskRom;
 
 /// Output from ROM execution.
@@ -24,6 +24,8 @@ pub struct RomExecutionOutput {
     pub secn_count: NestedDeviceMetricsList,
     /// Handle to memory operations thread (for ASM emulator).
     pub handle_mo: Option<JoinHandle<AsmRunnerMO>>,
+    /// Handle to hints runner thread (for ASM emulator).
+    pub handle_rh: Option<JoinHandle<AsmRunnerRH>>,
     /// Execution result with step counts.
     pub steps: u64,
 }
@@ -60,6 +62,14 @@ impl RomExecutor {
         self.emulator.reset_hints_stream()
     }
 
+    pub fn get_asm_execution_info(&self) -> Option<AsmExecutionInfo> {
+        self.emulator.get_asm_execution_info()
+    }
+
+    pub fn set_rh_data(&self, rh_data: AsmRunnerRH) {
+        self.emulator.set_rh_data(rh_data);
+    }
+
     /// Executes the ROM program and collects minimal traces.
     ///
     /// # Arguments
@@ -81,16 +91,10 @@ impl RomExecutor {
         stats: &ExecutorStatsHandle,
         caller_stats_scope: &StatsScope,
     ) -> RomExecutionOutput {
-        let (min_traces, main_count, secn_count, handle_mo, steps) = self.emulator.execute(
-            zisk_rom,
-            &self.stdin,
-            pctx,
-            sm_bundle,
-            use_hints,
-            stats,
-            caller_stats_scope,
-        );
+        let (min_traces, main_count, secn_count, handle_mo, handle_rh, steps) = self
+            .emulator
+            .execute(zisk_rom, &self.stdin, pctx, sm_bundle, use_hints, stats, caller_stats_scope);
 
-        RomExecutionOutput { min_traces, main_count, secn_count, handle_mo, steps }
+        RomExecutionOutput { min_traces, main_count, secn_count, handle_mo, handle_rh, steps }
     }
 }

@@ -45,14 +45,15 @@ use zisk_core::ZiskRom;
 pub type DeviceMetricsList = Vec<DeviceMetricsByChunk>;
 pub type NestedDeviceMetricsList = HashMap<usize, DeviceMetricsList>;
 
-use asm_runner::AsmRunnerMO;
+use asm_runner::{AsmRunnerMO, AsmRunnerRH};
 use fields::PrimeField64;
 use proofman_common::ProofCtx;
 use std::{collections::HashMap, sync::Mutex, thread::JoinHandle};
-use zisk_common::{io::ZiskStdin, EmuTrace, ExecutorStatsHandle, StatsScope};
+use zisk_common::{io::ZiskStdin, AsmExecutionInfo, EmuTrace, ExecutorStatsHandle, StatsScope};
 
 /// Trait for unified execution across different emulator backends
 #[allow(clippy::too_many_arguments)]
+#[allow(clippy::type_complexity)]
 pub trait Emulator<F: PrimeField64>: Send + Sync {
     /// Execute the emulator
     fn execute(
@@ -69,6 +70,7 @@ pub trait Emulator<F: PrimeField64>: Send + Sync {
         DeviceMetricsList,
         NestedDeviceMetricsList,
         Option<JoinHandle<AsmRunnerMO>>,
+        Option<JoinHandle<AsmRunnerRH>>,
         u64,
     );
 }
@@ -99,10 +101,23 @@ impl EmulatorKind {
         };
     }
 
+    pub fn get_asm_execution_info(&self) -> Option<AsmExecutionInfo> {
+        match self {
+            Self::Asm(e) => e.get_asm_execution_info(),
+            Self::Rust(_) => None, // No ASM execution info in Rust emulator
+        }
+    }
     pub fn reset_hints_stream(&self) {
         match self {
             Self::Asm(e) => e.reset_hints_stream(),
             Self::Rust(_) => (), // No hints stream in Rust emulator
+        }
+    }
+
+    pub fn set_rh_data(&self, rh_data: AsmRunnerRH) {
+        match self {
+            Self::Asm(e) => e.set_rh_data(rh_data),
+            Self::Rust(_) => (),
         }
     }
 }
@@ -122,6 +137,7 @@ impl<F: PrimeField64> Emulator<F> for EmulatorKind {
         DeviceMetricsList,
         NestedDeviceMetricsList,
         Option<JoinHandle<AsmRunnerMO>>,
+        Option<JoinHandle<AsmRunnerRH>>,
         u64,
     ) {
         match self {
