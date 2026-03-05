@@ -39,7 +39,7 @@ use crate::{
 use chrono::{DateTime, Utc};
 use colored::Colorize;
 use dashmap::DashMap;
-use proofman::{ContributionsInfo, ExecutionInfo};
+use proofman::{ContributionsInfo, WitnessInfo};
 use std::{
     collections::HashMap,
     fs,
@@ -52,6 +52,8 @@ use std::{
 use tokio::sync::RwLock;
 use tracing::{error, info, warn};
 use zisk_common::io::{StreamSource, ZiskStream};
+use zisk_common::AsmExecutionInfo;
+use zisk_common::ZiskExecutorTime;
 use zisk_distributed_common::{
     AggParamsDto, AggProofData, ChallengesDto, ComputeCapacity, ContributionParamsDto,
     ContributionsResult, CoordinatorMessageDto, DataId, ExecuteTaskRequestDto,
@@ -665,9 +667,6 @@ impl Coordinator {
         let active_workers = active_workers.to_vec();
         let total_workers = active_workers.len() as u32;
 
-        use futures::stream::{self, StreamExt};
-
-        // TODO!!!!! Can we avoid this clone ????
         let cloned_active_workers = active_workers.clone();
         let tasks = active_workers.into_iter().enumerate().map(|(rank_id, worker_id)| {
             let job_id = job.job_id.clone();
@@ -707,7 +706,9 @@ impl Coordinator {
         });
 
         // Process tasks with a concurrency limit
-        let results: Vec<_> = stream::iter(tasks).buffer_unordered(16).collect().await;
+        use futures::stream::StreamExt;
+
+        let results: Vec<_> = futures::stream::iter(tasks).buffer_unordered(16).collect().await;
 
         // Check for any errors
         for (worker_id, send_result, state_result) in results {
@@ -1265,16 +1266,40 @@ impl Coordinator {
                     })
                     .collect();
 
-                let execution_info = ExecutionInfo {
-                    summary_info: ch_list.execution_info.summary_info,
-                    publics: ch_list.execution_info.publics,
-                    proof_values: ch_list.execution_info.proof_values,
-                    execution_time: ch_list.execution_info.execution_time,
+                let witness_info = WitnessInfo {
+                    summary_info: ch_list.witness_info.summary_info,
+                    publics: ch_list.witness_info.publics,
+                    proof_values: ch_list.witness_info.proof_values,
+                    witness_time: ch_list.witness_info.witness_time,
+                };
+
+                let zisk_executor_time = ZiskExecutorTime {
+                    total_duration: Duration::from_secs_f32(
+                        ch_list.zisk_executor_time.total_duration / 1000.0,
+                    ),
+                    execution_duration: Duration::from_secs_f32(
+                        ch_list.zisk_executor_time.execution_duration / 1000.0,
+                    ),
+                    count_and_plan_duration: Duration::from_secs_f32(
+                        ch_list.zisk_executor_time.count_and_plan_duration / 1000.0,
+                    ),
+                    count_and_plan_mo_duration: Duration::from_secs_f32(
+                        ch_list.zisk_executor_time.count_and_plan_mo_duration / 1000.0,
+                    ),
+                    asm_execution_duration: ch_list.zisk_executor_time.asm_execution_duration.map(
+                        |asm_info| AsmExecutionInfo { time: asm_info.time, mhz: asm_info.mhz },
+                    ),
                 };
 
                 Ok(JobResultData::Challenges(ContributionsResult {
-                    execution_info,
+                    witness_info,
                     challenges: contributions,
+                    zisk_executor_time,
+                    task_received_time: chrono::DateTime::<Utc>::from_timestamp(
+                        (ch_list.zisk_executor_time.task_received_time / 1000.0) as i64,
+                        ((ch_list.zisk_executor_time.task_received_time % 1000.0) * 1_000_000.0)
+                            as u32,
+                    ),
                 }))
             }
             _ => Err(CoordinatorError::InvalidRequest(
@@ -1292,14 +1317,11 @@ impl Coordinator {
     ///
     /// * `job` - Reference to the job containing Phase 1 results
     fn print_execution_summary(&self, job: &Job) {
-        // Find the first completed contribution result to extract ExecutionInfo summary
+        // Find the first completed contribution result to extract WitnessInfo summary
         if let Some(contributions_results) = job.results.get(&JobPhase::Contributions) {
             if let Some((_worker_id, job_result)) = contributions_results.iter().next() {
                 if let JobResultData::Challenges(contributions_result) = &job_result.data {
-                    info!(
-                        "Execution Summary: {}",
-                        contributions_result.execution_info.summary_info
-                    );
+                    info!("Execution Summary: {}", contributions_result.witness_info.summary_info);
                 }
             }
         }
@@ -1315,35 +1337,65 @@ impl Coordinator {
             job.results.get(&JobPhase::Contributions).map(|r| r.len()).unwrap_or(0);
 
         let end_time = Utc::now();
-        let duration = end_time.signed_duration_since(
-            job.start_times.get(&JobPhase::Contributions).unwrap_or_else(|| {
-                error!("Missing start time for Phase1 in job {}", job.job_id);
-                &end_time
-            }),
-        );
+        let phase_start_time = job.start_times.get(&JobPhase::Contributions).unwrap_or_else(|| {
+            error!("Missing start time for Phase1 in job {}", job.job_id);
+            &end_time
+        });
+        let duration = end_time.signed_duration_since(phase_start_time);
         let duration_ms = Duration::from_millis(duration.num_milliseconds() as u64);
 
-        // Get execution time from the worker's result
-        let exec_time_info = job
-            .results
-            .get(&JobPhase::Contributions)
-            .and_then(|results| results.get(worker_id))
-            .and_then(|job_result| match &job_result.data {
+        // Get execution info from the worker's result
+        let worker_result =
+            job.results.get(&JobPhase::Contributions).and_then(|results| results.get(worker_id));
+
+        let (asm_info_str, witness_time_str, delay_time_str) = if let Some(job_result) =
+            worker_result
+        {
+            match &job_result.data {
                 JobResultData::Challenges(contributions_result) => {
-                    Some(contributions_result.execution_info.execution_time)
+                    // Calculate delay: time from coordinator sending job to worker receiving task
+                    let delay_duration = contributions_result
+                        .task_received_time
+                        .map(|task_received| task_received.signed_duration_since(*phase_start_time))
+                        .unwrap_or_else(chrono::Duration::zero);
+                    let delay_ms = delay_duration.num_milliseconds().max(0) as f32;
+                    let delay_str = format!(", Delay: {:.3}s", delay_ms / 1000.0);
+
+                    let asm_str = contributions_result
+                        .zisk_executor_time
+                        .asm_execution_duration
+                        .as_ref()
+                        .map(|asm_info| {
+                            format!(
+                                ", Asm Execution: {:.3}s at {} MHz",
+                                asm_info.time, asm_info.mhz
+                            )
+                        })
+                        .unwrap_or_default();
+
+                    let witness_str = format!(
+                        ", Witness: {:.3}s",
+                        contributions_result.witness_info.witness_time / 1000.0
+                    );
+
+                    (asm_str, witness_str, delay_str)
                 }
-                _ => None,
-            })
-            .unwrap_or(0.0);
+                _ => (String::new(), String::new(), String::new()),
+            }
+        } else {
+            (String::new(), String::new(), String::new())
+        };
 
         info!(
-            "[Phase1] {} finished phase 1 for {} ({}/{} workers done, {:.3}s (execution {:.3}s))",
+            "[Phase1] {} finished phase 1 for {} ({}/{} workers done, Phase: {:.3}s{}{}{})",
             worker_id,
             job.job_id,
             phase1_results_len,
             job.workers.len(),
             duration_ms.as_secs_f32(),
-            exec_time_info
+            delay_time_str,
+            witness_time_str,
+            asm_info_str,
         );
 
         // Ensure we have results from all assigned workers before proceeding.
@@ -1415,24 +1467,24 @@ impl Coordinator {
         } else {
             // Standard mode: aggregate challenges from all participating workers
             // Each worker contributes their portion of the overall challenge space
-            let (challenges, execution_info): (Vec<Vec<ContributionsInfo>>, Vec<ExecutionInfo>) =
+            let (challenges, witness_info): (Vec<Vec<ContributionsInfo>>, Vec<WitnessInfo>) =
                 phase1_results
                     .values()
                     .map(|results| match &results.data {
                         JobResultData::Challenges(values) => {
-                            (values.challenges.clone(), values.execution_info.clone())
+                            (values.challenges.clone(), values.witness_info.clone())
                         }
                         _ => unreachable!("Expected Challenges data in Phase1 results"),
                     })
                     .unzip();
 
-            let first = execution_info.first().ok_or_else(|| {
-                CoordinatorError::Internal(format!("No execution info found in job {}", job.job_id))
+            let first = witness_info.first().ok_or_else(|| {
+                CoordinatorError::Internal(format!("No witness info found in job {}", job.job_id))
             })?;
 
             let mut mismatched_workers = Vec::new();
 
-            for (worker_idx, info) in execution_info.iter().enumerate() {
+            for (worker_idx, info) in witness_info.iter().enumerate() {
                 if info.publics != first.publics || info.proof_values != first.proof_values {
                     mismatched_workers.push((worker_idx, info));
                 }
@@ -1451,7 +1503,7 @@ impl Coordinator {
                     .collect();
 
                 return Err(CoordinatorError::Internal(format!(
-                    "ExecutionInfo mismatch in job {}:\n{}",
+                    "WitnessInfo mismatch in job {}:\n{}",
                     job.job_id,
                     mismatch_report.join("\n")
                 )));
@@ -1578,6 +1630,10 @@ impl Coordinator {
         let agg_worker_id = self.resolve_aggregator_assignment(&mut job, &worker_id).await?;
 
         let all_done = self.check_phase2_completion(&job, &worker_id).await?;
+
+        if all_done {
+            job.start_times.insert(JobPhase::Aggregate, Utc::now());
+        }
 
         let proofs = self.collect_worker_proofs(&job, &agg_worker_id, &worker_id)?;
 
@@ -1988,21 +2044,6 @@ impl Coordinator {
 
         let duration = Duration::from_millis(job.duration_ms.unwrap_or(0));
 
-        // Extract execution time from Phase 1 results to split phase1 into execution + contributions
-        let phase1_execution_time = job
-            .results
-            .get(&JobPhase::Contributions)
-            .and_then(|results| results.values().next())
-            .and_then(|job_result| match &job_result.data {
-                JobResultData::Challenges(contributions_result) => {
-                    Some(contributions_result.execution_info.execution_time)
-                }
-                _ => None,
-            })
-            .unwrap_or(0.0);
-
-        let phase1_contributions_time = phase1_duration.as_seconds_f32() - phase1_execution_time;
-
         let header = format!("[Job] Finished {} successfully ✔", job_id).green();
         let duration_str = format!("Duration: {:.3}s", duration.as_secs_f32()).bold();
         let steps_str = if let Some(executed_steps) = job.executed_steps {
@@ -2011,11 +2052,10 @@ impl Coordinator {
             "Steps: N/A".to_string().red().bold()
         };
         info!(
-            "{} {} ({:.3}s+{:.3}s+{:.3}s+{:.3}s) {} Inputs: {:?}, Capacity: {} ",
+            "{} {} ({:.3}s+{:.3}s+{:.3}s) {} Inputs: {:?}, Capacity: {} ",
             header,
             duration_str,
-            phase1_execution_time,
-            phase1_contributions_time,
+            phase1_duration.as_seconds_f32(),
             phase2_duration.as_seconds_f32(),
             phase3_duration.as_seconds_f32(),
             steps_str,
@@ -2023,10 +2063,187 @@ impl Coordinator {
             job.compute_capacity,
         );
 
+        let workers = job.workers.clone();
+
+        if workers.len() > 1 {
+            for phase in [JobPhase::Contributions, JobPhase::Prove] {
+                if let Some(results) = job.results.get(&phase) {
+                    if let Some(start_time) = job.start_times.get(&phase) {
+                        let mut durations_ms: Vec<(WorkerId, i64)> = results
+                            .iter()
+                            .map(|(worker_id, result)| {
+                                let duration = result.end_time.signed_duration_since(start_time);
+                                (worker_id.clone(), duration.num_milliseconds())
+                            })
+                            .collect();
+
+                        if durations_ms.len() > 1 {
+                            durations_ms.sort_by_key(|(_, duration)| *duration);
+
+                            let (best_worker, best_duration) = &durations_ms[0];
+                            let (worst_worker, worst_duration) = durations_ms.last().unwrap();
+
+                            let avg_duration = durations_ms.iter().map(|(_, d)| d).sum::<i64>()
+                                as f64
+                                / durations_ms.len() as f64;
+
+                            let diff_percentage = if *best_duration > 0 {
+                                ((*worst_duration - *best_duration) as f64 / *best_duration as f64)
+                                    * 100.0
+                            } else {
+                                0.0
+                            };
+
+                            info!(
+                                "[Job] {:?} Performance - Avg: {:.3}s, Best: {} ({:.3}s), Worst: {} ({:.3}s), Diff: {:.1}%",
+                                phase,
+                                avg_duration / 1000.0,
+                                best_worker,
+                                *best_duration as f64 / 1000.0,
+                                worst_worker,
+                                *worst_duration as f64 / 1000.0,
+                                diff_percentage
+                            );
+                        }
+
+                        // For Phase 1, also show delay, witness, and ASM execution statistics
+                        if phase == JobPhase::Contributions && durations_ms.len() > 1 {
+                            // Extract delay times (coordinator send to worker start)
+                            let mut delays_ms: Vec<(WorkerId, i64)> = results
+                                .iter()
+                                .filter_map(|(worker_id, result)| {
+                                    if let JobResultData::Challenges(contrib) = &result.data {
+                                        contrib.task_received_time.map(|task_received| {
+                                            let delay =
+                                                task_received.signed_duration_since(start_time);
+                                            (worker_id.clone(), delay.num_milliseconds().max(0))
+                                        })
+                                    } else {
+                                        None
+                                    }
+                                })
+                                .collect();
+
+                            if !delays_ms.is_empty() {
+                                delays_ms.sort_by_key(|(_, delay)| *delay);
+                                let (best_delay_worker, best_delay) = &delays_ms[0];
+                                let (worst_delay_worker, worst_delay) = delays_ms.last().unwrap();
+                                let avg_delay = delays_ms.iter().map(|(_, d)| d).sum::<i64>()
+                                    as f64
+                                    / delays_ms.len() as f64;
+
+                                let delay_diff_percentage = if *best_delay > 0 {
+                                    ((*worst_delay - *best_delay) as f64 / *best_delay as f64)
+                                        * 100.0
+                                } else {
+                                    0.0
+                                };
+
+                                info!(
+                                    "[Job] Contributions Delay - Avg: {:.3}s, Best: {} ({:.3}s), Worst: {} ({:.3}s), Diff: {:.1}%",
+                                    avg_delay / 1000.0,
+                                    best_delay_worker,
+                                    *best_delay as f64 / 1000.0,
+                                    worst_delay_worker,
+                                    *worst_delay as f64 / 1000.0,
+                                    delay_diff_percentage
+                                );
+                            }
+
+                            // Extract witness times
+                            let mut witness_times: Vec<(WorkerId, f32)> = results
+                                .iter()
+                                .filter_map(|(worker_id, result)| {
+                                    if let JobResultData::Challenges(contrib) = &result.data {
+                                        Some((worker_id.clone(), contrib.witness_info.witness_time))
+                                    } else {
+                                        None
+                                    }
+                                })
+                                .collect();
+
+                            if !witness_times.is_empty() {
+                                witness_times.sort_by(|(_, a), (_, b)| {
+                                    a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal)
+                                });
+                                let (best_witness_worker, best_witness) = &witness_times[0];
+                                let (worst_witness_worker, worst_witness) =
+                                    witness_times.last().unwrap();
+                                let avg_witness =
+                                    witness_times.iter().map(|(_, t)| *t as f64).sum::<f64>()
+                                        / witness_times.len() as f64;
+
+                                let witness_diff_percentage = if *best_witness > 0.0 {
+                                    ((*worst_witness - *best_witness) as f64 / *best_witness as f64)
+                                        * 100.0
+                                } else {
+                                    0.0
+                                };
+
+                                info!(
+                                    "[Job] Contributions Witness - Avg: {:.3}s, Best: {} ({:.3}s), Worst: {} ({:.3}s), Diff: {:.1}%",
+                                    avg_witness / 1000.0,
+                                    best_witness_worker,
+                                    *best_witness as f64 / 1000.0,
+                                    worst_witness_worker,
+                                    *worst_witness as f64 / 1000.0,
+                                    witness_diff_percentage
+                                );
+                            }
+
+                            // Extract ASM execution times
+                            let mut asm_times: Vec<(WorkerId, f32, f32)> = results
+                                .iter()
+                                .filter_map(|(worker_id, result)| {
+                                    if let JobResultData::Challenges(contrib) = &result.data {
+                                        contrib
+                                            .zisk_executor_time
+                                            .asm_execution_duration
+                                            .as_ref()
+                                            .map(|asm| (worker_id.clone(), asm.time, asm.mhz))
+                                    } else {
+                                        None
+                                    }
+                                })
+                                .collect();
+
+                            if !asm_times.is_empty() {
+                                asm_times.sort_by(|(_, a, _), (_, b, _)| {
+                                    a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal)
+                                });
+                                let (best_asm_worker, best_asm, best_mhz) = &asm_times[0];
+                                let (worst_asm_worker, worst_asm, worst_mhz) =
+                                    asm_times.last().unwrap();
+                                let avg_asm =
+                                    asm_times.iter().map(|(_, t, _)| *t as f64).sum::<f64>()
+                                        / asm_times.len() as f64;
+
+                                let asm_diff_percentage = if *best_asm > 0.0 {
+                                    ((*worst_asm - *best_asm) as f64 / *best_asm as f64) * 100.0
+                                } else {
+                                    0.0
+                                };
+
+                                info!(
+                                    "[Job] Contributions ASM - Avg: {:.3}s, Best: {} ({:.3}s @ {:.1}MHz), Worst: {} ({:.3}s @ {:.1}MHz), Diff: {:.1}%",
+                                    avg_asm,
+                                    best_asm_worker,
+                                    *best_asm,
+                                    *best_mhz,
+                                    worst_asm_worker,
+                                    *worst_asm,
+                                    *worst_mhz,
+                                    asm_diff_percentage
+                                );
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
         // Print summary of the job
         let job_phases = vec![JobPhase::Contributions, JobPhase::Prove, JobPhase::Aggregate];
-
-        let workers = job.workers.clone();
 
         info!("[Job] Summary for {}", job_id);
         for phase in job_phases {

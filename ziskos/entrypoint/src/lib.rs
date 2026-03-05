@@ -24,6 +24,34 @@ pub mod ziskos_definitions;
 ))]
 pub mod hints;
 
+#[cfg(all(not(all(target_os = "zkvm", target_vendor = "zisk")), zisk_hints))]
+extern "C" {
+    fn hint_input_data(input_data_ptr: *const u8, input_data_len: usize);
+}
+
+#[cfg(all(not(all(target_os = "zkvm", target_vendor = "zisk")), zisk_hints_debug))]
+extern "C" {
+    fn hint_log_c(msg: *const c_char);
+}
+
+#[cfg(zisk_hints_debug)]
+pub fn hint_log<S: AsRef<str>>(msg: S) {
+    // On native we call external C function to log hints, since it controls if hints are paused or not
+    #[cfg(not(all(target_os = "zkvm", target_vendor = "zisk")))]
+    {
+        use std::ffi::CString;
+
+        if let Ok(c) = CString::new(msg.as_ref()) {
+            unsafe { hint_log_c(c.as_ptr()) };
+        }
+    }
+    // On zkvm/zisk, we can just print directly
+    #[cfg(all(target_os = "zkvm", target_vendor = "zisk"))]
+    {
+        println!("{}", msg.as_ref());
+    }
+}
+
 #[macro_export]
 macro_rules! entrypoint {
     ($path:path) => {
@@ -48,9 +76,63 @@ macro_rules! entrypoint {
 #[allow(unused_imports)]
 use crate::ziskos_definitions::ziskos_config::*;
 
+/// Pointer to the current position in the input buffer.
+#[cfg(all(target_os = "zkvm", target_vendor = "zisk"))]
+static mut INPUT_POS: usize = 8;
+
+/// Reset the input position to the beginning.
+#[cfg(all(target_os = "zkvm", target_vendor = "zisk"))]
+pub fn read_reset() {
+    unsafe { INPUT_POS = 8 };
+}
+
+/// Read a slice directly from INPUT_ADDR without copying (zero-copy).
+///
+/// This returns a slice pointing directly to the input memory region.
+/// Use this when you want to deserialize directly without an intermediate copy.
+/// The INPUT_POS is advanced after this call.
+#[cfg(all(target_os = "zkvm", target_vendor = "zisk"))]
+pub fn read_slice_zerocopy<'a>() -> &'a [u8] {
+    // SAFETY: Single threaded, so nothing else can touch INPUT_POS while we're working.
+    let input_pos = unsafe { INPUT_POS };
+    let addr = (INPUT_ADDR as usize) + input_pos;
+
+    // Ensure the 8-byte length prefix is ready and read it
+    crate::zisklib::fcall_input_ready(&((addr + 7) as u64));
+    let len = unsafe {
+        let bytes = core::slice::from_raw_parts(addr as *const u8, 8);
+        u64::from_le_bytes(bytes.try_into().unwrap()) as usize
+    };
+
+    // Ensure the data is ready (8-byte aligned)
+    let data_addr = addr + 8;
+    let aligned_len = (len + 7) & !0x7;
+    crate::zisklib::fcall_input_ready(&((data_addr + aligned_len - 1) as u64));
+
+    // Update input position: move past length (8 bytes) + data (8-byte aligned)
+    unsafe { INPUT_POS = input_pos + 8 + aligned_len };
+
+    // Return slice pointing directly to the input data (zero-copy)
+    unsafe { core::slice::from_raw_parts(data_addr as *const u8, len) }
+}
+
 #[cfg(all(target_os = "zkvm", target_vendor = "zisk"))]
 pub(crate) fn read_input() -> Vec<u8> {
-    read_input_slice().to_vec()
+    let vec = read_slice_zerocopy().to_vec();
+
+    #[cfg(zisk_hints_debug)]
+    {
+        let start_bytes = &vec[..vec.len().min(64)];
+        let ellipsis = if vec.len() > 64 { "..." } else { "" };
+        hint_log_c(format!(
+            "hint_input_data (input_data: {:x?}{} , input_data_len: {}",
+            start_bytes,
+            ellipsis,
+            vec.len()
+        ));
+    }
+
+    vec
 }
 
 #[cfg(not(all(target_os = "zkvm", target_vendor = "zisk")))]
@@ -61,23 +143,25 @@ pub(crate) fn read_input() -> Vec<u8> {
         File::open("build/input.bin").expect("Error opening input file at: build/input.bin");
     let mut buffer = Vec::new();
     file.read_to_end(&mut buffer).unwrap();
+
+    #[cfg(zisk_hints)]
+    unsafe {
+        hint_input_data(buffer.as_ptr(), buffer.len());
+    }
+
+    #[cfg(zisk_hints_debug)]
+    {
+        let start_bytes = &buffer[..buffer.len().min(64)];
+        let ellipsis = if buffer.len() > 64 { "..." } else { "" };
+        hint_log_c(format!(
+            "hint_input_data (input_data: {:x?}{} , input_data_len: {}",
+            start_bytes,
+            ellipsis,
+            buffer.len()
+        ));
+    }
+    
     buffer
-}
-
-#[cfg(all(target_os = "zkvm", target_vendor = "zisk"))]
-pub fn read_input_slice<'a>() -> &'a [u8] {
-    // Create a slice of the first 8 bytes to get the size
-    let bytes = unsafe { core::slice::from_raw_parts((INPUT_ADDR as *const u8).add(8), 8) };
-    // Convert the slice to a u64 (little-endian)
-    let size: u64 = u64::from_le_bytes(bytes.try_into().unwrap());
-
-    unsafe { core::slice::from_raw_parts((INPUT_ADDR as *const u8).add(16), size as usize) }
-}
-
-#[allow(unused)]
-#[cfg(not(all(target_os = "zkvm", target_vendor = "zisk")))]
-pub fn read_input_slice() -> Box<[u8]> {
-    read_input().into_boxed_slice()
 }
 
 #[cfg(all(target_os = "zkvm", target_vendor = "zisk"))]
@@ -287,4 +371,9 @@ mod ziskos {
     core::arch::global_asm!(include_str!("dma/memcmp.s"));
     //core::arch::global_asm!(include_str!("dma/inputcpy.s"));
     core::arch::global_asm!(include_str!("dma/memset.s"));
+}
+
+pub fn verify_zisk_proof(zisk_proof: &[u8]) -> bool {
+    let (proof, vk) = zisk_proof.split_at(zisk_proof.len() - 32);
+    zisk_verifier::verify_vadcop_final_proof(proof, vk)
 }

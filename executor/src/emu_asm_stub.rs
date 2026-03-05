@@ -4,13 +4,13 @@ use std::{
 };
 
 use crate::{DeviceMetricsList, NestedDeviceMetricsList, StaticSMBundle};
-use asm_runner::AsmRunnerMO;
+use asm_runner::{AsmRunnerMO, AsmRunnerRH};
 
 use crate::AsmResources;
 use fields::PrimeField64;
 use proofman_common::ProofCtx;
 use sm_rom::RomSM;
-use zisk_common::{io::ZiskStdin, EmuTrace, ExecutorStatsHandle, StatsScope};
+use zisk_common::{io::ZiskStdin, AsmExecutionInfo, EmuTrace, ExecutorStatsHandle, StatsScope};
 use zisk_core::ZiskRom;
 
 pub struct EmulatorAsm {}
@@ -44,6 +44,7 @@ impl EmulatorAsm {
         DeviceMetricsList,
         NestedDeviceMetricsList,
         Option<JoinHandle<AsmRunnerMO>>,
+        Option<JoinHandle<AsmRunnerRH>>,
         u64,
     ) {
         unimplemented!("AsmRunner is only supported on Linux x86_64 platforms.");
@@ -53,11 +54,19 @@ impl EmulatorAsm {
         unimplemented!("AsmRunner is only supported on Linux x86_64 platforms.");
     }
 
+    pub fn set_rh_data(&self, _rh_data: AsmRunnerRH) {
+        unimplemented!("AsmRunner is only supported on Linux x86_64 platforms.");
+    }
+
     pub fn get_chunk_size(&self) -> u64 {
         unimplemented!("AsmRunner is only supported on Linux x86_64 platforms.");
     }
 
     pub fn reset_hints_stream(&self) {
+        unimplemented!("AsmRunner is only supported on Linux x86_64 platforms.");
+    }
+
+    pub fn get_asm_execution_info(&self) -> Option<AsmExecutionInfo> {
         unimplemented!("AsmRunner is only supported on Linux x86_64 platforms.");
     }
 }

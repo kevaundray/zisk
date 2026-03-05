@@ -153,6 +153,8 @@ pub struct ZiskExecutorTime {
     pub count_and_plan_duration: Duration,
     /// Duration of the counting and planning phase for memory operations from ASM runner.
     pub count_and_plan_mo_duration: Duration,
+    /// Execution duration of the ASM runner.
+    pub asm_execution_duration: Option<AsmExecutionInfo>,
 }
 
 #[derive(Debug, Default, Clone)]
@@ -314,5 +316,17 @@ impl ElfBinaryLike for ElfBinary {
     }
     fn with_hints(&self) -> bool {
         self.with_hints
+    }
+}
+
+#[derive(Default, Debug, Clone)]
+pub struct AsmExecutionInfo {
+    pub time: f32,
+    pub mhz: f32,
+}
+
+impl fmt::Display for AsmExecutionInfo {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{:.3}s ({:.0} MHz)", self.time, self.mhz)
     }
 }

@@ -296,16 +296,31 @@ message ExecuteTaskResponse {
   }
 }
 
-message ExecuteInfo {
-  float execution_time = 1;
+message WitnessExecInfo {
+  float witness_time = 1;
   repeated uint64 publics = 2;
   repeated uint64 proof_values = 3;
   string summary_info = 4;
 }
 
+message AsmExecuteInfo {
+  float time = 1;
+  float mhz = 2;
+}
+
+message ZiskExecuteTime {
+  float total_duration = 1;
+  float execution_duration = 2;
+  float count_and_plan_duration = 3;
+  float count_and_plan_mo_duration = 4;
+  optional AsmExecuteInfo asm_execution_duration = 5;
+  double task_received_time = 6; // Time when task was received by worker (in milliseconds since UNIX epoch)
+}
+
 message ChallengesList {
   repeated Challenges challenges = 1;
-  ExecuteInfo execution_info = 2;
+  WitnessExecInfo witness_info = 2;
+  ZiskExecuteTime zisk_execution_time = 3;
 }
 
 message Challenges {

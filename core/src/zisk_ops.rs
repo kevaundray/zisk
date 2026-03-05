@@ -2501,19 +2501,18 @@ pub fn opc_fcall(ctx: &mut InstContext) {
     let function_id = ctx.a;
 
     let iresult = if function_id == FCALL_INPUT_READY_ID as u64 {
-        let required_address = ctx.fcall.parameters[0] as u64;
-        if required_address < INPUT_ADDR + 8 {
+        let required_address = ctx.fcall.parameters[0];
+        if required_address < INPUT_ADDR {
             panic!(
                 "opc_fcall() FCALL_INPUT_READY_ID called with required_address {:#x} < {:#x}",
-                required_address,
-                INPUT_ADDR + 8
+                required_address, INPUT_ADDR
             );
         }
-        if required_address >= INPUT_ADDR + MAX_INPUT_SIZE as u64 - 1 {
+        if required_address >= INPUT_ADDR + MAX_INPUT_SIZE - 1 {
             panic!(
                 "opc_fcall() FCALL_INPUT_READY_ID called with required_address {:#x} > {:#x}",
                 required_address,
-                INPUT_ADDR + MAX_INPUT_SIZE as u64 - 1
+                INPUT_ADDR + MAX_INPUT_SIZE - 1
             );
         }
 

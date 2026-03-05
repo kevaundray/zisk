@@ -10,8 +10,7 @@ use crate::{ProofMode, ProofOpts};
 use asm_runner::{AsmRunnerOptions, AsmServices};
 use executor::{get_packed_info, init_executor_asm, AsmResources};
 use proofman::{
-    AggProofs, AggProofsRegister, ExecutionInfo, ProofMan, ProvePhase, ProvePhaseInputs,
-    SnarkWrapper,
+    AggProofs, AggProofsRegister, ProofMan, ProvePhase, ProvePhaseInputs, SnarkWrapper, WitnessInfo,
 };
 use proofman_common::{initialize_logger, ParamsGPU, ProofOptions, RankInfo, RowInfo, VerboseMode};
 use proofman_util::{timer_start_info, timer_stop_and_log_info};
@@ -22,6 +21,7 @@ use std::sync::Arc;
 use zisk_common::io::ZiskStdin;
 use zisk_common::ElfBinaryLike;
 use zisk_common::ExecutorStatsHandle;
+use zisk_common::ZiskExecutorTime;
 use zisk_core::Riscv2zisk;
 use zisk_distributed_common::LoggingConfig;
 
@@ -138,27 +138,32 @@ impl ProverEngine for AsmProver {
         if check_paths_exist(&asm_mt_path).is_err() || check_paths_exist(&asm_rh_path).is_err() {
             if self.core_prover.no_auto_setup {
                 return Err(anyhow::anyhow!(
-                    "Assembly files not found for ELF {}. Force ROM setup is enabled, but assembly files are still missing. Please ensure that the assembly generation process has been completed successfully.",
-                    elf.name()
-                ));
+                        "Assembly files not found for ELF {}. Force ROM setup is enabled, but assembly files are still missing. Please ensure that the assembly generation process has been completed successfully.",
+                        elf.name()
+                    ));
             }
 
-            tracing::info!(
-                ">>> ROM SETUP (one time only) - Generating assembly files for ELF: {}",
-                elf.name()
-            );
-            timer_start_info!(ROM_SETUP);
-            let output_path = get_output_path(&None)?;
-            generate_assembly(
-                elf.elf(),
-                elf.name(),
-                &output_path,
-                elf.with_hints(),
-                self.core_prover.verbose != VerboseMode::Info,
-            )?;
-            timer_stop_and_log_info!(ROM_SETUP);
-            tracing::info!("<<< ROM SETUP complete - Assembly files cached for future use");
+            if pctx.mpi_ctx.rank == 0 {
+                tracing::info!(
+                    ">>> ROM SETUP (one time only) - Generating assembly files for ELF: {}",
+                    elf.name()
+                );
+                timer_start_info!(ROM_SETUP);
+                let output_path = get_output_path(&None)?;
+                generate_assembly(
+                    elf.elf(),
+                    elf.name(),
+                    &output_path,
+                    elf.with_hints(),
+                    self.core_prover.verbose != VerboseMode::Info,
+                )?;
+                timer_stop_and_log_info!(ROM_SETUP);
+                tracing::info!("<<< ROM SETUP complete - Assembly files cached for future use");
+            }
+            pctx.mpi_ctx.barrier();
         }
+
+        pctx.mpi_ctx.barrier();
 
         timer_start_info!(STARTING_ASM_MICROSERVICES);
         let asm_services = AsmServices::new(world_rank, local_rank, base_port);
@@ -197,7 +202,7 @@ impl ProverEngine for AsmProver {
         ))
     }
 
-    fn get_execution_info(&self) -> Result<ExecutionInfo> {
+    fn get_execution_info(&self) -> Result<(WitnessInfo, ZiskExecutorTime)> {
         self.core_prover.backend.get_execution_info()
     }
 
@@ -336,6 +341,15 @@ impl ProverEngine for AsmProver {
 
     fn mpi_broadcast(&self, data: &mut Vec<u8>) -> Result<()> {
         self.core_prover.backend.mpi_broadcast(data)
+    }
+
+    fn prepare_send_proof(
+        &self,
+        proof: &ZiskProof,
+        publics: &ZiskPublics,
+        program_vk: &ZiskProgramVK,
+    ) -> Result<Vec<u8>> {
+        self.core_prover.backend.prepare_send_proof(proof, publics, program_vk)
     }
 }
 

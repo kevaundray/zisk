@@ -183,7 +183,7 @@ impl<F: PrimeField64> WitnessComponent<F> for ZiskExecutor<F> {
         let count_and_plan_duration = start_partial.elapsed();
         timer_stop_and_log_info!(PLAN);
 
-        timer_start_info!(PLAN_MEM_CPP);
+        timer_start_info!(WAIT_PLAN_MEM_CPP);
         stats_end!(self.state.stats, &_secn_plan_scope);
         let start_partial = Instant::now();
 
@@ -206,7 +206,15 @@ impl<F: PrimeField64> WitnessComponent<F> for ZiskExecutor<F> {
         }
 
         let count_and_plan_mo_duration = start_partial.elapsed();
-        timer_stop_and_log_info!(PLAN_MEM_CPP);
+        timer_stop_and_log_info!(WAIT_PLAN_MEM_CPP);
+
+        if let Some(handle_rh) = output.handle_rh {
+            timer_start_info!(WAIT_ASM_RH);
+            let rh_data = handle_rh.join().expect("Error during ROM Histogram thread execution");
+
+            self.rom_executor.set_rh_data(rh_data);
+            timer_stop_and_log_info!(WAIT_ASM_RH);
+        }
 
         // Phase 4: Configure and assign secondary instances
         stats_begin!(self.state.stats, &_exec_scope, _config_scope, "CONFIGURE_INSTANCES", 0);
@@ -268,6 +276,7 @@ impl<F: PrimeField64> WitnessComponent<F> for ZiskExecutor<F> {
             count_and_plan_duration,
             count_and_plan_mo_duration,
             total_duration: start_total.elapsed(),
+            asm_execution_duration: self.rom_executor.get_asm_execution_info(),
         };
         // Store the execution result
         let execution_result =

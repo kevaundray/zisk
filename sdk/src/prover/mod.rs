@@ -5,8 +5,8 @@ pub use asm::*;
 use backend::*;
 pub use emu::*;
 use proofman::{
-    AggProofs, AggProofsRegister, ExecutionInfo, ProvePhase, ProvePhaseInputs, ProvePhaseResult,
-    SnarkProtocol,
+    AggProofs, AggProofsRegister, ProvePhase, ProvePhaseInputs, ProvePhaseResult, SnarkProtocol,
+    WitnessInfo,
 };
 use proofman_common::{ProofOptions, RankInfo, RowInfo};
 use proofman_util::VadcopFinalProof;
@@ -27,6 +27,7 @@ use std::{
 use tracing::info;
 use zisk_common::io::StreamSource;
 use zisk_common::ElfBinaryLike;
+use zisk_common::ZiskExecutorTime;
 use zisk_common::{io::ZiskStdin, ExecutorStatsHandle, StatsCostPerType, ZiskExecutorSummary};
 use zisk_core::ZiskRom;
 
@@ -146,6 +147,10 @@ impl ZiskProgramPK {
             ));
         }
         Ok(())
+    }
+
+    pub fn is_asm(&self) -> bool {
+        self.asm_services.is_some()
     }
 }
 
@@ -742,7 +747,7 @@ pub trait ProverEngine {
 
     fn executed_steps(&self) -> u64;
 
-    fn get_execution_info(&self) -> Result<ExecutionInfo>;
+    fn get_execution_info(&self) -> Result<(WitnessInfo, ZiskExecutorTime)>;
 
     fn get_instance_trace(
         &self,
@@ -844,6 +849,13 @@ pub trait ProverEngine {
     ) -> Result<Option<ZiskAggPhaseResult>>;
 
     fn mpi_broadcast(&self, data: &mut Vec<u8>) -> Result<()>;
+
+    fn prepare_send_proof(
+        &self,
+        proof: &ZiskProof,
+        publics: &ZiskPublics,
+        program_vk: &ZiskProgramVK,
+    ) -> Result<Vec<u8>>;
 }
 
 pub trait ZiskBackend: Send + Sync {
@@ -890,7 +902,7 @@ impl<C: ZiskBackend> ZiskProver<C> {
         self.prover.executed_steps()
     }
 
-    pub fn get_execution_info(&self) -> Result<ExecutionInfo> {
+    pub fn get_execution_info(&self) -> Result<(WitnessInfo, ZiskExecutorTime)> {
         self.prover.get_execution_info()
     }
 
@@ -1039,6 +1051,15 @@ impl<C: ZiskBackend> ZiskProver<C> {
     /// Broadcast data to all MPI processes.
     pub fn mpi_broadcast(&self, data: &mut Vec<u8>) -> Result<()> {
         self.prover.mpi_broadcast(data)
+    }
+
+    pub fn prepare_send_proof(
+        &self,
+        proof: &ZiskProof,
+        publics: &ZiskPublics,
+        program_vk: &ZiskProgramVK,
+    ) -> Result<Vec<u8>> {
+        self.prover.prepare_send_proof(proof, publics, program_vk)
     }
 }
 

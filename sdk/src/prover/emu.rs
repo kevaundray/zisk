@@ -8,8 +8,7 @@ use crate::{
 use crate::{ensure_custom_commits, ProofMode, ProofOpts};
 use executor::{get_packed_info, init_executor_emu};
 use proofman::{
-    AggProofs, AggProofsRegister, ExecutionInfo, ProofMan, ProvePhase, ProvePhaseInputs,
-    SnarkWrapper,
+    AggProofs, AggProofsRegister, ProofMan, ProvePhase, ProvePhaseInputs, SnarkWrapper, WitnessInfo,
 };
 use proofman_common::{initialize_logger, ParamsGPU, ProofOptions, RankInfo, RowInfo};
 use std::path::PathBuf;
@@ -17,6 +16,7 @@ use std::sync::Arc;
 use zisk_common::io::ZiskStdin;
 use zisk_common::ElfBinaryLike;
 use zisk_common::ExecutorStatsHandle;
+use zisk_common::ZiskExecutorTime;
 use zisk_core::Riscv2zisk;
 use zisk_distributed_common::LoggingConfig;
 
@@ -115,7 +115,7 @@ impl ProverEngine for EmuProver {
             .unwrap_or(0)
     }
 
-    fn get_execution_info(&self) -> Result<ExecutionInfo> {
+    fn get_execution_info(&self) -> Result<(WitnessInfo, ZiskExecutorTime)> {
         self.core_prover.backend.get_execution_info()
     }
 
@@ -254,6 +254,15 @@ impl ProverEngine for EmuProver {
 
     fn mpi_broadcast(&self, data: &mut Vec<u8>) -> Result<()> {
         self.core_prover.backend.mpi_broadcast(data)
+    }
+
+    fn prepare_send_proof(
+        &self,
+        proof: &ZiskProof,
+        publics: &ZiskPublics,
+        program_vk: &ZiskProgramVK,
+    ) -> Result<Vec<u8>> {
+        self.core_prover.backend.prepare_send_proof(proof, publics, program_vk)
     }
 }
 
