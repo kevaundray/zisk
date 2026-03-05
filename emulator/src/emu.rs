@@ -1497,6 +1497,13 @@ impl<'a> Emu<'a> {
         // };
         self.source_a(instruction);
         self.source_b(instruction);
+
+        if instruction.input_size > 0 {
+            self.ctx.inst_ctx.extended_arg = instruction.jmp_offset1;
+        } else {
+            self.ctx.inst_ctx.extended_arg = 0;
+        }
+
         (instruction.func)(&mut self.ctx.inst_ctx);
         self.store_c(instruction);
 
