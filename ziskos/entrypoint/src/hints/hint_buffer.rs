@@ -1,42 +1,46 @@
 use bytes::{Bytes, BytesMut};
 use std::io::{self, Write};
 use std::sync::{Arc, Condvar, Mutex, MutexGuard};
-use zisk_common::{CTRL_END, CTRL_START};
+use zisk_common::{CTRL_END, CTRL_START, HINT_INPUT};
 
 pub const DEFAULT_BUFFER_LEN: usize = 1 << 20; // 1 MiB
                                                // TODO: Set MAX_WRITE_LEN based on writer type (file or socket)
 pub const MAX_WRITER_LEN: usize = 128 * 1024; // 128KB is the max write size for Unix sockets
 pub const WRITE_BUFFER_FLUSH_LEN: usize = 64 * 1024; // Flush writer buffer once it exceeds 64KB
+const MAX_INPUT_DATA_CHUNK: usize = 128 * 1024 - 8; // Max input data chunk size is 128KB minus 8 bytes for the header (length)
 pub const HEADER_LEN: usize = 8;
 
 pub struct HintBuffer {
-    inner: Mutex<HintBufferInner>,
+    precompiles: Mutex<HintBufferInner>,
+    input_data: Mutex<HintBufferInner>,
     not_empty: Condvar,
+    closed: Mutex<bool>,
+    paused: Mutex<bool>,
 }
 
 struct HintBufferInner {
     buf: BytesMut,
     commit_pos: usize,
-    closed: bool,
-    paused: bool,
-    // counter: u64,
 }
 
-pub struct HintWrite<'a> {
+pub struct WriteBuffer<'a> {
     hb: &'a HintBuffer,
     g: MutexGuard<'a, HintBufferInner>,
 }
 
 pub fn build_hint_buffer() -> Arc<HintBuffer> {
     Arc::new(HintBuffer {
-        inner: Mutex::new(HintBufferInner {
+        precompiles: Mutex::new(HintBufferInner {
             buf: BytesMut::with_capacity(DEFAULT_BUFFER_LEN),
             commit_pos: 0,
-            closed: true,
-            paused: false,
-            // counter: 0,
+        }),
+        input_data: Mutex::new(HintBufferInner {
+            buf: BytesMut::with_capacity(DEFAULT_BUFFER_LEN),
+            commit_pos: 0,
         }),
         not_empty: Condvar::new(),
+        closed: Mutex::new(true),
+        paused: Mutex::new(false),
     })
 }
 
@@ -54,53 +58,55 @@ impl HintBufferInner {
 
 impl HintBuffer {
     pub fn close(&self) {
-        let mut g = self.inner.lock().unwrap();
-        g.closed = true;
+        *self.closed.lock().unwrap() = true;
         self.not_empty.notify_all();
     }
 
     pub fn reset(&self) {
-        let mut g = self.inner.lock().unwrap();
+        let mut g = self.precompiles.lock().unwrap();
         g.buf.clear();
         g.commit_pos = 0;
-        g.closed = false;
-        g.paused = false;
-        // g.counter = 0;
+        let mut i = self.input_data.lock().unwrap();
+        i.buf.clear();
+        i.commit_pos = 0;
+
+        *self.closed.lock().unwrap() = false;
+        *self.paused.lock().unwrap() = false;
         self.not_empty.notify_all();
     }
 
     #[inline(always)]
     pub fn pause(&self) {
-        self.inner.lock().unwrap().paused = true;
+        *self.paused.lock().unwrap() = true;
     }
 
     #[inline(always)]
     pub fn resume(&self) {
-        self.inner.lock().unwrap().paused = false;
+        *self.paused.lock().unwrap() = false;
     }
 
     #[inline(always)]
     pub fn is_paused(&self) -> bool {
-        let g = self.inner.lock().unwrap();
-        g.paused
+        *self.paused.lock().unwrap()
     }
 
     #[inline(always)]
     pub fn is_enabled(&self) -> bool {
-        let g = self.inner.lock().unwrap();
-        !g.paused && !g.closed
+        let paused = *self.paused.lock().unwrap();
+        let closed = *self.closed.lock().unwrap();
+        !paused && !closed
     }
 
     #[inline(always)]
-    pub fn begin_hint(&self, hint_id: u32, len: usize, is_result: bool) -> HintWrite<'_> {
+    pub fn begin_hint(&self, hint_id: u32, len: usize, is_result: bool) -> WriteBuffer<'_> {
         let header = ((((if is_result { 0x8000_0000u64 } else { 0 }) | hint_id as u64) << 32)
             | (len as u64))
             .to_le_bytes();
 
-        let mut g = self.inner.lock().unwrap();
+        let mut g = self.precompiles.lock().unwrap();
         g.write_bytes(&header);
 
-        HintWrite { hb: self, g }
+        WriteBuffer { hb: self, g }
     }
 
     #[inline(always)]
@@ -113,6 +119,11 @@ impl HintBuffer {
     pub fn write_hint_end(&self) {
         let w = self.begin_hint(CTRL_END, 0, false);
         w.commit();
+    }
+
+    #[inline(always)]
+    pub fn begin_input_data(&self) -> WriteBuffer<'_> {
+        WriteBuffer { hb: self, g: self.input_data.lock().unwrap() }
     }
 
     pub fn drain_to_writer<W, D>(
@@ -158,22 +169,39 @@ impl HintBuffer {
         'drain: loop {
             // Get chunk of hints to write from HintBuffer (under lock)
             let chunk: Bytes = {
-                let mut g = self.inner.lock().unwrap();
+                let mut g = self.precompiles.lock().unwrap();
+                let mut i = self.input_data.lock().unwrap();
+                let closed = *self.closed.lock().unwrap();
 
-                // Wait until there's data to write or buffer is closed
-                while g.commit_pos == 0 && !g.closed {
+                if g.commit_pos == 0 && i.commit_pos == 0 && !closed {
+                    // Wait until there's data to write or buffer is closed
                     g = self.not_empty.wait(g).unwrap();
                 }
 
                 // If buffer is empty and closed, we're done, we can exit the drain loop
-                if g.commit_pos == 0 && g.closed {
+                if g.commit_pos == 0 && i.commit_pos == 0 && closed {
                     break 'drain;
                 }
 
                 // Take the committed chunk of hints to write
-                let n = g.commit_pos;
-                g.commit_pos = 0;
-                g.buf.split_to(n).freeze()
+                if g.commit_pos > 0 {
+                    let n = g.commit_pos;
+                    g.commit_pos = 0;
+                    g.buf.split_to(n).freeze()
+                } else {
+                    let n = i.commit_pos.min(MAX_INPUT_DATA_CHUNK);
+                    i.commit_pos = i.commit_pos.saturating_sub(n);
+
+                    let input_chunk = i.buf.split_to(n);
+
+                    let hint_input_header: [u8; 8] =
+                        (((HINT_INPUT as u64) << 32) | (input_chunk.len() as u64)).to_le_bytes();
+
+                    let mut chunk = BytesMut::with_capacity(HEADER_LEN + input_chunk.len());
+                    chunk.extend_from_slice(&hint_input_header);
+                    chunk.unsplit(input_chunk);
+                    chunk.freeze()
+                }
             };
 
             // Write hints from chunk without holding the lock
@@ -251,19 +279,19 @@ impl HintBuffer {
     }
 }
 
-impl<'a> HintWrite<'a> {
+impl<'a> WriteBuffer<'a> {
     #[inline(always)]
-    pub fn write_hint_data_ptr(&mut self, data: *const u8, len: usize) {
+    pub fn write_data_ptr(&mut self, data: *const u8, len: usize) {
         if len == 0 {
             return;
         }
-        debug_assert!(!data.is_null(), "write_hint_data_ptr called with null data pointer");
+        debug_assert!(!data.is_null(), "write_data_ptr called with null data pointer");
         let payload = unsafe { std::slice::from_raw_parts(data, len) };
         self.g.write_bytes(payload);
     }
 
     #[inline(always)]
-    pub fn write_hint_data_slice(&mut self, payload: &[u8]) {
+    pub fn write_data_slice(&mut self, payload: &[u8]) {
         if payload.is_empty() {
             return;
         }

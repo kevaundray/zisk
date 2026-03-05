@@ -257,10 +257,12 @@ impl ZiskAsmContext {
         self.precompile_results
     }
     pub fn precompile_results_keccak(&self) -> bool {
-        self.precompile_results()
+        //self.precompile_results()
+        false
     }
     pub fn precompile_results_sha256(&self) -> bool {
-        self.precompile_results()
+        //self.precompile_results()
+        false
     }
     pub fn precompile_results_arith256(&self) -> bool {
         self.precompile_results()
@@ -320,7 +322,8 @@ impl ZiskAsmContext {
         self.precompile_results()
     }
     pub fn precompile_results_blake2(&self) -> bool {
-        self.precompile_results()
+        //self.precompile_results()
+        false
     }
     pub fn call_wait_for_prec_avail(&self) -> bool {
         self.precompile_results()

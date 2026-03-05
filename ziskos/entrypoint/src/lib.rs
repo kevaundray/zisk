@@ -31,7 +31,7 @@ extern "C" {
 
 #[cfg(all(not(all(target_os = "zkvm", target_vendor = "zisk")), zisk_hints_debug))]
 extern "C" {
-    fn hint_log_c(msg: *const c_char);
+    fn hint_log_c(msg: *const std::os::raw::c_char);
 }
 
 #[cfg(zisk_hints_debug)]
@@ -124,7 +124,7 @@ pub(crate) fn read_input() -> Vec<u8> {
     {
         let start_bytes = &vec[..vec.len().min(64)];
         let ellipsis = if vec.len() > 64 { "..." } else { "" };
-        hint_log_c(format!(
+        hint_log(format!(
             "hint_input_data (input_data: {:x?}{} , input_data_len: {}",
             start_bytes,
             ellipsis,
@@ -153,14 +153,14 @@ pub(crate) fn read_input() -> Vec<u8> {
     {
         let start_bytes = &buffer[..buffer.len().min(64)];
         let ellipsis = if buffer.len() > 64 { "..." } else { "" };
-        hint_log_c(format!(
+        hint_log(format!(
             "hint_input_data (input_data: {:x?}{} , input_data_len: {}",
             start_bytes,
             ellipsis,
             buffer.len()
         ));
     }
-    
+
     buffer
 }
 
