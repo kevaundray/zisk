@@ -5,8 +5,7 @@
 
 use crate::{
     sem_available_name, sem_read_name, shmem_control_reader_name, shmem_precompile_name,
-    AsmService, AsmServices, ControlShmem, ControlShmemOffsets, SharedMemoryReader,
-    SharedMemoryWriter,
+    AsmService, AsmServices, ControlShmem, SharedMemoryReader, SharedMemoryWriter,
 };
 use anyhow::Result;
 use named_sem::NamedSemaphore;
@@ -218,7 +217,7 @@ impl StreamSink for HintsShmem {
         };
 
         // Read current write position once
-        let write_pos = unified.control_writer.read_u64_at(ControlShmemOffsets::PrecompilesSize);
+        let write_pos = unified.control_writer.prec_hints_size();
 
         // Flow control: wait until all consumers have advanced enough
         // We need to wait for the slowest consumer (minimum read position)
@@ -268,9 +267,7 @@ impl StreamSink for HintsShmem {
         fence(Ordering::Release);
 
         // Update write position ONCE in control memory
-        unified
-            .control_writer
-            .write_u64_at(ControlShmemOffsets::PrecompilesSize, write_pos + data_size);
+        unified.control_writer.set_prec_hints_size(write_pos + data_size);
 
         fence(Ordering::Release);
 

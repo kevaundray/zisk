@@ -39,14 +39,30 @@ impl ControlShmem {
         self.writer.write_u64_at(offset as usize, size);
     }
 
-    pub fn increment_u64_at(&self, offset: ControlShmemOffsets, size: usize) {
-        let current_size = self.read_u64_at(offset);
-        self.write_u64_at(offset, current_size + size as u64);
-    }
-
     pub fn reset(&self) {
         self.write_u64_at(ControlShmemOffsets::PrecompilesSize, 0);
         self.write_u64_at(ControlShmemOffsets::ShutdownFlag, 0);
         self.write_u64_at(ControlShmemOffsets::InputsSize, 0);
+    }
+
+    pub fn set_prec_hints_size(&self, size: u64) {
+        self.write_u64_at(ControlShmemOffsets::PrecompilesSize, size);
+    }
+
+    pub fn prec_hints_size(&self) -> u64 {
+        self.read_u64_at(ControlShmemOffsets::PrecompilesSize)
+    }
+
+    pub fn set_shutdown_flag(&self) {
+        self.write_u64_at(ControlShmemOffsets::ShutdownFlag, 1);
+    }
+
+    pub fn set_inputs_size(&self, size: u64) {
+        self.write_u64_at(ControlShmemOffsets::InputsSize, size);
+    }
+
+    pub fn inc_inputs_size(&self, size: usize) {
+        let current_size = self.read_u64_at(ControlShmemOffsets::InputsSize);
+        self.write_u64_at(ControlShmemOffsets::InputsSize, current_size + size as u64);
     }
 }

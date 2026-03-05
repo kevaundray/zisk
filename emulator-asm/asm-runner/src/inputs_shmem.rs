@@ -6,7 +6,7 @@ use zisk_core::MAX_INPUT_SIZE;
 
 use crate::{
     shmem_input_avail_name, shmem_input_name, AsmInputHeader, AsmServices, ControlShmem,
-    ControlShmemOffsets, SharedMemoryWriter,
+    SharedMemoryWriter,
 };
 
 use anyhow::Result;
@@ -80,7 +80,7 @@ impl InputsShmemWriter {
 
         // self.writer.write_input(&full_input)?;
 
-        self.control_writer.increment_u64_at(ControlShmemOffsets::InputsSize, inputs.len());
+        self.control_writer.inc_inputs_size(inputs.len());
 
         self.sem_avail.lock().unwrap().post()?;
 
