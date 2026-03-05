@@ -50,12 +50,12 @@ use crate::ziskos_definitions::ziskos_config::*;
 
 /// Pointer to the current position in the input buffer.
 #[cfg(all(target_os = "zkvm", target_vendor = "zisk"))]
-static mut INPUT_POS: usize = 0;
+static mut INPUT_POS: usize = 8;
 
 /// Reset the input position to the beginning.
 #[cfg(all(target_os = "zkvm", target_vendor = "zisk"))]
 pub fn read_reset() {
-    unsafe { INPUT_POS = 0 };
+    unsafe { INPUT_POS = 8 };
 }
 
 /// Read a slice directly from INPUT_ADDR without copying (zero-copy).
