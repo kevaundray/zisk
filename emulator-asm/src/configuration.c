@@ -525,20 +525,19 @@ void configure (void)
                 strcat(sem_prec_avail_name, "_FT_prec_avail");
                 strcpy(sem_prec_read_name, shm_prefix);
                 strcat(sem_prec_read_name, "_FT_prec_read");
-                strcpy(sem_input_avail_name, shm_prefix);
-                strcat(sem_input_avail_name, "_FT_input_avail");
             }
             else
             {
                 strcpy(shmem_precompile_name, "");
                 strcpy(sem_prec_avail_name, "");
                 strcpy(sem_prec_read_name, "");
-                strcpy(sem_input_avail_name, "");
             }
             strcpy(shmem_output_name, "");
             strcpy(sem_chunk_done_name, "");
             strcpy(sem_shutdown_done_name, shm_prefix);
             strcat(sem_shutdown_done_name, "_FT_shutdown_done");
+            strcpy(sem_input_avail_name, shm_prefix);
+            strcat(sem_input_avail_name, "_FT_input_avail");
             strcpy(shmem_mt_name, "");
             strcpy(file_lock_name, "/tmp/");
             strcat(file_lock_name, shm_prefix);
@@ -573,15 +572,12 @@ void configure (void)
                 strcat(sem_prec_avail_name, "_MT_prec_avail");
                 strcpy(sem_prec_read_name, shm_prefix);
                 strcat(sem_prec_read_name, "_MT_prec_read");
-                strcpy(sem_input_avail_name, shm_prefix);
-                strcat(sem_input_avail_name, "_MT_input_avail");
             }
             else
             {
                 strcpy(shmem_precompile_name, "");
                 strcpy(sem_prec_avail_name, "");
                 strcpy(sem_prec_read_name, "");
-                strcpy(sem_input_avail_name, "");
             }
             strcpy(shmem_output_name, shm_prefix);
             strcat(shmem_output_name, "_MT_output");
@@ -589,6 +585,8 @@ void configure (void)
             strcat(sem_chunk_done_name, "_MT_chunk_done");
             strcpy(sem_shutdown_done_name, shm_prefix);
             strcat(sem_shutdown_done_name, "_MT_shutdown_done");
+            strcpy(sem_input_avail_name, shm_prefix);
+            strcat(sem_input_avail_name, "_MT_input_avail");
             strcpy(shmem_mt_name, "");
             strcpy(file_lock_name, "/tmp/");
             strcat(file_lock_name, shm_prefix);
@@ -624,15 +622,12 @@ void configure (void)
                 strcat(sem_prec_avail_name, "_RH_prec_avail");
                 strcpy(sem_prec_read_name, shm_prefix);
                 strcat(sem_prec_read_name, "_RH_prec_read");
-                strcpy(sem_input_avail_name, shm_prefix);
-                strcat(sem_input_avail_name, "_RH_input_avail");
             }
             else
             {
                 strcpy(shmem_precompile_name, "");
                 strcpy(sem_prec_avail_name, "");
                 strcpy(sem_prec_read_name, "");
-                strcpy(sem_input_avail_name, "");
             }
             strcpy(shmem_output_name, shm_prefix);
             strcat(shmem_output_name, "_RH_output");
@@ -640,6 +635,8 @@ void configure (void)
             strcat(sem_chunk_done_name, "_RH_chunk_done");
             strcpy(sem_shutdown_done_name, shm_prefix);
             strcat(sem_shutdown_done_name, "_RH_shutdown_done");
+            strcpy(sem_input_avail_name, shm_prefix);
+            strcat(sem_input_avail_name, "_RH_input_avail");
             strcpy(shmem_mt_name, "");
             strcpy(file_lock_name, "/tmp/");
             strcat(file_lock_name, shm_prefix);
@@ -675,15 +672,12 @@ void configure (void)
                 strcat(sem_prec_avail_name, "_MA_prec_avail");
                 strcpy(sem_prec_read_name, shm_prefix);
                 strcat(sem_prec_read_name, "_MA_prec_read");
-                strcpy(sem_input_avail_name, shm_prefix);
-                strcat(sem_input_avail_name, "_MA_input_avail");
             }
             else
             {
                 strcpy(shmem_precompile_name, "");
                 strcpy(sem_prec_avail_name, "");
                 strcpy(sem_prec_read_name, "");
-                strcpy(sem_input_avail_name, "");
             }
             strcpy(shmem_output_name, shm_prefix);
             strcat(shmem_output_name, "_MA_output");
@@ -691,6 +685,8 @@ void configure (void)
             strcat(sem_chunk_done_name, "_MA_chunk_done");
             strcpy(sem_shutdown_done_name, shm_prefix);
             strcat(sem_shutdown_done_name, "_MA_shutdown_done");
+            strcpy(sem_input_avail_name, shm_prefix);
+            strcat(sem_input_avail_name, "_MA_input_avail");
             strcpy(shmem_mt_name, "");
             strcpy(file_lock_name, "/tmp/");
             strcat(file_lock_name, shm_prefix);
@@ -769,15 +765,12 @@ void configure (void)
                 strcat(sem_prec_avail_name, "_ZP_prec_avail");
                 strcpy(sem_prec_read_name, shm_prefix);
                 strcat(sem_prec_read_name, "_ZP_prec_read");
-                strcpy(sem_input_avail_name, shm_prefix);
-                strcat(sem_input_avail_name, "_ZP_input_avail");
             }
             else
             {
                 strcpy(shmem_precompile_name, "");
                 strcpy(sem_prec_avail_name, "");
                 strcpy(sem_prec_read_name, "");
-                strcpy(sem_input_avail_name, "");
             }
             strcpy(shmem_output_name, shm_prefix);
             strcat(shmem_output_name, "_ZP_output");
@@ -785,6 +778,8 @@ void configure (void)
             strcat(sem_chunk_done_name, "_ZP_chunk_done");
             strcpy(sem_shutdown_done_name, shm_prefix);
             strcat(sem_shutdown_done_name, "_ZP_shutdown_done");
+            strcpy(sem_input_avail_name, shm_prefix);
+            strcat(sem_input_avail_name, "_ZP_input_avail");
             strcpy(shmem_mt_name, "");
             strcpy(file_lock_name, "/tmp/");
             strcat(file_lock_name, shm_prefix);
@@ -820,15 +815,12 @@ void configure (void)
                 strcat(sem_prec_avail_name, "_MO_prec_avail");
                 strcpy(sem_prec_read_name, shm_prefix);
                 strcat(sem_prec_read_name, "_MO_prec_read");
-                strcpy(sem_input_avail_name, shm_prefix);
-                strcat(sem_input_avail_name, "_MO_input_avail");
             }
             else
             {
                 strcpy(shmem_precompile_name, "");
                 strcpy(sem_prec_avail_name, "");
                 strcpy(sem_prec_read_name, "");
-                strcpy(sem_input_avail_name, "");
             }
             strcpy(shmem_output_name, shm_prefix);
             strcat(shmem_output_name, "_MO_output");
@@ -836,6 +828,8 @@ void configure (void)
             strcat(sem_chunk_done_name, "_MO_chunk_done");
             strcpy(sem_shutdown_done_name, shm_prefix);
             strcat(sem_shutdown_done_name, "_MO_shutdown_done");
+            strcpy(sem_input_avail_name, shm_prefix);
+            strcat(sem_input_avail_name, "_MO_input_avail");
             strcpy(shmem_mt_name, "");
             strcpy(file_lock_name, "/tmp/");
             strcat(file_lock_name, shm_prefix);
@@ -900,15 +894,12 @@ void configure (void)
                 strcat(sem_prec_avail_name, "_MT_prec_avail");
                 strcpy(sem_prec_read_name, shm_prefix);
                 strcat(sem_prec_read_name, "_MT_prec_read");
-                strcpy(sem_input_avail_name, shm_prefix);
-                strcat(sem_input_avail_name, "_MT_input_avail");
             }
             else
             {
                 strcpy(shmem_precompile_name, "");
                 strcpy(sem_prec_avail_name, "");
                 strcpy(sem_prec_read_name, "");
-                strcpy(sem_input_avail_name, "");
             }
             strcpy(shmem_output_name, shm_prefix);
             strcat(shmem_output_name, "_MT_output");
@@ -916,6 +907,8 @@ void configure (void)
             strcat(sem_chunk_done_name, "_MT_chunk_done");
             strcpy(sem_shutdown_done_name, shm_prefix);
             strcat(sem_shutdown_done_name, "_MT_shutdown_done");
+            strcpy(sem_input_avail_name, shm_prefix);
+            strcat(sem_input_avail_name, "_MT_input_avail");
             strcpy(shmem_mt_name, "");
             strcpy(file_lock_name, "/tmp/");
             strcat(file_lock_name, shm_prefix);

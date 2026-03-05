@@ -6174,30 +6174,30 @@ impl ZiskRom2Asm {
                 *code += &ctx.full_line_comment("Fcall".to_string());
 
                 assert!(ctx.store_b_in_c);
+
                 if !ctx.chunk_player_mt_collect_mem() && !ctx.chunk_player_mem_reads_collect_main()
                 {
-                    // Store a (function id) in context
-                    assert!(ctx.a.is_constant);
-                    *code += &format!(
-                        "\tmov qword {}[{} + {}*8], {} {}\n",
-                        ctx.ptr,
-                        ctx.fcall_ctx,
-                        FCALL_FUNCTION_ID,
-                        ctx.a.constant_value,
-                        ctx.comment_str("ctx.function id = a")
-                    );
-
                     // Get result from precompile results data
                     if ctx.a.constant_value == FCALL_INPUT_READY_ID as u64 {
-                        Self::wait_for_input_ready(ctx, code, unusual_code, REG_C);
+                        Self::wait_for_input_ready(ctx, code, unusual_code);
                     } else {
+                        // Store a (function id) in context
+                        assert!(ctx.a.is_constant);
+                        *code += &format!(
+                            "\tmov qword {}[{} + {}*8], {} {}\n",
+                            ctx.ptr,
+                            ctx.fcall_ctx,
+                            FCALL_FUNCTION_ID,
+                            ctx.a.constant_value,
+                            ctx.comment_str("ctx.function id = a")
+                        );
+
                         // Set the fcall context address as the first parameter
                         *code += &format!(
                             "\tlea rdi, {} {}\n",
                             ctx.fcall_ctx,
                             ctx.comment_str("rdi = fcall context")
                         );
-
                         // Get result from precompile results data
                         if ctx.precompile_results_fcall() {
                             Self::precompile_results_fcall(ctx, code, unusual_code, "rdi");
@@ -6209,36 +6209,36 @@ impl ZiskRom2Asm {
                             Self::pop_internal_registers(ctx, code, false);
                             //Self::assert_rsp_is_aligned(ctx, code);
                         }
+
+                        // If ctx.result_size == 0 => free_input = 0
+                        *code += &format!(
+                            "\tmov {}, qword {}[{} + {}*8] {}\n",
+                            REG_AUX,
+                            ctx.ptr,
+                            ctx.fcall_ctx,
+                            FCALL_RESULT_SIZE,
+                            ctx.comment_str("aux = ctx.result_size")
+                        );
+                        *code += &format!("\tcmp {REG_AUX}, 0\n");
+                        *code += &format!("\tjz pc_{:x}_fcall_result_zero\n", ctx.pc);
+
+                        // Copy ctx.result[0] to free input address
+                        *code += &format!(
+                            "\tmov {}, qword {}[{} + {}*8] {}\n",
+                            REG_VALUE,
+                            ctx.ptr,
+                            ctx.fcall_ctx,
+                            FCALL_RESULT,
+                            ctx.comment_str("value = ctx.result[0]")
+                        );
+                        *code += &format!(
+                            "\tmov {}, {} {}\n",
+                            ctx.mem_free_input,
+                            REG_VALUE,
+                            ctx.comment_str("free_input = value")
+                        );
+                        *code += &format!("\tjmp pc_{:x}_fcall_result_done\n", ctx.pc);
                     }
-
-                    // If ctx.result_size == 0 => free_input = 0
-                    *code += &format!(
-                        "\tmov {}, qword {}[{} + {}*8] {}\n",
-                        REG_AUX,
-                        ctx.ptr,
-                        ctx.fcall_ctx,
-                        FCALL_RESULT_SIZE,
-                        ctx.comment_str("aux = ctx.result_size")
-                    );
-                    *code += &format!("\tcmp {REG_AUX}, 0\n");
-                    *code += &format!("\tjz pc_{:x}_fcall_result_zero\n", ctx.pc);
-
-                    // Copy ctx.result[0] to free input address
-                    *code += &format!(
-                        "\tmov {}, qword {}[{} + {}*8] {}\n",
-                        REG_VALUE,
-                        ctx.ptr,
-                        ctx.fcall_ctx,
-                        FCALL_RESULT,
-                        ctx.comment_str("value = ctx.result[0]")
-                    );
-                    *code += &format!(
-                        "\tmov {}, {} {}\n",
-                        ctx.mem_free_input,
-                        REG_VALUE,
-                        ctx.comment_str("free_input = value")
-                    );
-                    *code += &format!("\tjmp pc_{:x}_fcall_result_done\n", ctx.pc);
 
                     *code += &format!("pc_{:x}_fcall_result_zero:\n", ctx.pc);
                     *code += &format!(
@@ -8804,7 +8804,7 @@ impl ZiskRom2Asm {
         ctx: &mut ZiskAsmContext,
         code: &mut String,
         unusual_code: &mut String,
-        reg_address: &str, // REG_C
+        //reg_address: &str, // fcall structure address
     ) {
         *code += &ctx.full_line_comment("Wait for input data available".to_string());
 
@@ -8812,10 +8812,16 @@ impl ZiskRom2Asm {
         // required_bytes = (required_address - INPUT_ADDR - 8 + 1 + 7) & ~0x7;
         // + 1 because required_address is the address of the last required byte
         // + 7 & ~0x7 because if we require any byte of the last u64, we need to wait for the whole u64 to be available
-        *code +=
-            &format!("\tmov rdi, {} {}\n", reg_address, ctx.comment_str("rdi = required_address"));
+        assert!(ctx.a.is_constant);
         *code += &format!(
-            "\tmov {}, {} {}\n",
+            "\tmov rdi, qword {}[{} + {}*8] {}\n",
+            ctx.ptr,
+            ctx.fcall_ctx,
+            FCALL_PARAMS,
+            ctx.comment_str("rdi = params[0] = required_address")
+        );
+        *code += &format!(
+            "\tmov {}, 0x{:x} {}\n",
             REG_AUX,
             INPUT_ADDR,
             ctx.comment_str("aux = INPUT_ADDRESS")
@@ -8828,12 +8834,6 @@ impl ZiskRom2Asm {
         *code += &format!("\tand rdi, ~0x7 {}\n", ctx.comment_str("rdi &= 0x7"));
 
         // if input_written == input_ready then call wait_for_input_avail
-        *code += &format!(
-            "\tmov {}, {} {}\n",
-            REG_AUX,
-            ctx.mem_input_written_address,
-            ctx.comment_str("aux = input_written")
-        );
         *code += &format!(
             "\tcmp rdi, {} {}\n",
             ctx.mem_input_written_address,

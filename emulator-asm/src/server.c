@@ -555,7 +555,7 @@ void server_setup (void)
         fflush(stderr);
         exit(-1);
     }
-    if (verbose) printf("sem_open(%s) succeeded sem_input_avail=%p\n", sem_input_avail_name, sem_input_avail);
+    if (verbose) printf("sem_open(%s) succeeded\n", sem_input_avail_name);
 }
 
 void server_reset_fast (void)

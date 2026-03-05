@@ -612,12 +612,11 @@ void client_run (void)
             exit(-1);
         }
 
-        // Write the input size in the first 64 bits
+        // Write the free input value as 0 in the first 64 bits
         *(uint64_t *)shmem_input_address = (uint64_t)0; // free input
-        *(uint64_t *)(shmem_input_address + 8)= (uint64_t)input_data_size;
 
         // Copy input data into input memory
-        size_t input_read = fread(shmem_input_address + 16, 1, input_data_size, input_fp);
+        size_t input_read = fread(shmem_input_address + 8, 1, input_data_size, input_fp);
         if (input_read != input_data_size)
         {
             printf("ERROR: Input read (%lu) != input file size (%lu)\n", input_read, input_data_size);
@@ -640,7 +639,7 @@ void client_run (void)
         }
 
         // Set written counter
-        *input_written_address = input_data_size + 8; // in bytes, including the 8 bytes of input size at the beginning
+        *input_written_address = input_data_size; // in bytes
 
 #ifdef DEBUG
         gettimeofday(&stop_time, NULL);
