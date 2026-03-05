@@ -24,6 +24,34 @@ pub mod ziskos_definitions;
 ))]
 pub mod hints;
 
+#[cfg(all(not(all(target_os = "zkvm", target_vendor = "zisk")), zisk_hints))]
+extern "C" {
+    fn hint_input_data(input_data_ptr: *const u8, input_data_len: usize);
+}
+
+#[cfg(all(not(all(target_os = "zkvm", target_vendor = "zisk")), zisk_hints_debug))]
+extern "C" {
+    fn hint_log_c(msg: *const c_char);
+}
+
+#[cfg(zisk_hints_debug)]
+pub fn hint_log<S: AsRef<str>>(msg: S) {
+    // On native we call external C function to log hints, since it controls if hints are paused or not
+    #[cfg(not(all(target_os = "zkvm", target_vendor = "zisk")))]
+    {
+        use std::ffi::CString;
+
+        if let Ok(c) = CString::new(msg.as_ref()) {
+            unsafe { hint_log_c(c.as_ptr()) };
+        }
+    }
+    // On zkvm/zisk, we can just print directly
+    #[cfg(all(target_os = "zkvm", target_vendor = "zisk"))]
+    {
+        println!("{}", msg.as_ref());
+    }
+}
+
 #[macro_export]
 macro_rules! entrypoint {
     ($path:path) => {
@@ -90,7 +118,21 @@ pub fn read_slice_zerocopy<'a>() -> &'a [u8] {
 
 #[cfg(all(target_os = "zkvm", target_vendor = "zisk"))]
 pub(crate) fn read_input() -> Vec<u8> {
-    read_slice_zerocopy().to_vec()
+    let vec = read_slice_zerocopy().to_vec();
+
+    #[cfg(zisk_hints_debug)]
+    {
+        let start_bytes = &vec[..vec.len().min(64)];
+        let ellipsis = if vec.len() > 64 { "..." } else { "" };
+        hint_log_c(format!(
+            "hint_input_data (input_data: {:x?}{} , input_data_len: {}",
+            start_bytes,
+            ellipsis,
+            vec.len()
+        ));
+    }
+
+    vec
 }
 
 #[cfg(not(all(target_os = "zkvm", target_vendor = "zisk")))]
@@ -101,6 +143,24 @@ pub(crate) fn read_input() -> Vec<u8> {
         File::open("build/input.bin").expect("Error opening input file at: build/input.bin");
     let mut buffer = Vec::new();
     file.read_to_end(&mut buffer).unwrap();
+
+    #[cfg(zisk_hints)]
+    unsafe {
+        hint_input_data(buffer.as_ptr(), buffer.len());
+    }
+
+    #[cfg(zisk_hints_debug)]
+    {
+        let start_bytes = &buffer[..buffer.len().min(64)];
+        let ellipsis = if buffer.len() > 64 { "..." } else { "" };
+        hint_log_c(format!(
+            "hint_input_data (input_data: {:x?}{} , input_data_len: {}",
+            start_bytes,
+            ellipsis,
+            buffer.len()
+        ));
+    }
+    
     buffer
 }
 
@@ -313,7 +373,7 @@ mod ziskos {
     core::arch::global_asm!(include_str!("dma/memset.s"));
 }
 
-pub fn verify_zisk_proof(zisk_proof: &[u8]) -> bool {    
+pub fn verify_zisk_proof(zisk_proof: &[u8]) -> bool {
     let (proof, vk) = zisk_proof.split_at(zisk_proof.len() - 32);
     zisk_verifier::verify_vadcop_final_proof(proof, vk)
 }
