@@ -100,13 +100,13 @@ impl AsmResources {
                 let hints_shmem =
                     HintsShmem::new(base_port, local_rank, unlock_mapped_memory, control_writer)?;
 
-                HintsProcessor::builder2(hints_shmem, Some(inputs_shmem_writer.clone()))
+                HintsProcessor::builder(hints_shmem, Some(inputs_shmem_writer.clone()))
                     .enable_stats(verbose_mode != proofman_common::VerboseMode::Info)
                     .build()?
             } else {
                 let hints_file = HintsFile::new(format!("hints_results_{}.bin", local_rank))?;
 
-                HintsProcessor::builder2(hints_file, Some(inputs_shmem_writer.clone()))
+                HintsProcessor::builder(hints_file, Some(inputs_shmem_writer.clone()))
                     .enable_stats(verbose_mode != proofman_common::VerboseMode::Info)
                     .build()?
             };

@@ -697,12 +697,19 @@ impl<T: ZiskBackend + 'static> Worker<T> {
         let control_writer =
             Arc::new(ControlShmem::new(base_port, local_rank, unlock_mapped_memory)?);
 
+        let inputs_shmem_writer = Arc::new(InputsShmemWriter::new(
+            base_port,
+            local_rank,
+            unlock_mapped_memory,
+            control_writer.clone(),
+        )?);
+
         // HintsShmem::new and HintsProcessor::build perform OS-level shared-memory operations;
         // run them on the blocking thread pool to avoid stalling Tokio workers.
         let processor = tokio::task::spawn_blocking(move || -> Result<HintsProcessor> {
             let hints_shmem =
                 HintsShmem::new(base_port, local_rank, unlock_mapped_memory, control_writer)?;
-            HintsProcessor::builder(hints_shmem, None::<InputsShmemWriter>)
+            HintsProcessor::builder(hints_shmem, Some(inputs_shmem_writer))
                 .build()
                 .map_err(|e| anyhow::anyhow!("Failed to initialize hints processor: {}", e))
         })

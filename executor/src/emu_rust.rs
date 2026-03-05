@@ -1,6 +1,5 @@
-use std::{collections::HashMap, sync::Mutex, thread::JoinHandle};
+use std::{collections::HashMap, sync::Mutex};
 
-use asm_runner::{AsmRunnerMO, AsmRunnerRH};
 use data_bus::DataBusTrait;
 use fields::PrimeField64;
 use proofman_common::ProofCtx;
@@ -14,7 +13,8 @@ use zisk_core::ZiskRom;
 use ziskemu::{EmuOptions, ZiskEmulator};
 
 use crate::{
-    DeviceMetricsList, DummyCounter, NestedDeviceMetricsList, StaticSMBundle, MAX_NUM_STEPS,
+    DeviceMetricsList, DummyCounter, EmulatorResult, NestedDeviceMetricsList, StaticSMBundle,
+    MAX_NUM_STEPS,
 };
 
 use anyhow::Result;
@@ -58,14 +58,7 @@ impl EmulatorRust {
         zisk_rom: &ZiskRom,
         stdin: &Mutex<ZiskStdin>,
         sm_bundle: &StaticSMBundle<F>,
-    ) -> Result<(
-        Vec<EmuTrace>,
-        DeviceMetricsList,
-        NestedDeviceMetricsList,
-        Option<JoinHandle<AsmRunnerMO>>,
-        Option<JoinHandle<AsmRunnerRH>>,
-        u64,
-    )> {
+    ) -> Result<EmulatorResult> {
         let min_traces = self.run_emulator(zisk_rom, Self::NUM_THREADS, &stdin.lock().unwrap());
 
         // Store execute steps
@@ -174,14 +167,7 @@ impl<F: PrimeField64> crate::Emulator<F> for EmulatorRust {
         _use_hints: bool,
         _stats: &ExecutorStatsHandle,
         _caller_stats_scope: &zisk_common::StatsScope,
-    ) -> Result<(
-        Vec<EmuTrace>,
-        DeviceMetricsList,
-        NestedDeviceMetricsList,
-        Option<JoinHandle<AsmRunnerMO>>,
-        Option<JoinHandle<AsmRunnerRH>>,
-        u64,
-    )> {
+    ) -> Result<EmulatorResult> {
         self.execute(zisk_rom, stdin, sm_bundle)
     }
 }
