@@ -1,7 +1,9 @@
 use crate::{worker::ComputationResult, ProverConfig, Worker};
 use anyhow::{anyhow, Result};
+use asm_runner::InputsShmemWriter;
 use proofman::{AggProofs, ContributionsInfo, WitnessInfo};
 use std::path::Path;
+use std::sync::Arc;
 use std::{path::PathBuf, time::Duration};
 use tokio::sync::mpsc;
 use tokio_stream::StreamExt;
@@ -17,7 +19,7 @@ use zisk_distributed_common::{DataId, JobId};
 use zisk_distributed_grpc_api::contribution_params::InputSource;
 use zisk_distributed_grpc_api::execute_task_response::ResultData;
 use zisk_distributed_grpc_api::*;
-use zisk_sdk::{Asm, Emu, ZiskBackend};
+use zisk_sdk::{Asm, Emu, StreamSink, ZiskBackend};
 
 use crate::config::WorkerServiceConfig;
 
@@ -80,11 +82,17 @@ impl<T: ZiskBackend + 'static> WorkerNode<T> {
 
 pub struct WorkerNodeMpi<T: ZiskBackend + 'static> {
     worker: Worker<T>,
+    inputs_shmem_writer: Arc<InputsShmemWriter>,
+    hints_sink: Option<Arc<dyn StreamSink>>,
 }
 
 impl<T: ZiskBackend + 'static> WorkerNodeMpi<T> {
     pub async fn new(worker: Worker<T>) -> Result<Self> {
-        Ok(Self { worker })
+        let pk = worker.pk();
+        let inputs_shmem_writer = pk.asm_resources.as_ref().unwrap().inputs_shmem_writer.clone();
+        let hints_sink = pk.asm_resources.as_ref().unwrap().hints_sink.clone();
+
+        Ok(Self { worker, inputs_shmem_writer, hints_sink })
     }
 
     pub fn world_rank(&self) -> i32 {
@@ -96,7 +104,12 @@ impl<T: ZiskBackend + 'static> WorkerNodeMpi<T> {
 
         loop {
             // Non-rank 0 workers are executing inside a cluster and only receives MPI requests
-            self.worker.handle_mpi_broadcast_request().await?;
+            self.worker
+                .handle_mpi_broadcast_request(
+                    self.inputs_shmem_writer.clone(),
+                    self.hints_sink.clone(),
+                )
+                .await?;
         }
     }
 }

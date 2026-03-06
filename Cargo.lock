@@ -3115,6 +3115,7 @@ name = "precompiles-hints"
 version = "0.16.0"
 dependencies = [
  "anyhow",
+ "borsh",
  "criterion 0.8.2",
  "lib-c",
  "precompiles-helpers",
@@ -3122,6 +3123,7 @@ dependencies = [
  "rustls",
  "tracing",
  "zisk-common",
+ "zisk-distributed-common",
  "ziskos-hints",
 ]
 

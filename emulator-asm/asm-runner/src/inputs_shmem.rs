@@ -75,8 +75,8 @@ impl InputsShmemWriter {
 }
 
 impl StreamSink for InputsShmemWriter {
-    fn submit(&self, hints: Vec<u64>) -> anyhow::Result<()> {
-        self.append_input(&reinterpret_vec(hints)?)
+    fn submit(&self, hints: &[u64]) -> anyhow::Result<()> {
+        self.append_input(&reinterpret_vec(hints.to_vec())?)
     }
 
     fn reset(&self) {

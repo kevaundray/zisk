@@ -9,6 +9,7 @@ use asm_runner::InputsShmemWriter;
 use asm_runner::{MOShMemReader, MTShMemReader, RHShMemReader};
 use precompiles_hints::HintsProcessor;
 use std::sync::atomic::{AtomicBool, Ordering};
+use zisk_common::io::StreamSink;
 use zisk_common::io::ZiskIO;
 use zisk_common::io::ZiskStdin;
 use zisk_common::io::{StreamSource, ZiskStream};
@@ -49,6 +50,8 @@ pub struct AsmResources {
     pub rh_shmem_reader: Arc<Mutex<Option<RHShMemReader>>>,
 
     pub inputs_shmem_writer: Arc<InputsShmemWriter>,
+
+    pub hints_sink: Option<Arc<dyn StreamSink>>,
 
     /// Pipeline for handling precompile hints.
     pub hints_stream: Option<Arc<Mutex<ZiskStream>>>,
@@ -95,25 +98,43 @@ impl AsmResources {
         // Debug flag: true = HintsShmem (shared memory), false = HintsFile (file output)
         const USE_SHARED_MEMORY_HINTS: bool = true;
 
-        let hints_stream = if with_hints {
-            let hints_processor = if USE_SHARED_MEMORY_HINTS {
-                let hints_shmem =
-                    HintsShmem::new(base_port, local_rank, unlock_mapped_memory, control_writer)?;
+        let (hints_stream, hints_sink) = if with_hints {
+            let (hints_processor, hints_sink): (HintsProcessor, Arc<dyn StreamSink>) =
+                if USE_SHARED_MEMORY_HINTS {
+                    let hints_shmem = Arc::new(HintsShmem::new(
+                        base_port,
+                        local_rank,
+                        unlock_mapped_memory,
+                        control_writer,
+                    )?);
 
-                HintsProcessor::builder(hints_shmem, Some(inputs_shmem_writer.clone()))
-                    .enable_stats(verbose_mode != proofman_common::VerboseMode::Info)
-                    .build()?
-            } else {
-                let hints_file = HintsFile::new(format!("hints_results_{}.bin", local_rank))?;
+                    (
+                        HintsProcessor::builder(
+                            hints_shmem.clone(),
+                            Some(inputs_shmem_writer.clone()),
+                        )
+                        .enable_stats(verbose_mode != proofman_common::VerboseMode::Info)
+                        .build()?,
+                        hints_shmem,
+                    )
+                } else {
+                    let hints_file =
+                        Arc::new(HintsFile::new(format!("hints_results_{}.bin", local_rank))?);
 
-                HintsProcessor::builder(hints_file, Some(inputs_shmem_writer.clone()))
-                    .enable_stats(verbose_mode != proofman_common::VerboseMode::Info)
-                    .build()?
-            };
+                    (
+                        HintsProcessor::builder(
+                            hints_file.clone(),
+                            Some(inputs_shmem_writer.clone()),
+                        )
+                        .enable_stats(verbose_mode != proofman_common::VerboseMode::Info)
+                        .build()?,
+                        hints_file,
+                    )
+                };
 
-            Some(Arc::new(Mutex::new(ZiskStream::new(hints_processor))))
+            (Some(Arc::new(Mutex::new(ZiskStream::new(hints_processor)))), Some(hints_sink))
         } else {
-            None
+            (None, None)
         };
 
         Ok(Self {
@@ -128,6 +149,7 @@ impl AsmResources {
             rh_shmem_reader: Arc::new(Mutex::new(None)),
             #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
             inputs_shmem_writer,
+            hints_sink,
         })
     }
 
