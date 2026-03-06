@@ -1,12 +1,12 @@
 use std::sync::{Arc, Mutex};
 
 use named_sem::NamedSemaphore;
+use tracing::info;
 use zisk_common::{io::StreamSink, reinterpret_vec};
 use zisk_core::MAX_INPUT_SIZE;
 
 use crate::{
-    shmem_input_avail_name, shmem_input_name, AsmInputHeader, AsmServices, ControlShmem,
-    SharedMemoryWriter,
+    shmem_input_avail_name, shmem_input_name, AsmServices, ControlShmem, SharedMemoryWriter,
 };
 
 use anyhow::Result;
@@ -47,28 +47,32 @@ impl InputsShmemWriter {
     }
 
     pub fn write_input(&self, inputs: &[u8]) -> Result<()> {
-        const HEADER_SIZE: usize = size_of::<AsmInputHeader>();
-
-        let shmem_input_size = (HEADER_SIZE + inputs.len() + 7) & !7;
-
-        let mut full_input = Vec::with_capacity(shmem_input_size);
-
-        let header = AsmInputHeader { zero: 0, input_data_size: 0 };
-        full_input.extend_from_slice(&header.to_bytes());
-        full_input.extend_from_slice(inputs);
-        while full_input.len() < shmem_input_size {
-            full_input.push(0);
-        }
-
-        let writer = self.writer.lock().unwrap();
-        writer.write_input(&full_input)?;
-        writer.write_u64_at(8, inputs.len() as u64);
+        self.writer.lock().unwrap().write_at(8, inputs)?;
+        self.control_writer.inc_inputs_size(inputs.len());
+        self.sem_avail.lock().unwrap().post()?;
 
         Ok(())
     }
 
     pub fn append_input(&self, inputs: &[u8]) -> Result<()> {
-        self.writer.lock().unwrap().append_input(&inputs)?;
+        info!("Appending input of size {} bytes to shared memory", inputs.len());
+        // Print the first 4 u64 in hexadecimal for debugging
+        for (i, chunk) in inputs.chunks(8).take(4).enumerate() {
+            let value = u64::from_le_bytes(chunk.try_into().unwrap_or_default());
+            info!("Input chunk {}: 0x{:016x}", i, value);
+        }
+        // Printhe two last u64 in hexadecimal for debugging
+        for (i, chunk) in inputs.chunks(8).rev().take(2).enumerate() {
+            let value = u64::from_le_bytes(chunk.try_into().unwrap_or_default());
+            info!("Input chunk {}: 0x{:016x}", inputs.len() - (i + 1) * 8, value);
+        }
+        // Print if the input is divisible by 8tes
+        if inputs.len() % 8 == 0 {
+            info!("Input size is divisible by 8 bytes");
+        } else {
+            info!("Input size is not divisible by 8 bytes");
+        }
+        self.writer.lock().unwrap().append_input(inputs)?;
         self.control_writer.inc_inputs_size(inputs.len());
         self.sem_avail.lock().unwrap().post()?;
 

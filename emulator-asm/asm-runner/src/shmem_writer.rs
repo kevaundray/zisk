@@ -2,6 +2,7 @@
 use libc::{mmap, msync, shm_open, MAP_FAILED, MAP_SHARED, MS_SYNC};
 use std::io::{self, Result};
 use std::ptr;
+use tracing::info;
 
 use libc::{c_void, close, munmap, PROT_READ, PROT_WRITE, S_IRUSR, S_IWUSR};
 
@@ -79,18 +80,19 @@ impl SharedMemoryWriter {
         }
     }
 
-    /// Writes data to the shared memory, always from the start
+    /// Writes data to the shared memory, starting at the specified offset
     ///
     /// # Type Parameters
     /// * `T` - The element type of the slice (e.g., u8, u64)
     ///
     /// # Arguments
+    /// * `offset` - Byte offset from the start of shared memory where data should be written
     /// * `data` - A slice of data to write to shared memory
     ///
     /// # Returns
     /// * `Ok(())` - If data was successfully written
     /// * `Err` - If data size exceeds shared memory capacity or msync fails
-    pub fn write_input<T>(&self, data: &[T]) -> Result<()> {
+    pub fn write_at<T>(&self, offset: usize, data: &[T]) -> Result<()> {
         let byte_size = std::mem::size_of_val(data);
 
         if byte_size > self.size {
@@ -104,7 +106,7 @@ impl SharedMemoryWriter {
         }
 
         unsafe {
-            ptr::copy_nonoverlapping(data.as_ptr() as *const u8, self.ptr, byte_size);
+            ptr::copy_nonoverlapping(data.as_ptr() as *const u8, self.ptr.add(offset), byte_size);
             // Force changes to be flushed to the shared memory
             #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
             if msync(self.ptr as *mut _, self.size, MS_SYNC /*| MS_INVALIDATE*/) != 0 {
@@ -139,6 +141,13 @@ impl SharedMemoryWriter {
             ));
         }
 
+        unsafe {
+            let offset = self.current_ptr.offset_from(self.ptr) as usize;
+            info!(
+            "Appending data of size {} bytes to shared memory '{}' at offset {} (current_ptr: {:p})",
+            byte_size, self.name, offset, self.current_ptr
+            );
+        }
         unsafe {
             ptr::copy_nonoverlapping(data.as_ptr() as *const u8, self.current_ptr, byte_size);
             // Force changes to be flushed to the shared memory
