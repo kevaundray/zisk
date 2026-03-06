@@ -93,15 +93,16 @@ impl RomExecutor {
         stats: &ExecutorStatsHandle,
         caller_stats_scope: &StatsScope,
     ) -> Result<RomExecutionOutput> {
-        let (min_traces, main_count, secn_count, handle_mo, handle_rh, steps) = self.emulator.execute(
-            zisk_rom,
-            &self.stdin,
-            pctx,
-            sm_bundle,
-            use_hints,
-            stats,
-            caller_stats_scope,
-        )?;
+        let (min_traces, main_count, secn_count, handle_mo, handle_rh, steps) =
+            self.emulator.execute(
+                zisk_rom,
+                &self.stdin,
+                pctx,
+                sm_bundle,
+                use_hints,
+                stats,
+                caller_stats_scope,
+            )?;
 
         Ok(RomExecutionOutput { min_traces, main_count, secn_count, handle_mo, handle_rh, steps })
     }
