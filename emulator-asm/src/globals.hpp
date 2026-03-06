@@ -30,6 +30,8 @@ extern bool do_shutdown; // If true, the client will perform a shutdown request 
 extern uint64_t number_of_mt_requests; // Loop to send this number of minimal trace requests
 extern uint16_t port; // Service TCP port
 extern uint64_t chunk_player_address; // Chunk player address, used for generation methods that use the chunk player, i.e. gen_method=8 or gen_method=10
+extern bool wait_flag; // If true, the shmem will get a flag set to 1 if we are waiting for a semaphore, and set it back to 0 when we are not waiting anymore. This can be used for debugging purposes to know if the assembly code is waiting for a semaphore or not.
+
 extern char precompile_file_name[4096]; // Precompile results file name (used by client)
 extern char shmem_control_input_name[128];
 extern char shmem_control_output_name[128];
@@ -88,8 +90,6 @@ extern uint64_t duration;
 
 // Input shared memory
 extern int shmem_input_fd;
-extern uint64_t shmem_input_size;
-extern void * shmem_input_address;
 
 // Output trace shared memory
 extern int shmem_output_fd;
@@ -100,9 +100,6 @@ extern int shmem_mt_fd;
 // Chunk done semaphore: notifies the caller when a new chunk has been processed
 extern sem_t * sem_chunk_done;
 
-// Shutdown done semaphore: notifies the caller when a shutdown has been processed
-extern sem_t * sem_shutdown_done;
-
 /**************************/
 /* PRECOMPILE AND CONTROL */
 /**************************/
@@ -111,7 +108,6 @@ extern uint64_t * precompile_results_address;
 
 // Precompile results shared memory
 extern int shmem_precompile_fd;
-extern uint64_t shmem_precompile_size;
 extern void * shmem_precompile_address;
 
 // Precompile results semaphores
@@ -130,6 +126,8 @@ extern volatile uint64_t * input_written_address;
 extern int shmem_control_output_fd;
 extern uint64_t * shmem_control_output_address;
 extern volatile uint64_t * precompile_read_address;
+extern volatile uint64_t * waiting_for_precompile_address;
+extern volatile uint64_t * waiting_for_input_address;
 
 /**************/
 /* TRACE SIZE */
@@ -166,6 +164,5 @@ extern uint64_t * pOutputTrace; // Used for trace generation, i.e. assembly code
 /**************/
 
 extern uint64_t chunk_size;
-extern uint64_t chunk_size_mask;
 
 #endif // EMULATOR_ASM_GLOBALS_HPP

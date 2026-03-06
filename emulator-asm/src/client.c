@@ -20,6 +20,8 @@
 #include "globals.hpp"
 #include "emu.hpp"
 
+void * shmem_input_address = NULL;
+
 /**********/
 /* CLIENT */
 /**********/

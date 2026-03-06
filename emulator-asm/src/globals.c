@@ -25,6 +25,8 @@ bool do_shutdown = false;
 uint64_t number_of_mt_requests = 1;
 uint16_t port = 0;
 uint64_t chunk_player_address = 0;
+bool wait_flag = true;
+
 char precompile_file_name[4096] = {0};
 char shmem_control_input_name[128] = {0};
 char shmem_control_output_name[128] = {0};
@@ -59,8 +61,6 @@ uint64_t duration;
 
 // Input shared memory
 int shmem_input_fd = -1;
-uint64_t shmem_input_size = 0;
-void * shmem_input_address = NULL;
 
 // Output trace shared memory
 int shmem_output_fd = -1;
@@ -71,9 +71,6 @@ int shmem_mt_fd = -1;
 // Chunk done semaphore: notifies the caller when a new chunk has been processed
 sem_t * sem_chunk_done = NULL;
 
-// Shutdown done semaphore: notifies the caller when a shutdown has been processed
-sem_t * sem_shutdown_done = NULL;
-
 /**************************/
 /* PRECOMPILE AND CONTROL */
 /**************************/
@@ -82,7 +79,6 @@ uint64_t * precompile_results_address = NULL;
 
 // Precompile results shared memory
 int shmem_precompile_fd = -1;
-uint64_t shmem_precompile_size = 0;
 void * shmem_precompile_address = NULL;
 
 // Precompile results semaphores
@@ -101,6 +97,8 @@ volatile uint64_t * input_written_address = NULL;
 int shmem_control_output_fd = -1;
 uint64_t * shmem_control_output_address = NULL;
 volatile uint64_t * precompile_read_address = NULL;
+volatile uint64_t * waiting_for_precompile_address = NULL;
+volatile uint64_t * waiting_for_input_address = NULL;
 
 /**************/
 /* TRACE SIZE */
@@ -137,4 +135,3 @@ uint64_t * pOutputTrace = (uint64_t *)TRACE_ADDR; // Used for trace generation, 
 /**************/
 
 uint64_t chunk_size = CHUNK_SIZE;
-uint64_t chunk_size_mask = CHUNK_SIZE - 1;

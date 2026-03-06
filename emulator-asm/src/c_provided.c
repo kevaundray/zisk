@@ -339,7 +339,9 @@ int _wait_for_prec_avail (void)
         ts.tv_sec += 5; // 5 seconds timeout
 
         //printf("_wait_for_prec_avail() calling sem_wait precompile_written_address=%lu precompile_read_address=%lu\n", *precompile_written_address, *precompile_read_address);
+        if (wait_flag) *waiting_for_precompile_address = wait_prec_avail_counter << 1; // Leave a mark in shmem that we are waiting; for debugging purposes
         result = sem_timedwait(sem_prec_avail, &ts);
+        if (wait_flag) *waiting_for_precompile_address = (wait_prec_avail_counter << 1) + 1; // Clear the mark in shmem that we are waiting; for debugging purposes
         //printf("_wait_for_prec_avail() called sem_wait precompile_written_address=%lu precompile_read_address=%lu\n", *precompile_written_address, *precompile_read_address);
         if ((result == -1) && (errno != ETIMEDOUT))
         {
@@ -438,7 +440,9 @@ int _wait_for_input_avail (uint64_t required_input_bytes)
         ts.tv_sec += 5; // 5 seconds timeout
 
         //printf("_wait_for_input_avail() calling sem_wait input_written_address=%lu required_input_bytes=%lu\n", *input_written_address, required_input_bytes);
+        if (wait_flag) *waiting_for_input_address = wait_input_avail_counter << 1; // Leave a mark in shmem that we are waiting; for debugging purposes
         result = sem_timedwait(sem_input_avail, &ts);
+        if (wait_flag) *waiting_for_input_address = (wait_input_avail_counter << 1) + 1; // Clear the mark in shmem that we are waiting; for debugging purposes
         //printf("_wait_for_input_avail() called sem_wait input_written_address=%lu required_input_bytes=%lu\n", *input_written_address, required_input_bytes);
         if ((result == -1) && (errno != ETIMEDOUT))
         {

@@ -30,6 +30,9 @@ uint64_t histogram_size = 0;
 uint64_t bios_size = 0;
 uint64_t program_size = 0;
 
+// Shutdown done semaphore: notifies the caller when a shutdown has been processed
+sem_t * sem_shutdown_done = NULL;
+
 void server_setup (void)
 {
     assert(server);
@@ -389,6 +392,8 @@ void server_setup (void)
     }
     shmem_control_output_address = (uint64_t *)pControl;
     precompile_read_address = &shmem_control_output_address[0];
+    waiting_for_precompile_address = &shmem_control_output_address[1];
+    waiting_for_input_address = &shmem_control_output_address[2];
     if (verbose) printf("mmap(control_output) mapped %lu B and returned address %p in %lu us\n", CONTROL_OUTPUT_SIZE, shmem_control_output_address, duration);
 
     /*******/
@@ -611,6 +616,18 @@ void server_reset_trace (void)
         // Reset trace used size
         trace_used_size = 0;
     }
+
+    // Reset flags
+    if (wait_flag)
+    {
+        *waiting_for_precompile_address = 0;
+        *waiting_for_input_address = 0;
+    }
+    
+    // Reset counters
+    wait_prec_avail_counter = 0;
+    wait_input_avail_counter = 0;
+    print_pc_counter = 0;
 }
 
 void server_run (void)
@@ -940,20 +957,26 @@ void server_cleanup (void)
     {
         printf("ERROR: Failed calling munmap(control_input) errno=%d=%s\n", errno, strerror(errno));
     }
-    result = shm_unlink(shmem_control_input_name);
-    if (result == -1)
+    if (!wait_flag)
     {
-        printf("ERROR: Failed calling shm_unlink(%s) errno=%d=%s\n", shmem_control_input_name, errno, strerror(errno));
+        result = shm_unlink(shmem_control_input_name);
+        if (result == -1)
+        {
+            printf("ERROR: Failed calling shm_unlink(%s) errno=%d=%s\n", shmem_control_input_name, errno, strerror(errno));
+        }
     }
     result = munmap((void *)shmem_control_output_address, CONTROL_OUTPUT_SIZE);
     if (result == -1)
     {
         printf("ERROR: Failed calling munmap(control_output) errno=%d=%s\n", errno, strerror(errno));
     }
-    result = shm_unlink(shmem_control_output_name);
-    if (result == -1)
+    if (!wait_flag)
     {
-        printf("ERROR: Failed calling shm_unlink(%s) errno=%d=%s\n", shmem_control_output_name, errno, strerror(errno));
+        result = shm_unlink(shmem_control_output_name);
+        if (result == -1)
+        {
+            printf("ERROR: Failed calling shm_unlink(%s) errno=%d=%s\n", shmem_control_output_name, errno, strerror(errno));
+        }
     }
 
     // Cleanup trace
