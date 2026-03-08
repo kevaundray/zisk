@@ -50,6 +50,7 @@ impl AsmProver {
         shared_tables: bool,
         base_port: Option<u16>,
         unlock_mapped_memory: bool,
+        asm_out_file: bool,
         no_auto_setup: bool,
         gpu_params: ParamsGPU,
         logging_config: Option<LoggingConfig>,
@@ -64,6 +65,7 @@ impl AsmProver {
             shared_tables,
             base_port,
             unlock_mapped_memory,
+            asm_out_file,
             no_auto_setup,
             gpu_params,
             logging_config,
@@ -112,6 +114,7 @@ impl ProverEngine for AsmProver {
         let local_rank = self.core_prover.rank_info.local_rank;
         let n_processes = self.core_prover.rank_info.n_processes;
         let unlock_mapped_memory = self.core_prover.unlock_mapped_memory;
+        let asm_out_file = self.core_prover.asm_out_file;
         let verbose_mode = self.core_prover.verbose;
         let rank_info = self.core_prover.rank_info.clone();
         let base_port = Some(AsmServices::port_base_offset(
@@ -174,7 +177,8 @@ impl ProverEngine for AsmProver {
             .with_local_rank(local_rank)
             .with_verbose(verbose_mode == VerboseMode::Debug)
             .with_metrics(verbose_mode == VerboseMode::Debug)
-            .with_unlock_mapped_memory(unlock_mapped_memory);
+            .with_unlock_mapped_memory(unlock_mapped_memory)
+            .with_asm_out_file(asm_out_file);
 
         asm_services.start_asm_services(&asm_mt_path, asm_runner_options)?;
         timer_stop_and_log_info!(STARTING_ASM_MICROSERVICES);
@@ -354,6 +358,7 @@ pub struct AsmCoreProver {
     rank_info: RankInfo,
     base_port: Option<u16>,
     unlock_mapped_memory: bool,
+    asm_out_file: bool,
     verbose: VerboseMode,
     no_auto_setup: bool,
 }
@@ -370,6 +375,7 @@ impl AsmCoreProver {
         shared_tables: bool,
         base_port: Option<u16>,
         unlock_mapped_memory: bool,
+        asm_out_file: bool,
         no_auto_setup: bool,
         gpu_params: ParamsGPU,
         logging_config: Option<LoggingConfig>,
@@ -428,6 +434,7 @@ impl AsmCoreProver {
             rank_info,
             base_port,
             unlock_mapped_memory,
+            asm_out_file,
             verbose: verbose.into(),
             no_auto_setup,
         })
@@ -442,6 +449,7 @@ impl AsmCoreProver {
             rank_info: RankInfo { world_rank: 0, local_rank: 0, n_processes: 1 },
             base_port: None,
             unlock_mapped_memory: false,
+            asm_out_file: false,
             verbose: VerboseMode::Info,
             no_auto_setup: false,
         })

@@ -59,6 +59,7 @@ pub struct ProverClientBuilder<Backend = (), Operation = ()> {
     asm_path: Option<PathBuf>,
     base_port: Option<u16>,
     unlock_mapped_memory: bool,
+    asm_out_file: bool,
     no_auto_setup: bool,
 
     // Prove-specific fields (only available when Operation = Prove)
@@ -233,6 +234,12 @@ impl<Operation> ProverClientBuilder<AsmB, Operation> {
     #[must_use]
     pub fn unlock_mapped_memory(mut self, unlock: bool) -> Self {
         self.unlock_mapped_memory = unlock;
+        self
+    }
+
+    #[must_use]
+    pub fn asm_out_file(mut self, asm_out_file: bool) -> Self {
+        self.asm_out_file = asm_out_file;
         self
     }
 }
@@ -413,6 +420,7 @@ impl<X> ProverClientBuilder<AsmB, X> {
                 self.shared_tables,
                 self.base_port,
                 self.unlock_mapped_memory,
+                self.asm_out_file,
                 self.no_auto_setup,
                 self.gpu_params,
                 self.logging_config,
@@ -453,6 +461,8 @@ impl From<ProverClientBuilder<(), ()>> for ProverClientBuilder<EmuB, ()> {
             asm_path: None,
             base_port: None,
             unlock_mapped_memory: false,
+            asm_out_file: false,
+
             no_auto_setup: false,
 
             _backend: std::marker::PhantomData,
@@ -482,6 +492,7 @@ impl From<ProverClientBuilder<(), ()>> for ProverClientBuilder<AsmB, ()> {
             asm_path: builder.asm_path,
             base_port: builder.base_port,
             unlock_mapped_memory: builder.unlock_mapped_memory,
+            asm_out_file: builder.asm_out_file,
             no_auto_setup: builder.no_auto_setup,
 
             _backend: std::marker::PhantomData,
@@ -513,6 +524,7 @@ impl<Backend> From<ProverClientBuilder<Backend, ()>>
             asm_path: builder.asm_path,
             base_port: builder.base_port,
             unlock_mapped_memory: builder.unlock_mapped_memory,
+            asm_out_file: builder.asm_out_file,
             no_auto_setup: builder.no_auto_setup,
 
             _backend: std::marker::PhantomData,
@@ -542,6 +554,7 @@ impl<Backend> From<ProverClientBuilder<Backend, ()>> for ProverClientBuilder<Bac
             asm_path: builder.asm_path,
             base_port: builder.base_port,
             unlock_mapped_memory: builder.unlock_mapped_memory,
+            asm_out_file: builder.asm_out_file,
             no_auto_setup: builder.no_auto_setup,
 
             _backend: std::marker::PhantomData,
