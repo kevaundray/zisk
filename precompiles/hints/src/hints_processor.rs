@@ -186,7 +186,7 @@ impl HintsProcessorBuilder {
             stream_active: AtomicBool::new(false),
             instant: Mutex::new(None),
             pending_partial: Mutex::new(None),
-            mpi_broadcast_fn: self.mpi_broadcast_fn,
+            mpi_broadcast_fn: self.mpi_broadcast_fn.clone(),
         })
     }
 }
@@ -229,7 +229,7 @@ pub struct HintsProcessor {
     /// Buffer for incomplete hint data between batches
     pending_partial: Mutex<Option<PartialPrecompileHint>>,
 
-    /// Optional MPI broadcast function for initialization synchronization
+    /// Optional MPI broadcast function for distributed execution
     mpi_broadcast_fn: Option<MpiBroadcastFn>,
 }
 
@@ -263,21 +263,6 @@ impl HintsProcessor {
             custom_handlers: HashMap::new(),
             mpi_broadcast_fn: None,
         }
-    }
-
-    /// Executes the MPI broadcast callback if one was configured.
-    ///
-    /// This allows manual control over when MPI synchronization occurs.
-    ///
-    /// # Returns
-    ///
-    /// * `Ok(())` - Broadcast completed successfully or no callback configured
-    /// * `Err` - If the broadcast callback returns an error
-    pub fn mpi_broadcast(&self, data: &mut Vec<u8>) -> Result<()> {
-        if let Some(broadcast_fn) = &self.mpi_broadcast_fn {
-            broadcast_fn(data)?;
-        }
-        Ok(())
     }
 
     /// Processes hints in parallel with non-blocking, ordered output.
@@ -430,13 +415,16 @@ impl HintsProcessor {
 
             // If the hint is an input hint, write it to the inputs sink instead of processing
             if hint.hint_code == HintCode::BuiltIn(BuiltInHint::Input) {
-                let mut serialized = borsh::to_vec(&(
-                    JobPhase::ContributionsInputsStream,
-                    StreamMessage { data: hint.data.clone() },
-                ))
-                .unwrap();
+                if let Some(broadcast_fn) = &self.mpi_broadcast_fn {
+                    let mut serialized = borsh::to_vec(&(
+                        JobPhase::ContributionsInputsStream,
+                        StreamMessage { data: hint.data.clone() },
+                    ))
+                    .unwrap();
 
-                self.mpi_broadcast(&mut serialized)?;
+                    broadcast_fn(&mut serialized).expect("MPI broadcast failed for input hint");
+                }
+
                 self.inputs_sink
                     .as_ref()
                     .ok_or_else(|| {
@@ -832,6 +820,10 @@ impl StreamProcessor for HintsProcessor {
 
     fn reset(&self) {
         self.reset();
+    }
+
+    fn as_any(self: Arc<Self>) -> Arc<dyn std::any::Any + Send + Sync> {
+        self
     }
 }
 
@@ -1746,7 +1738,7 @@ mod tests {
 
         const VARIABLE_HINT: u32 = 0x7FFF_0100;
 
-        let p = HintsProcessor::builder(Arc::new(sink), None::<Arc<RecordingSink>>)
+        let p = HintsProcessor::builder(Arc::new(sink), None::<Arc<NullHints>>)
             .num_threads(16)
             .custom_hint(VARIABLE_HINT, |data| {
                 // Pseudo-random delay based on hash of input value (0-15ms range)

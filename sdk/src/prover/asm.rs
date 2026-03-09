@@ -53,6 +53,7 @@ impl AsmProver {
         asm_out_file: bool,
         no_auto_setup: bool,
         gpu_params: ParamsGPU,
+        is_distributed: bool,
         logging_config: Option<LoggingConfig>,
     ) -> Result<Self> {
         let core_prover = AsmCoreProver::new(
@@ -68,6 +69,7 @@ impl AsmProver {
             asm_out_file,
             no_auto_setup,
             gpu_params,
+            is_distributed,
             logging_config,
         )?;
 
@@ -113,6 +115,7 @@ impl ProverEngine for AsmProver {
         let world_rank = self.core_prover.rank_info.world_rank;
         let local_rank = self.core_prover.rank_info.local_rank;
         let n_processes = self.core_prover.rank_info.n_processes;
+        let is_distributed = self.core_prover.is_distributed;
         let unlock_mapped_memory = self.core_prover.unlock_mapped_memory;
         let asm_out_file = self.core_prover.asm_out_file;
         let verbose_mode = self.core_prover.verbose;
@@ -183,12 +186,21 @@ impl ProverEngine for AsmProver {
         asm_services.start_asm_services(&asm_mt_path, asm_runner_options)?;
         timer_stop_and_log_info!(STARTING_ASM_MICROSERVICES);
 
+        let mpi_broadcast_fn = (is_distributed && n_processes > 1 && elf.with_hints()).then(|| {
+            let pctx = pctx.clone();
+            Arc::new(move |data: &mut Vec<u8>| {
+                pctx.mpi_ctx.broadcast(data);
+                Ok(())
+            }) as Arc<dyn Fn(&mut Vec<u8>) -> Result<()> + Send + Sync>
+        });
+
         let asm_resources = AsmResources::new(
             local_rank,
             base_port,
             unlock_mapped_memory,
             verbose_mode,
             elf.with_hints(),
+            mpi_broadcast_fn,
         )?;
 
         self.n_setups.fetch_add(1, Ordering::SeqCst);
@@ -356,6 +368,7 @@ impl ProverEngine for AsmProver {
 pub struct AsmCoreProver {
     backend: ProverBackend,
     rank_info: RankInfo,
+    is_distributed: bool,
     base_port: Option<u16>,
     unlock_mapped_memory: bool,
     asm_out_file: bool,
@@ -378,6 +391,7 @@ impl AsmCoreProver {
         asm_out_file: bool,
         no_auto_setup: bool,
         gpu_params: ParamsGPU,
+        is_distributed: bool,
         logging_config: Option<LoggingConfig>,
     ) -> Result<Self> {
         check_paths_exist(&proving_key)?;
@@ -437,6 +451,7 @@ impl AsmCoreProver {
             asm_out_file,
             verbose: verbose.into(),
             no_auto_setup,
+            is_distributed,
         })
     }
 
@@ -452,6 +467,7 @@ impl AsmCoreProver {
             asm_out_file: false,
             verbose: VerboseMode::Info,
             no_auto_setup: false,
+            is_distributed: false,
         })
     }
 }
