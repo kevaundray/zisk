@@ -183,6 +183,13 @@ impl AsmServices {
             }
         }
 
+        tracing::error!(
+            ">>> [{}] Timeout waiting for ASM service {} to be ready on port {} after {:?}",
+            world_rank,
+            service,
+            port,
+            start.elapsed()
+        );
         Err(anyhow::anyhow!("Timeout: service `{service}` not ready on {addr}"))
     }
 
