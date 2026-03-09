@@ -99,6 +99,9 @@ pub struct ProverConfig {
     /// Flag to unlock mapped memory
     pub unlock_mapped_memory: bool,
 
+    /// Flag to redirect ASM emulator output to file
+    pub asm_out_file: bool,
+
     /// Flag to verify constraints
     pub verify_constraints: bool,
 
@@ -230,6 +233,7 @@ impl ProverConfig {
             debug_info,
             asm_port: prover_service_config.asm_port,
             unlock_mapped_memory: prover_service_config.unlock_mapped_memory,
+            asm_out_file: prover_service_config.asm_out_file,
             verify_constraints: prover_service_config.verify_constraints,
             aggregation: prover_service_config.aggregation,
             gpu_params,
@@ -321,6 +325,7 @@ impl<T: ZiskBackend + 'static> Worker<T> {
                 .asm_path_opt(prover_config.asm.clone())
                 .base_port_opt(prover_config.asm_port)
                 .unlock_mapped_memory(prover_config.unlock_mapped_memory)
+                .asm_out_file(prover_config.asm_out_file)
                 .gpu(prover_config.gpu_params.clone())
                 .build()?,
         );

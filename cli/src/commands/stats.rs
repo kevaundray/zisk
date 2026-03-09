@@ -66,6 +66,11 @@ pub struct ZiskStats {
     #[clap(short = 'u', long, conflicts_with = "emulator")]
     pub unlock_mapped_memory: bool,
 
+    /// Redirect ASM emulator output to file
+    /// This option is mutually exclusive with `--emulator`
+    #[clap(long, conflicts_with = "emulator", default_value_t = false)]
+    pub asm_out_file: bool,
+
     /// Verbosity (-v, -vv)
     #[arg(short = 'v', long, action = clap::ArgAction::Count, help = "Increase verbosity level")]
     pub verbose: u8, // Using u8 to hold the number of `-v`
@@ -193,6 +198,7 @@ impl ZiskStats {
             .no_auto_setup(self.no_auto_setup)
             .base_port_opt(self.port)
             .unlock_mapped_memory(self.unlock_mapped_memory)
+            .asm_out_file(self.asm_out_file)
             .print_command_info()
             .build()?;
 
