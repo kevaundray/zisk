@@ -192,4 +192,47 @@ impl ZiskStdin {
             ZiskStdin::from_file(uri.as_str())
         }
     }
+
+    // Inherent methods that delegate to ZiskIO trait
+    // This allows using these methods without importing the trait
+
+    /// Read a value from the buffer.
+    pub fn read_bytes(&self) -> Vec<u8> {
+        ZiskIO::read_bytes(self)
+    }
+
+    /// Read a slice of bytes from the buffer.
+    pub fn read_slice(&self, slice: &mut [u8]) {
+        ZiskIO::read_slice(self, slice)
+    }
+
+    /// Read bytes into the provided buffer.
+    pub fn read_into(&self, buffer: &mut [u8]) {
+        ZiskIO::read_into(self, buffer)
+    }
+
+    /// Read and deserialize a value from the buffer.
+    pub fn read<T: DeserializeOwned>(&self) -> Result<T> {
+        ZiskIO::read(self)
+    }
+
+    /// Write a serialized value to the buffer.
+    pub fn write<T: Serialize>(&self, data: &T) {
+        ZiskIO::write(self, data)
+    }
+
+    /// Write a slice of bytes to the buffer.
+    pub fn write_slice(&self, data: &[u8]) {
+        ZiskIO::write_slice(self, data)
+    }
+
+    /// Write proof
+    pub fn write_proof(&self, proof: &[u8]) {
+        ZiskIO::write_proof(self, proof)
+    }
+
+    /// Save to file
+    pub fn save(&self, path: &Path) -> Result<()> {
+        ZiskIO::save(self, path)
+    }
 }

@@ -1,5 +1,5 @@
 use std::path::PathBuf;
-use zisk_sdk::{build_program, ZiskIO, ZiskStdin};
+use zisk_sdk::{build_program, ZiskStdin};
 
 fn main() {
     build_program("../guest");

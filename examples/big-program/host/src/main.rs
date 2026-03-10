@@ -1,6 +1,6 @@
 use anyhow::Result;
 use std::path::PathBuf;
-use zisk_sdk::{include_elf, ElfBinary, ProofOpts, ProverClient, ZiskIO, ZiskStdin};
+use zisk_sdk::{include_elf, ElfBinary, ProverClient, ZiskStdin};
 
 pub const ELF: ElfBinary = include_elf!("big-program-guest");
 
@@ -27,7 +27,7 @@ fn main() -> Result<()> {
         .build()
         .unwrap();
 
-    let (pk, vkey) = client.setup(&ELF)?;
+    let (pk, _vkey) = client.setup(&ELF)?;
 
     // Execute the program using the `ProverClient.execute` method, without generating a proof.
     let result = client.execute(&pk, stdin.clone())?;

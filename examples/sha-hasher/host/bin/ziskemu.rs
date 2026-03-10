@@ -1,6 +1,6 @@
 use anyhow::Result;
 use std::path::PathBuf;
-use zisk_sdk::{elf_path, ziskemu, ElfBinaryFromFile, EmuOptions, ZiskIO, ZiskStdin};
+use zisk_sdk::{elf_path, ziskemu, ElfBinaryFromFile, EmuOptions, ZiskStdin};
 
 fn main() -> Result<()> {
     let elf_path = elf_path!("sha-hasher-guest");

@@ -1,5 +1,5 @@
 use std::fmt::Write;
-use zisk_common::io::{ZiskIO, ZiskStdin};
+use zisk_common::io::ZiskStdin;
 use zisk_common::ElfBinaryLike;
 use zisk_core::Riscv2zisk;
 pub use ziskemu::EmuOptions;

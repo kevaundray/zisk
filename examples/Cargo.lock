@@ -1126,32 +1126,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "37909eebbb50d72f9059c3b6d82c0463f2ff062c9e95845c43a6c9c0355411be"
 
 [[package]]
-name = "fibonacci-guest"
-version = "0.1.0"
-dependencies = [
- "byteorder",
- "ziskos",
-]
-
-[[package]]
-name = "fibonacci-guest-2"
-version = "0.1.0"
-dependencies = [
- "byteorder",
- "ziskos",
-]
-
-[[package]]
-name = "fibonacci-host"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "serde",
- "sha2",
- "zisk-sdk",
-]
-
-[[package]]
 name = "fields"
 version = "0.16.0"
 source = "git+https://github.com/0xPolygonHermez/pil2-proofman.git?branch=feature%2Fwrite-proof#f352400887bc87929df4b143671e6abd78cfd072"
@@ -1821,6 +1795,32 @@ checksum = "fbeff6bd154a309b2ada5639b2661ca6ae4599b34e8487dc276d2cd637da2d76"
 dependencies = [
  "bitflags",
  "itoa",
+]
+
+[[package]]
+name = "multiple-program-guest"
+version = "0.1.0"
+dependencies = [
+ "byteorder",
+ "ziskos",
+]
+
+[[package]]
+name = "multiple-program-guest-2"
+version = "0.1.0"
+dependencies = [
+ "byteorder",
+ "ziskos",
+]
+
+[[package]]
+name = "multiple-program-host"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "serde",
+ "sha2",
+ "zisk-sdk",
 ]
 
 [[package]]

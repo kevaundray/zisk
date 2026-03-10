@@ -10,7 +10,6 @@ use asm_runner::{MOShMemReader, MTShMemReader, RHShMemReader};
 use precompiles_hints::{HintsProcessor, MpiBroadcastFn};
 use std::sync::atomic::{AtomicBool, Ordering};
 use zisk_common::io::StreamSink;
-use zisk_common::io::ZiskIO;
 use zisk_common::io::ZiskStdin;
 use zisk_common::io::{StreamProcessor, StreamSource, ZiskStream};
 

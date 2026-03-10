@@ -5,10 +5,7 @@ use fields::PrimeField64;
 use proofman_common::ProofCtx;
 use proofman_util::{timer_start_info, timer_stop_and_log_info};
 use rayon::prelude::*;
-use zisk_common::{
-    io::{ZiskIO, ZiskStdin},
-    ChunkId, EmuTrace, ExecutorStatsHandle,
-};
+use zisk_common::{io::ZiskStdin, ChunkId, EmuTrace, ExecutorStatsHandle};
 use zisk_core::ZiskRom;
 use ziskemu::{EmuOptions, ZiskEmulator};
 
