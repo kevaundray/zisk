@@ -33,7 +33,7 @@
 #endif
 
 #define TRACE_ADDR         (uint64_t)0xd0000000
-#define TRACE_MAX_SIZE     (uint64_t)0x1000000000 // 64GB
+#define TRACE_MAX_SIZE     (uint64_t)0x800000000 // 32GB
 #define TRACE_NUMBER_OF_CHUNKS (((TRACE_MAX_SIZE - TRACE_INITIAL_SIZE) / TRACE_DELTA_SIZE) + 1)
 #define TRACE_SIZE_GRANULARITY (1014*1014) // ROM histogram trace size is round up to a multiple of this granularity
 
