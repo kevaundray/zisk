@@ -56,8 +56,12 @@ impl ZiskFileStdin {
 }
 
 impl ZiskIO for ZiskFileStdin {
-    fn read_bytes(&self) -> Vec<u8> {
+    fn read_raw_bytes(&self) -> Vec<u8> {
         fs::read(&self.path).expect("Could not read inputs file")
+    }
+
+    fn read_bytes(&self) -> Vec<u8> {
+        self.read_raw_data().expect("Failed to read into buffer")
     }
 
     fn read_slice(&self, slice: &mut [u8]) {
@@ -70,18 +74,6 @@ impl ZiskIO for ZiskFileStdin {
             slice.len()
         );
         slice.copy_from_slice(&data);
-    }
-
-    fn read_into(&self, buffer: &mut [u8]) {
-        let data = self.read_raw_data().expect("Failed to read into buffer");
-        assert_eq!(
-            buffer.len(),
-            data.len(),
-            "Buffer length mismatch: expected {}, got {}",
-            data.len(),
-            buffer.len()
-        );
-        buffer.copy_from_slice(&data);
     }
 
     fn read<T: DeserializeOwned>(&self) -> Result<T> {

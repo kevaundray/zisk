@@ -201,7 +201,7 @@ impl AsmResources {
     }
 
     pub fn write_input(&self, stdin: &ZiskStdin) -> Result<()> {
-        let inputs = stdin.read_bytes();
+        let inputs = stdin.read_raw_bytes();
 
         self.inputs_shmem_writer.write_input(&inputs)
     }
