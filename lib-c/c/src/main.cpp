@@ -16,6 +16,7 @@
 #include "ffiasm/fec.hpp"
 #include "ffiasm/fnec.hpp"
 #include "common/utils.hpp"
+#include "chfast/zisk_keccak.h"
 
 #define N_TESTS 1000000
 #define MAX_TEST_SIZE_U64  36  // Enough for the largest test
@@ -1263,6 +1264,34 @@ void Div256_benchmark(uint64_t *data) {
     }
 }
 
+void Keccakf_benchmark(uint64_t *data) {
+
+    try {
+        const uint64_t TEST_SIZE_U64 = 25;
+        for (uint64_t i = 0; i<N_TESTS; i++)
+        {
+            for (uint64_t j = 0; j < TEST_SIZE_U64; j++) {
+                data[i * TEST_SIZE_U64 + j] = (uint64_t)rand();
+            }
+        }
+
+        struct timeval startTime;
+        gettimeofday(&startTime, NULL);
+        for (uint64_t i = 0; i<N_TESTS; i++)
+        {
+            uint64_t *test_data = data + i * TEST_SIZE_U64;
+            zisk_keccakf1600(test_data);
+        }
+
+        uint64_t duration = TimeDiff(startTime);
+        double tp = duration == 0 ? 0 : double(N_TESTS)/duration;
+        print_results("Keccakf", duration, tp);
+    }
+    catch (const std::exception & e) {
+        printf("Keccakf                      |Exception: %s\n", e.what());
+    }
+}
+
 int main(int argc, char *argv[])
 {
     if (argc > 1)
@@ -1313,6 +1342,8 @@ int main(int argc, char *argv[])
     BN254TwistDblLineCoeffs_test();
     
     Div256_benchmark(data);
+
+    Keccakf_benchmark(data);
 
     free(data);
 }

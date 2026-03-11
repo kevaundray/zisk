@@ -18,11 +18,10 @@
 #include "../../lib-c/c/src/bls12_381/bls12_381.hpp"
 #include "../../lib-c/c/src/poseidon2/poseidon2_goldilocks.hpp"
 #include "../../lib-c/c/src/blake2/blake2.hpp"
-#include "bcon/bcon_sha256.hpp"
+#include "../../lib-c/c/src/bcon/bcon_sha256.hpp"
+#include "../../lib-c/c/src/chfast/zisk_keccak.h"
 
 extern void zisk_sha256(uint64_t state[4], uint64_t input[8]);
-
-extern void keccakf1600_generic(uint64_t state[25]);
 
 #ifdef DEBUG
 bool emu_verbose = false;
@@ -531,7 +530,7 @@ extern int _opcode_keccak(uint64_t address)
     {
 #endif
         // Call keccak-f compression function
-        keccakf1600_generic((uint64_t *)address);
+        zisk_keccakf1600((uint64_t *)address);
 
 #ifdef ASM_PRECOMPILE_CACHE
         // Store result in cache
