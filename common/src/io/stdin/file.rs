@@ -33,6 +33,26 @@ impl ZiskFileStdin {
         let file = File::open(&path_buf)?;
         Ok(ZiskFileStdin { path: path_buf, reader: Mutex::new(BufReader::new(file)) })
     }
+
+    fn read_raw_data(&self) -> std::io::Result<Vec<u8>> {
+        let mut reader = self.reader.lock().unwrap();
+
+        let mut len_bytes = [0u8; 8];
+        reader.read_exact(&mut len_bytes)?;
+        let len = usize::from_le_bytes(len_bytes);
+
+        let mut data = vec![0u8; len];
+        reader.read_exact(&mut data)?;
+
+        let total_len = 8 + len;
+        let padding = (8 - (total_len % 8)) % 8;
+        if padding > 0 {
+            let mut padding_bytes = vec![0u8; padding];
+            reader.read_exact(&mut padding_bytes)?;
+        }
+
+        Ok(data)
+    }
 }
 
 impl ZiskIO for ZiskFileStdin {
@@ -41,18 +61,35 @@ impl ZiskIO for ZiskFileStdin {
     }
 
     fn read_slice(&self, slice: &mut [u8]) {
-        let mut reader = self.reader.lock().unwrap();
-        reader.read_exact(slice).expect("Failed to read slice");
+        let data = self.read_raw_data().expect("Failed to read slice");
+        assert_eq!(
+            slice.len(),
+            data.len(),
+            "Slice length mismatch: expected {}, got {}",
+            data.len(),
+            slice.len()
+        );
+        slice.copy_from_slice(&data);
     }
 
     fn read_into(&self, buffer: &mut [u8]) {
-        let mut reader = self.reader.lock().unwrap();
-        reader.read_exact(buffer).expect("Failed to read into buffer");
+        let data = self.read_raw_data().expect("Failed to read into buffer");
+        assert_eq!(
+            buffer.len(),
+            data.len(),
+            "Buffer length mismatch: expected {}, got {}",
+            data.len(),
+            buffer.len()
+        );
+        buffer.copy_from_slice(&data);
     }
 
     fn read<T: DeserializeOwned>(&self) -> Result<T> {
-        let mut reader = self.reader.lock().unwrap();
-        bincode::deserialize_from(&mut *reader)
+        let data = self
+            .read_raw_data()
+            .map_err(|e| anyhow::anyhow!("Failed to read data from file: {}", e))?;
+
+        bincode::deserialize(&data)
             .map_err(|e| anyhow::anyhow!("Failed to deserialize from file: {}", e))
     }
 
