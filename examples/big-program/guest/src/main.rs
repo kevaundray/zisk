@@ -6,7 +6,7 @@ ziskos::entrypoint!(main);
 
 fn main() {
     // Get zero-copy slice directly from INPUT_ADDR (no RAM allocation!)
-    let data_bytes = ziskos::read_input_slice();
+    let data_bytes = ziskos::io::read_input_slice();
 
     // Reinterpret bytes as &[u64] - still zero-copy
     let data: &[u64] = unsafe {

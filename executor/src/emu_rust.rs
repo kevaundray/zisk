@@ -1,21 +1,20 @@
-use std::{collections::HashMap, sync::Mutex, thread::JoinHandle};
+use std::{collections::HashMap, sync::Mutex};
 
-use asm_runner::{AsmRunnerMO, AsmRunnerRH};
 use data_bus::DataBusTrait;
 use fields::PrimeField64;
 use proofman_common::ProofCtx;
 use proofman_util::{timer_start_info, timer_stop_and_log_info};
 use rayon::prelude::*;
-use zisk_common::{
-    io::{ZiskIO, ZiskStdin},
-    ChunkId, EmuTrace, ExecutorStatsHandle,
-};
+use zisk_common::{io::ZiskStdin, ChunkId, EmuTrace, ExecutorStatsHandle};
 use zisk_core::ZiskRom;
 use ziskemu::{EmuOptions, ZiskEmulator};
 
 use crate::{
-    DeviceMetricsList, DummyCounter, NestedDeviceMetricsList, StaticSMBundle, MAX_NUM_STEPS,
+    DeviceMetricsList, DummyCounter, EmulatorResult, NestedDeviceMetricsList, StaticSMBundle,
+    MAX_NUM_STEPS,
 };
+
+use anyhow::Result;
 
 pub struct EmulatorRust {
     /// Chunk size for processing.
@@ -56,14 +55,7 @@ impl EmulatorRust {
         zisk_rom: &ZiskRom,
         stdin: &Mutex<ZiskStdin>,
         sm_bundle: &StaticSMBundle<F>,
-    ) -> (
-        Vec<EmuTrace>,
-        DeviceMetricsList,
-        NestedDeviceMetricsList,
-        Option<JoinHandle<AsmRunnerMO>>,
-        Option<JoinHandle<AsmRunnerRH>>,
-        u64,
-    ) {
+    ) -> Result<EmulatorResult> {
         let min_traces = self.run_emulator(zisk_rom, Self::NUM_THREADS, &stdin.lock().unwrap());
 
         // Store execute steps
@@ -73,7 +65,7 @@ impl EmulatorRust {
         let (main_count, secn_count) = self.count(zisk_rom, &min_traces, sm_bundle);
         timer_stop_and_log_info!(COUNT);
 
-        (min_traces, main_count, secn_count, None, None, steps)
+        Ok((min_traces, main_count, secn_count, None, None, steps))
     }
 
     fn run_emulator(
@@ -83,7 +75,7 @@ impl EmulatorRust {
         stdin: &ZiskStdin,
     ) -> Vec<EmuTrace> {
         // Call emulate with these options
-        let input_data = stdin.read_bytes();
+        let input_data = stdin.read_raw_bytes();
 
         // Settings for the emulator
         let emu_options = EmuOptions {
@@ -172,14 +164,7 @@ impl<F: PrimeField64> crate::Emulator<F> for EmulatorRust {
         _use_hints: bool,
         _stats: &ExecutorStatsHandle,
         _caller_stats_scope: &zisk_common::StatsScope,
-    ) -> (
-        Vec<EmuTrace>,
-        DeviceMetricsList,
-        NestedDeviceMetricsList,
-        Option<JoinHandle<AsmRunnerMO>>,
-        Option<JoinHandle<AsmRunnerRH>>,
-        u64,
-    ) {
+    ) -> Result<EmulatorResult> {
         self.execute(zisk_rom, stdin, sm_bundle)
     }
 }

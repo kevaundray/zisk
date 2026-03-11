@@ -20,6 +20,8 @@
 #include "globals.hpp"
 #include "emu.hpp"
 
+void * shmem_input_address = NULL;
+
 /**********/
 /* CLIENT */
 /**********/
@@ -114,87 +116,6 @@ void client_setup (void)
 
         if (verbose) printf("mmap(precompile) mapped %lu B and returned address %p in %lu us\n", MAX_PRECOMPILE_SIZE, precompile_results_address, duration);
 
-        /*****************/
-        /* CONTROL INPUT */
-        /*****************/
-
-        // Create the control input shared memory
-        shmem_control_input_fd = shm_open(shmem_control_input_name, O_RDWR, 0666);
-        if (shmem_control_input_fd < 0)
-        {
-            printf("ERROR: Failed calling control shm_open(%s) errno=%d=%s\n", shmem_control_input_name, errno, strerror(errno));
-            fflush(stdout);
-            fflush(stderr);
-            exit(-1);
-        }
-
-        // Map control input address space
-        if (verbose) gettimeofday(&start_time, NULL);
-        void * pControl = mmap((void *)CONTROL_INPUT_ADDR, CONTROL_INPUT_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_FIXED | map_locked_flag, shmem_control_input_fd, 0);
-        if (verbose)
-        {
-            gettimeofday(&stop_time, NULL);
-            duration = TimeDiff(start_time, stop_time);
-        }
-        if (pControl == MAP_FAILED)
-        {
-            printf("ERROR: Failed calling mmap(control_input) errno=%d=%s\n", errno, strerror(errno));
-            fflush(stdout);
-            fflush(stderr);
-            exit(-1);
-        }
-        if (pControl != (void *)CONTROL_INPUT_ADDR)
-        {
-            printf("ERROR: Called mmap(control_input) but returned address = %p != 0x%08lx\n", pControl, CONTROL_INPUT_ADDR);
-            fflush(stdout);
-            fflush(stderr);
-            exit(-1);
-        }
-        shmem_control_input_address = (uint64_t *)pControl;
-        precompile_written_address = &shmem_control_input_address[0];
-        precompile_exit_address = &shmem_control_input_address[1];
-        if (verbose) printf("mmap(control_input) mapped %lu B and returned address %p in %lu us\n", CONTROL_INPUT_SIZE, shmem_control_input_address, duration);
-
-        /*****************/
-        /* CONTROL OUTPUT */
-        /*****************/
-
-        // Create the control input shared memory
-        shmem_control_output_fd = shm_open(shmem_control_output_name, O_RDWR, 0666);
-        if (shmem_control_output_fd < 0)
-        {
-            printf("ERROR: Failed calling control shm_open(%s) errno=%d=%s\n", shmem_control_output_name, errno, strerror(errno));
-            fflush(stdout);
-            fflush(stderr);
-            exit(-1);
-        }
-
-        // Map control input address space
-        if (verbose) gettimeofday(&start_time, NULL);
-        pControl = mmap((void *)CONTROL_OUTPUT_ADDR, CONTROL_OUTPUT_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_FIXED | map_locked_flag, shmem_control_output_fd, 0);
-        if (verbose)
-        {
-            gettimeofday(&stop_time, NULL);
-            duration = TimeDiff(start_time, stop_time);
-        }
-        if (pControl == MAP_FAILED)
-        {
-            printf("ERROR: Failed calling mmap(control_output) errno=%d=%s\n", errno, strerror(errno));
-            fflush(stdout);
-            fflush(stderr);
-            exit(-1);
-        }
-        if (pControl != (void *)CONTROL_OUTPUT_ADDR)
-        {
-            printf("ERROR: Called mmap(control_output) but returned address = %p != 0x%08lx\n", pControl, CONTROL_OUTPUT_ADDR);
-            fflush(stdout);
-            fflush(stderr);
-            exit(-1);
-        }
-        shmem_control_output_address = (uint64_t *)pControl;
-        precompile_read_address = &shmem_control_output_address[0];
-        if (verbose) printf("mmap(control_output) mapped %lu B and returned address %p in %lu us\n", CONTROL_OUTPUT_SIZE, shmem_control_output_address, duration);
-
         /*************************/
         /* PRECOMPILE SEMAPHORES */
         /*************************/
@@ -225,6 +146,88 @@ void client_setup (void)
         }
         if (verbose) printf("sem_open(%s) succeeded\n", sem_prec_read_name);
     }
+
+    /*****************/
+    /* CONTROL INPUT */
+    /*****************/
+
+    // Create the control input shared memory
+    shmem_control_input_fd = shm_open(shmem_control_input_name, O_RDWR, 0666);
+    if (shmem_control_input_fd < 0)
+    {
+        printf("ERROR: Failed calling control shm_open(%s) errno=%d=%s\n", shmem_control_input_name, errno, strerror(errno));
+        fflush(stdout);
+        fflush(stderr);
+        exit(-1);
+    }
+
+    // Map control input address space
+    if (verbose) gettimeofday(&start_time, NULL);
+    void * pControl = mmap((void *)CONTROL_INPUT_ADDR, CONTROL_INPUT_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_FIXED | map_locked_flag, shmem_control_input_fd, 0);
+    if (verbose)
+    {
+        gettimeofday(&stop_time, NULL);
+        duration = TimeDiff(start_time, stop_time);
+    }
+    if (pControl == MAP_FAILED)
+    {
+        printf("ERROR: Failed calling mmap(control_input) errno=%d=%s\n", errno, strerror(errno));
+        fflush(stdout);
+        fflush(stderr);
+        exit(-1);
+    }
+    if (pControl != (void *)CONTROL_INPUT_ADDR)
+    {
+        printf("ERROR: Called mmap(control_input) but returned address = %p != 0x%08lx\n", pControl, CONTROL_INPUT_ADDR);
+        fflush(stdout);
+        fflush(stderr);
+        exit(-1);
+    }
+    shmem_control_input_address = (uint64_t *)pControl;
+    precompile_written_address = &shmem_control_input_address[0];
+    precompile_exit_address = &shmem_control_input_address[1];
+    input_written_address = &shmem_control_input_address[2];
+    if (verbose) printf("mmap(control_input) mapped %lu B and returned address %p in %lu us\n", CONTROL_INPUT_SIZE, shmem_control_input_address, duration);
+
+    /*****************/
+    /* CONTROL OUTPUT */
+    /*****************/
+
+    // Create the control input shared memory
+    shmem_control_output_fd = shm_open(shmem_control_output_name, O_RDWR, 0666);
+    if (shmem_control_output_fd < 0)
+    {
+        printf("ERROR: Failed calling control shm_open(%s) errno=%d=%s\n", shmem_control_output_name, errno, strerror(errno));
+        fflush(stdout);
+        fflush(stderr);
+        exit(-1);
+    }
+
+    // Map control input address space
+    if (verbose) gettimeofday(&start_time, NULL);
+    pControl = mmap((void *)CONTROL_OUTPUT_ADDR, CONTROL_OUTPUT_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_FIXED | map_locked_flag, shmem_control_output_fd, 0);
+    if (verbose)
+    {
+        gettimeofday(&stop_time, NULL);
+        duration = TimeDiff(start_time, stop_time);
+    }
+    if (pControl == MAP_FAILED)
+    {
+        printf("ERROR: Failed calling mmap(control_output) errno=%d=%s\n", errno, strerror(errno));
+        fflush(stdout);
+        fflush(stderr);
+        exit(-1);
+    }
+    if (pControl != (void *)CONTROL_OUTPUT_ADDR)
+    {
+        printf("ERROR: Called mmap(control_output) but returned address = %p != 0x%08lx\n", pControl, CONTROL_OUTPUT_ADDR);
+        fflush(stdout);
+        fflush(stderr);
+        exit(-1);
+    }
+    shmem_control_output_address = (uint64_t *)pControl;
+    precompile_read_address = &shmem_control_output_address[0];
+    if (verbose) printf("mmap(control_output) mapped %lu B and returned address %p in %lu us\n", CONTROL_OUTPUT_SIZE, shmem_control_output_address, duration);
 }
 
 typedef enum {
@@ -611,12 +614,11 @@ void client_run (void)
             exit(-1);
         }
 
-        // Write the input size in the first 64 bits
+        // Write the free input value as 0 in the first 64 bits
         *(uint64_t *)shmem_input_address = (uint64_t)0; // free input
-        *(uint64_t *)(shmem_input_address + 8)= (uint64_t)input_data_size;
 
         // Copy input data into input memory
-        size_t input_read = fread(shmem_input_address + 16, 1, input_data_size, input_fp);
+        size_t input_read = fread(shmem_input_address + 8, 1, input_data_size, input_fp);
         if (input_read != input_data_size)
         {
             printf("ERROR: Input read (%lu) != input file size (%lu)\n", input_read, input_data_size);
@@ -638,6 +640,9 @@ void client_run (void)
             exit(-1);
         }
 
+        // Set written counter
+        *input_written_address = input_data_size; // in bytes
+
 #ifdef DEBUG
         gettimeofday(&stop_time, NULL);
         duration = TimeDiff(start_time, stop_time);
@@ -651,7 +656,7 @@ void client_run (void)
     /*****************************/
     if (precompile_results_enabled)
     {
-        // reset written counter
+        // Reset written counter
         *precompile_written_address = 0;
 
         //client_write_precompile_results();

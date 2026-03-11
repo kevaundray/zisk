@@ -28,7 +28,9 @@ use tracing::info;
 use zisk_common::io::StreamSource;
 use zisk_common::ElfBinaryLike;
 use zisk_common::ZiskExecutorTime;
-use zisk_common::{io::ZiskStdin, ExecutorStatsHandle, StatsCostPerType, ZiskExecutorSummary};
+use zisk_common::{
+    io::StreamProcessor, io::ZiskStdin, ExecutorStatsHandle, StatsCostPerType, ZiskExecutorSummary,
+};
 use zisk_core::ZiskRom;
 
 pub struct ZiskExecuteResult {
@@ -151,6 +153,20 @@ impl ZiskProgramPK {
 
     pub fn is_asm(&self) -> bool {
         self.asm_services.is_some()
+    }
+
+    pub fn get_hints_processor(&self) -> Option<Arc<dyn StreamProcessor>> {
+        if let Some(asm_resources) = &self.asm_resources {
+            asm_resources.get_hints_processor()
+        } else {
+            None
+        }
+    }
+
+    pub fn reset(&self) {
+        if let Some(asm_resources) = &self.asm_resources {
+            asm_resources.reset();
+        }
     }
 }
 
@@ -836,8 +852,6 @@ pub trait ProverEngine {
         rank_id: usize,
     ) -> Result<()>;
 
-    fn is_first_partition(&self) -> Result<bool>;
-
     fn register_aggregated_proofs(&self, agg_proofs: Vec<AggProofsRegister>) -> Result<()>;
 
     fn aggregate_proofs(
@@ -849,6 +863,13 @@ pub trait ProverEngine {
     ) -> Result<Option<ZiskAggPhaseResult>>;
 
     fn mpi_broadcast(&self, data: &mut Vec<u8>) -> Result<()>;
+
+    fn prepare_send_proof(
+        &self,
+        proof: &ZiskProof,
+        publics: &ZiskPublics,
+        program_vk: &ZiskProgramVK,
+    ) -> Result<Vec<u8>>;
 }
 
 pub trait ZiskBackend: Send + Sync {
@@ -1023,10 +1044,6 @@ impl<C: ZiskBackend> ZiskProver<C> {
         self.prover.set_partition(total_compute_units, allocation, rank_id)
     }
 
-    pub fn is_first_partition(&self) -> Result<bool> {
-        self.prover.is_first_partition()
-    }
-
     pub fn register_aggregated_proofs(&self, agg_proofs: Vec<AggProofsRegister>) -> Result<()> {
         self.prover.register_aggregated_proofs(agg_proofs)
     }
@@ -1044,6 +1061,15 @@ impl<C: ZiskBackend> ZiskProver<C> {
     /// Broadcast data to all MPI processes.
     pub fn mpi_broadcast(&self, data: &mut Vec<u8>) -> Result<()> {
         self.prover.mpi_broadcast(data)
+    }
+
+    pub fn prepare_send_proof(
+        &self,
+        proof: &ZiskProof,
+        publics: &ZiskPublics,
+        program_vk: &ZiskProgramVK,
+    ) -> Result<Vec<u8>> {
+        self.prover.prepare_send_proof(proof, publics, program_vk)
     }
 }
 

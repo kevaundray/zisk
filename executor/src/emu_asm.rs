@@ -8,10 +8,7 @@ use crate::AsmResources;
 use crate::{
     DeviceMetricsList, DummyCounter, NestedDeviceMetricsList, StaticSMBundle, MAX_NUM_STEPS,
 };
-use asm_runner::{
-    shmem_input_name, write_input, AsmRunnerMO, AsmRunnerMT, AsmRunnerRH, AsmService, AsmServices,
-    SharedMemoryWriter,
-};
+use asm_runner::{AsmRunnerMO, AsmRunnerMT, AsmRunnerRH};
 use data_bus::DataBusTrait;
 use fields::PrimeField64;
 use proofman_common::ProofCtx;
@@ -20,8 +17,10 @@ use zisk_common::{
     io::ZiskStdin, stats_begin, stats_end, AsmExecutionInfo, ChunkId, EmuTrace,
     ExecutorStatsHandle, StatsScope,
 };
-use zisk_core::{ZiskRom, MAX_INPUT_SIZE};
+use zisk_core::ZiskRom;
 use ziskemu::ZiskEmulator;
+
+use anyhow::Result;
 
 pub struct EmulatorAsm {
     /// World rank for distributed execution. Default to 0 for single-node execution.
@@ -114,47 +113,31 @@ impl EmulatorAsm {
         use_hints: bool,
         stats: &ExecutorStatsHandle,
         _caller_stats_scope: &StatsScope,
-    ) -> (
+    ) -> Result<(
         Vec<EmuTrace>,
         DeviceMetricsList,
         NestedDeviceMetricsList,
         Option<JoinHandle<AsmRunnerMO>>,
         Option<JoinHandle<AsmRunnerRH>>,
         u64,
-    ) {
+    )> {
         let asm_resources_guard = self.asm_resources.lock().unwrap();
-        let asm_resources = asm_resources_guard.as_ref().expect("AsmResources not initialized");
+        let asm_resources = asm_resources_guard
+            .as_ref()
+            .ok_or_else(|| anyhow::anyhow!("AsmResources not initialized"))?;
 
         let has_hints_stream = asm_resources.is_hints_stream_initialized();
         if use_hints && has_hints_stream {
-            asm_resources.start_stream().expect("Failed to start hints stream");
+            asm_resources.start_stream()?;
         }
 
         stats_begin!(stats, _caller_stats_scope, _exec_scope, "EXECUTE_WITH_ASSEMBLY", 0);
 
         stats_begin!(stats, &_exec_scope, _write_scope, "ASM_WRITE_INPUT", 0);
 
-        asm_resources.shmem_input_writer.lock().unwrap().get_or_insert_with(|| {
-            let port =
-                AsmServices::port_base_for(asm_resources.base_port, asm_resources.local_rank);
-            let shmem_input_name = shmem_input_name(port, asm_resources.local_rank);
-            tracing::debug!(
-                "Initializing SharedMemoryWriter for service {:?} at '{}'",
-                AsmService::MO,
-                shmem_input_name
-            );
-            SharedMemoryWriter::new(
-                &shmem_input_name,
-                MAX_INPUT_SIZE as usize,
-                asm_resources.unlock_mapped_memory,
-            )
-            .expect("Failed to create SharedMemoryWriter")
-        });
+        let config = asm_resources.config();
 
-        write_input(
-            &stdin.lock().unwrap(),
-            asm_resources.shmem_input_writer.lock().unwrap().as_ref().unwrap(),
-        );
+        asm_resources.write_input(&stdin.lock().unwrap())?;
 
         stats_end!(stats, &_write_scope);
 
@@ -165,8 +148,8 @@ impl EmulatorAsm {
 
         // Run the assembly Memory Operations (MO) runner thread
         let handle_mo = std::thread::spawn({
-            let asm_shmem_mo = asm_resources.asm_shmem_mo.clone();
-            let base_port = asm_resources.base_port;
+            let asm_shmem_mo = asm_resources.mo_shmem_reader.clone();
+            let base_port = config.base_port;
             move || {
                 AsmRunnerMO::run(
                     &mut asm_shmem_mo.lock().unwrap(),
@@ -182,13 +165,13 @@ impl EmulatorAsm {
         });
 
         // Run the ROM histogram only on partition 0 as it is always computed by this partition
-        let has_rom_sm = pctx.dctx_is_first_partition();
+        let has_rom_sm = pctx.dctx_is_first_process();
 
         let _stats = stats.clone();
 
         let handle_rh = (has_rom_sm).then(|| {
-            let asm_shmem_rh = asm_resources.asm_shmem_rh.clone();
-            let base_port = asm_resources.base_port;
+            let asm_shmem_rh = asm_resources.rh_shmem_reader.clone();
+            let base_port = config.base_port;
             let unlock_mapped_memory = self.unlock_mapped_memory;
             std::thread::spawn(move || {
                 AsmRunnerRH::run(
@@ -211,7 +194,7 @@ impl EmulatorAsm {
 
         stats_end!(stats, &_exec_scope);
 
-        (min_traces, main_count, secn_count, Some(handle_mo), handle_rh, steps)
+        Ok((min_traces, main_count, secn_count, Some(handle_mo), handle_rh, steps))
     }
 
     fn run_mt_assembly<F: PrimeField64>(
@@ -255,13 +238,13 @@ impl EmulatorAsm {
             let asm_resources_guard = self.asm_resources.lock().unwrap();
             let asm_resources = asm_resources_guard.as_ref().expect("AsmResources not initialized");
             let result = AsmRunnerMT::run_and_count(
-                &mut asm_resources.asm_shmem_mt.lock().unwrap(),
+                &mut asm_resources.mt_shmem_reader.lock().unwrap(),
                 MAX_NUM_STEPS,
                 self.chunk_size,
                 on_chunk,
                 self.world_rank,
                 self.local_rank,
-                asm_resources.base_port,
+                asm_resources.config().base_port,
                 stats.clone(),
             )
             .expect("Error during ASM execution");
@@ -317,14 +300,14 @@ impl<F: PrimeField64> crate::Emulator<F> for EmulatorAsm {
         use_hints: bool,
         stats: &ExecutorStatsHandle,
         caller_stats_scope: &StatsScope,
-    ) -> (
+    ) -> Result<(
         Vec<EmuTrace>,
         DeviceMetricsList,
         NestedDeviceMetricsList,
         Option<JoinHandle<AsmRunnerMO>>,
         Option<JoinHandle<AsmRunnerRH>>,
         u64,
-    ) {
+    )> {
         self.execute(zisk_rom, stdin, pctx, sm_bundle, use_hints, stats, caller_stats_scope)
     }
 }

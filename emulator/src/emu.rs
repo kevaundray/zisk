@@ -1533,11 +1533,13 @@ impl<'a> Emu<'a> {
         // };
         self.source_a(instruction);
         self.source_b(instruction);
+
         if instruction.input_size > 0 {
             self.ctx.inst_ctx.extended_arg = instruction.jmp_offset1;
         } else {
             self.ctx.inst_ctx.extended_arg = 0;
         }
+
         (instruction.func)(&mut self.ctx.inst_ctx);
         self.store_c(instruction);
 
@@ -1578,6 +1580,7 @@ impl<'a> Emu<'a> {
         self.ctx = self.create_emu_context(inputs.clone(), options);
 
         let mut elf = ElfSymbolReader::new();
+        println!("READ SYMBOLS={}", options.read_symbols);
         if options.read_symbols {
             if let Some(elf_file) = &options.elf {
                 println!("Loading symbols from ELF file: {elf_file}");
@@ -1971,6 +1974,8 @@ impl<'a> Emu<'a> {
                 instruction.verbose
             );
         }
+        // println!("PCLOG={}", instruction.to_text());
+
         // Build the 'a' register value  based on the source specified by the current instruction
         self.source_a(instruction);
 

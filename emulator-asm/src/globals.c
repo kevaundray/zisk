@@ -25,6 +25,8 @@ bool do_shutdown = false;
 uint64_t number_of_mt_requests = 1;
 uint16_t port = 0;
 uint64_t chunk_player_address = 0;
+bool wait_flag = true;
+
 char precompile_file_name[4096] = {0};
 char shmem_control_input_name[128] = {0};
 char shmem_control_output_name[128] = {0};
@@ -36,6 +38,7 @@ char sem_prec_avail_name[128] = {0};
 char sem_prec_read_name[128] = {0};
 char sem_chunk_done_name[128] = {0};
 char sem_shutdown_done_name[128] = {0};
+char sem_input_avail_name[128] = {0};
 char file_lock_name[128] = {0};
 char log_name[128] = {0};
 bool call_chunk_done = false;
@@ -58,8 +61,6 @@ uint64_t duration;
 
 // Input shared memory
 int shmem_input_fd = -1;
-uint64_t shmem_input_size = 0;
-void * shmem_input_address = NULL;
 
 // Output trace shared memory
 int shmem_output_fd = -1;
@@ -70,9 +71,6 @@ int shmem_mt_fd = -1;
 // Chunk done semaphore: notifies the caller when a new chunk has been processed
 sem_t * sem_chunk_done = NULL;
 
-// Shutdown done semaphore: notifies the caller when a shutdown has been processed
-sem_t * sem_shutdown_done = NULL;
-
 /**************************/
 /* PRECOMPILE AND CONTROL */
 /**************************/
@@ -81,23 +79,26 @@ uint64_t * precompile_results_address = NULL;
 
 // Precompile results shared memory
 int shmem_precompile_fd = -1;
-uint64_t shmem_precompile_size = 0;
 void * shmem_precompile_address = NULL;
 
 // Precompile results semaphores
 sem_t * sem_prec_avail = NULL;
 sem_t * sem_prec_read = NULL;
+sem_t * sem_input_avail = NULL;
 
 // Control input shared memory
 int shmem_control_input_fd = -1;
 uint64_t * shmem_control_input_address = NULL;
 volatile uint64_t * precompile_written_address = NULL;
 volatile uint64_t * precompile_exit_address = NULL;
+volatile uint64_t * input_written_address = NULL;
 
 // Control output shared memory
 int shmem_control_output_fd = -1;
 uint64_t * shmem_control_output_address = NULL;
 volatile uint64_t * precompile_read_address = NULL;
+volatile uint64_t * waiting_for_precompile_address = NULL;
+volatile uint64_t * waiting_for_input_address = NULL;
 
 /**************/
 /* TRACE SIZE */
@@ -114,7 +115,8 @@ uint64_t assembly_duration;
 
 // Counters used in functions called from assembly code
 uint64_t realloc_counter = 0;
-uint64_t wait_counter = 0;
+uint64_t wait_prec_avail_counter = 0;
+uint64_t wait_input_avail_counter = 0;
 uint64_t print_pc_counter = 0;
 
 // Chunk player globals
@@ -133,4 +135,3 @@ uint64_t * pOutputTrace = (uint64_t *)TRACE_ADDR; // Used for trace generation, 
 /**************/
 
 uint64_t chunk_size = CHUNK_SIZE;
-uint64_t chunk_size_mask = CHUNK_SIZE - 1;

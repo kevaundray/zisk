@@ -30,6 +30,8 @@ extern bool do_shutdown; // If true, the client will perform a shutdown request 
 extern uint64_t number_of_mt_requests; // Loop to send this number of minimal trace requests
 extern uint16_t port; // Service TCP port
 extern uint64_t chunk_player_address; // Chunk player address, used for generation methods that use the chunk player, i.e. gen_method=8 or gen_method=10
+extern bool wait_flag; // If true, the shmem will get a flag set to 1 if we are waiting for a semaphore, and set it back to 0 when we are not waiting anymore. This can be used for debugging purposes to know if the assembly code is waiting for a semaphore or not.
+
 extern char precompile_file_name[4096]; // Precompile results file name (used by client)
 extern char shmem_control_input_name[128];
 extern char shmem_control_output_name[128];
@@ -41,6 +43,7 @@ extern char sem_prec_avail_name[128];
 extern char sem_prec_read_name[128];
 extern char sem_chunk_done_name[128];
 extern char sem_shutdown_done_name[128];
+extern char sem_input_avail_name[128];
 extern char file_lock_name[128];
 extern char log_name[128];
 extern bool call_chunk_done;
@@ -87,8 +90,6 @@ extern uint64_t duration;
 
 // Input shared memory
 extern int shmem_input_fd;
-extern uint64_t shmem_input_size;
-extern void * shmem_input_address;
 
 // Output trace shared memory
 extern int shmem_output_fd;
@@ -99,9 +100,6 @@ extern int shmem_mt_fd;
 // Chunk done semaphore: notifies the caller when a new chunk has been processed
 extern sem_t * sem_chunk_done;
 
-// Shutdown done semaphore: notifies the caller when a shutdown has been processed
-extern sem_t * sem_shutdown_done;
-
 /**************************/
 /* PRECOMPILE AND CONTROL */
 /**************************/
@@ -110,23 +108,26 @@ extern uint64_t * precompile_results_address;
 
 // Precompile results shared memory
 extern int shmem_precompile_fd;
-extern uint64_t shmem_precompile_size;
 extern void * shmem_precompile_address;
 
 // Precompile results semaphores
 extern sem_t * sem_prec_avail;
 extern sem_t * sem_prec_read;
+extern sem_t * sem_input_avail;
 
 // Control input shared memory
 extern int shmem_control_input_fd;
 extern uint64_t * shmem_control_input_address;
 extern volatile uint64_t * precompile_written_address;
 extern volatile uint64_t * precompile_exit_address;
+extern volatile uint64_t * input_written_address;
 
 // Control output shared memory
 extern int shmem_control_output_fd;
 extern uint64_t * shmem_control_output_address;
 extern volatile uint64_t * precompile_read_address;
+extern volatile uint64_t * waiting_for_precompile_address;
+extern volatile uint64_t * waiting_for_input_address;
 
 /**************/
 /* TRACE SIZE */
@@ -143,7 +144,8 @@ extern uint64_t assembly_duration;
 
 // Counters used in functions called from assembly code
 extern uint64_t realloc_counter;
-extern uint64_t wait_counter;
+extern uint64_t wait_prec_avail_counter;
+extern uint64_t wait_input_avail_counter;
 extern uint64_t print_pc_counter;
 
 // Chunk player globals
@@ -162,6 +164,5 @@ extern uint64_t * pOutputTrace; // Used for trace generation, i.e. assembly code
 /**************/
 
 extern uint64_t chunk_size;
-extern uint64_t chunk_size_mask;
 
 #endif // EMULATOR_ASM_GLOBALS_HPP

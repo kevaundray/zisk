@@ -90,7 +90,6 @@ void set_chunk_size (uint64_t new_chunk_size)
         exit(-1);
     }
     chunk_size = new_chunk_size;
-    chunk_size_mask = chunk_size - 1;
     trace_address_threshold = TRACE_ADDR + trace_size - MAX_CHUNK_TRACE_SIZE;
 }
 
