@@ -1,6 +1,6 @@
 //! Operations on the twist E': y² = x³ + 4·(1+u) of the BLS12-381 curve
 
-use crate::zisklib::{eq, fcall_msb_pos_256, lt};
+use crate::zisklib::{eq, fcall_msb_pos_256, is_zero, lt};
 
 use super::{
     constants::{
@@ -18,13 +18,15 @@ use super::{
 /// G2 add result codes
 pub const G2_ADD_SUCCESS: u8 = 0;
 pub const G2_ADD_SUCCESS_INFINITY: u8 = 1;
-pub const G2_ADD_ERR_NOT_ON_CURVE: u8 = 2;
+pub const G1_ADD_ERR_NOT_IN_FIELD: u8 = 2;
+pub const G2_ADD_ERR_NOT_ON_CURVE: u8 = 3;
 
 /// G2 MSM result codes
 pub const G2_MSM_SUCCESS: u8 = 0;
 pub const G2_MSM_SUCCESS_INFINITY: u8 = 1;
-pub const G2_MSM_ERR_NOT_ON_CURVE: u8 = 2;
-pub const G2_MSM_ERR_NOT_IN_SUBGROUP: u8 = 3;
+pub const G2_MSM_ERR_NOT_IN_FIELD: u8 = 2;
+pub const G2_MSM_ERR_NOT_ON_CURVE: u8 = 3;
+pub const G2_MSM_ERR_NOT_IN_SUBGROUP: u8 = 4;
 
 /// Decompresses a G2 point on the BLS12-381 twist from 96 bytes (compressed format).
 ///
@@ -478,7 +480,14 @@ pub fn add_complete_twist_bls12_381(
     }
 
     if p1_is_inf {
-        // Validate p2 is on curve
+        // Validate p2 field elements and curve membership
+        let x2_0: [u64; 6] = p2[0..6].try_into().unwrap();
+        let x2_1: [u64; 6] = p2[6..12].try_into().unwrap();
+        let y2_0: [u64; 6] = p2[12..18].try_into().unwrap();
+        let y2_1: [u64; 6] = p2[18..24].try_into().unwrap();
+        if !lt(&x2_0, &P) || !lt(&x2_1, &P) || !lt(&y2_0, &P) || !lt(&y2_1, &P) {
+            return Err(G1_ADD_ERR_NOT_IN_FIELD);
+        }
         if !is_on_curve_twist_bls12_381(
             p2,
             #[cfg(feature = "hints")]
@@ -490,7 +499,14 @@ pub fn add_complete_twist_bls12_381(
     }
 
     if p2_is_inf {
-        // Validate p1 is on curve
+        // Validate p1 field elements and curve membership
+        let x1_0: [u64; 6] = p1[0..6].try_into().unwrap();
+        let x1_1: [u64; 6] = p1[6..12].try_into().unwrap();
+        let y1_0: [u64; 6] = p1[12..18].try_into().unwrap();
+        let y1_1: [u64; 6] = p1[18..24].try_into().unwrap();
+        if !lt(&x1_0, &P) || !lt(&x1_1, &P) || !lt(&y1_0, &P) || !lt(&y1_1, &P) {
+            return Err(G1_ADD_ERR_NOT_IN_FIELD);
+        }
         if !is_on_curve_twist_bls12_381(
             p1,
             #[cfg(feature = "hints")]
@@ -501,13 +517,28 @@ pub fn add_complete_twist_bls12_381(
         return Ok(*p1);
     }
 
-    // Both points are non-identity, validate both are on curve
+    // Both points are non-identity, validate both
+    let x1_0: [u64; 6] = p1[0..6].try_into().unwrap();
+    let x1_1: [u64; 6] = p1[6..12].try_into().unwrap();
+    let y1_0: [u64; 6] = p1[12..18].try_into().unwrap();
+    let y1_1: [u64; 6] = p1[18..24].try_into().unwrap();
+    if !lt(&x1_0, &P) || !lt(&x1_1, &P) || !lt(&y1_0, &P) || !lt(&y1_1, &P) {
+        return Err(G1_ADD_ERR_NOT_IN_FIELD);
+    }
     if !is_on_curve_twist_bls12_381(
         p1,
         #[cfg(feature = "hints")]
         hints,
     ) {
         return Err(G2_ADD_ERR_NOT_ON_CURVE);
+    }
+
+    let x2_0: [u64; 6] = p2[0..6].try_into().unwrap();
+    let x2_1: [u64; 6] = p2[6..12].try_into().unwrap();
+    let y2_0: [u64; 6] = p2[12..18].try_into().unwrap();
+    let y2_1: [u64; 6] = p2[18..24].try_into().unwrap();
+    if !lt(&x2_0, &P) || !lt(&x2_1, &P) || !lt(&y2_0, &P) || !lt(&y2_1, &P) {
+        return Err(G1_ADD_ERR_NOT_IN_FIELD);
     }
     if !is_on_curve_twist_bls12_381(
         p2,
@@ -843,14 +874,23 @@ pub fn msm_complete_twist_bls12_381(
             continue;
         }
 
-        // Skip zero scalars
-        if reduce_fr_bls12_381(
+        // Reduce the scalar modulo the group order, and skip if the result is zero
+        let scalar = reduce_fr_bls12_381(
             scalar,
             #[cfg(feature = "hints")]
             hints,
-        ) == [0, 0, 0, 0]
-        {
+        );
+        if is_zero(&scalar) {
             continue;
+        }
+
+        // Verify point coordinates are in the field
+        let x_0: [u64; 6] = point[0..6].try_into().unwrap();
+        let x_1: [u64; 6] = point[6..12].try_into().unwrap();
+        let y_0: [u64; 6] = point[12..18].try_into().unwrap();
+        let y_1: [u64; 6] = point[18..24].try_into().unwrap();
+        if !lt(&x_0, &P) || !lt(&x_1, &P) || !lt(&y_0, &P) || !lt(&y_1, &P) {
+            return Err(G2_MSM_ERR_NOT_IN_FIELD);
         }
 
         // Verify point is on curve
@@ -874,7 +914,7 @@ pub fn msm_complete_twist_bls12_381(
         // Compute P * k
         let product = scalar_mul_twist_bls12_381(
             point,
-            scalar,
+            &scalar,
             #[cfg(feature = "hints")]
             hints,
         );

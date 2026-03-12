@@ -1,9 +1,9 @@
 //! Pairing over BLS12-381 curve
 
-use crate::zisklib::lib::utils::{eq, gt, is_one};
+use crate::zisklib::lib::utils::{eq, gt, is_one, lt};
 
 use super::{
-    constants::{G1_IDENTITY, G2_IDENTITY, P_MINUS_ONE},
+    constants::{G1_IDENTITY, G2_IDENTITY, P, P_MINUS_ONE},
     curve::{
         g1_bytes_be_to_u64_le_bls12_381, is_on_curve_bls12_381, is_on_subgroup_bls12_381,
         neg_bls12_381,
@@ -19,10 +19,12 @@ use super::{
 /// Pairing check result codes
 const PAIRING_CHECK_SUCCESS: u8 = 0;
 const PAIRING_CHECK_FAILED: u8 = 1;
-const PAIRING_CHECK_ERR_G1_NOT_ON_CURVE: u8 = 2;
-const PAIRING_CHECK_ERR_G1_NOT_IN_SUBGROUP: u8 = 3;
-const PAIRING_CHECK_ERR_G2_NOT_ON_CURVE: u8 = 4;
-const PAIRING_CHECK_ERR_G2_NOT_IN_SUBGROUP: u8 = 5;
+const PAIRING_CHECK_ERR_G1_NOT_IN_FIELD: u8 = 2;
+const PAIRING_CHECK_ERR_G1_NOT_ON_CURVE: u8 = 3;
+const PAIRING_CHECK_ERR_G1_NOT_IN_SUBGROUP: u8 = 4;
+const PAIRING_CHECK_ERR_G2_NOT_IN_FIELD: u8 = 5;
+const PAIRING_CHECK_ERR_G2_NOT_ON_CURVE: u8 = 6;
+const PAIRING_CHECK_ERR_G2_NOT_IN_SUBGROUP: u8 = 7;
 
 /// Optimal Ate Pairing e: G1 x G2 -> GT over the BLS12-381 curve
 /// where G1 = E(Fp)[r] = E(Fp), G2 = E'(Fp2)[r] and GT = μ_r (the r-th roots of unity over Fp12*)
@@ -127,28 +129,46 @@ pub fn pairing_check_bls12_381(
         let g1_is_inf = eq(g1, &G1_IDENTITY);
         let g2_is_inf = eq(g2, &G2_IDENTITY);
 
-        // If p = 𝒪 or q = 𝒪 => MillerLoop(P, 𝒪) = MillerLoop(𝒪, Q) = 1; we can skip
+        if g1_is_inf && g2_is_inf {
+            // If p = 𝒪 and q = 𝒪 => e(𝒪, 𝒪) = 1; we can skip
+            continue;
+        }
+
+        // If q = 𝒪 => MillerLoop(P, 𝒪) = 1; we can skip
         if g2_is_inf {
-            if !g1_is_inf {
-                if !is_on_curve_bls12_381(
-                    g1,
-                    #[cfg(feature = "hints")]
-                    hints,
-                ) {
-                    return Err(PAIRING_CHECK_ERR_G1_NOT_ON_CURVE);
-                }
-                if !is_on_subgroup_bls12_381(
-                    g1,
-                    #[cfg(feature = "hints")]
-                    hints,
-                ) {
-                    return Err(PAIRING_CHECK_ERR_G1_NOT_IN_SUBGROUP);
-                }
+            // Validate p1 field elements and curve membership
+            let x1: [u64; 6] = g1[0..6].try_into().unwrap();
+            let y1: [u64; 6] = g1[6..12].try_into().unwrap();
+            if !lt(&x1, &P) || !lt(&y1, &P) {
+                return Err(PAIRING_CHECK_ERR_G1_NOT_IN_FIELD);
+            }
+            if !is_on_curve_bls12_381(
+                g1,
+                #[cfg(feature = "hints")]
+                hints,
+            ) {
+                return Err(PAIRING_CHECK_ERR_G1_NOT_ON_CURVE);
+            }
+            if !is_on_subgroup_bls12_381(
+                g1,
+                #[cfg(feature = "hints")]
+                hints,
+            ) {
+                return Err(PAIRING_CHECK_ERR_G1_NOT_IN_SUBGROUP);
             }
             continue;
         }
 
+        // If p = 𝒪 => MillerLoop(𝒪, Q) = 1; we can skip
         if g1_is_inf {
+            // Validate p2 field elements and curve membership
+            let x2_0: [u64; 6] = g2[0..6].try_into().unwrap();
+            let x2_1: [u64; 6] = g2[6..12].try_into().unwrap();
+            let y2_0: [u64; 6] = g2[12..18].try_into().unwrap();
+            let y2_1: [u64; 6] = g2[18..24].try_into().unwrap();
+            if !lt(&x2_0, &P) || !lt(&x2_1, &P) || !lt(&y2_0, &P) || !lt(&y2_1, &P) {
+                return Err(PAIRING_CHECK_ERR_G2_NOT_IN_FIELD);
+            }
             if !is_on_curve_twist_bls12_381(
                 g2,
                 #[cfg(feature = "hints")]
@@ -166,6 +186,12 @@ pub fn pairing_check_bls12_381(
             continue;
         }
 
+        // Both points are non-identity, validate both
+        let x1: [u64; 6] = g1[0..6].try_into().unwrap();
+        let y1: [u64; 6] = g1[6..12].try_into().unwrap();
+        if !lt(&x1, &P) || !lt(&y1, &P) {
+            return Err(PAIRING_CHECK_ERR_G1_NOT_IN_FIELD);
+        }
         if !is_on_curve_bls12_381(
             g1,
             #[cfg(feature = "hints")]
@@ -181,6 +207,13 @@ pub fn pairing_check_bls12_381(
             return Err(PAIRING_CHECK_ERR_G1_NOT_IN_SUBGROUP);
         }
 
+        let x2_0: [u64; 6] = g2[0..6].try_into().unwrap();
+        let x2_1: [u64; 6] = g2[6..12].try_into().unwrap();
+        let y2_0: [u64; 6] = g2[12..18].try_into().unwrap();
+        let y2_1: [u64; 6] = g2[18..24].try_into().unwrap();
+        if !lt(&x2_0, &P) || !lt(&x2_1, &P) || !lt(&y2_0, &P) || !lt(&y2_1, &P) {
+            return Err(PAIRING_CHECK_ERR_G2_NOT_IN_FIELD);
+        }
         if !is_on_curve_twist_bls12_381(
             g2,
             #[cfg(feature = "hints")]
