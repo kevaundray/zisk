@@ -20,13 +20,13 @@ impl InputsShmemWriter {
         );
     }
 
-    pub fn write_input(&self, inputs: &[u8]) -> Result<()> {
+    pub fn write_input(&self, _inputs: &[u8]) -> Result<()> {
         unreachable!(
             "InputsShmemWriter::write_input() is not supported on this platform. Only Linux x86_64 is supported."
         );
     }
 
-    pub fn append_input(&self, inputs: &[u8]) -> Result<()> {
+    pub fn append_input(&self, _inputs: &[u8]) -> Result<()> {
         unreachable!(
             "InputsShmemWriter::append_input() is not supported on this platform. Only Linux x86_64 is supported."
         );
@@ -40,7 +40,7 @@ impl InputsShmemWriter {
 }
 
 impl StreamSink for InputsShmemWriter {
-    fn submit(&self, hints: &[u64]) -> anyhow::Result<()> {
+    fn submit(&self, _hints: &[u64]) -> anyhow::Result<()> {
         unreachable!(
             "InputsShmemWriter::submit() is not supported on this platform. Only Linux x86_64 is supported."
         );
