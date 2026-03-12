@@ -1,6 +1,6 @@
 //! Pairing over BLS12-381 curve
 
-use crate::zisklib::lib::utils::{eq, gt, is_one, lt};
+use crate::zisklib::lib::utils::{eq, is_one, lt};
 
 use super::{
     constants::{G1_IDENTITY, G2_IDENTITY, P, P_MINUS_ONE},
@@ -258,12 +258,14 @@ pub fn pairing_check_bls12_381(
 /// `pairs` must point to an array of `num_pairs * 288` bytes
 ///
 /// # Returns
-/// - 0 = pairing check passed
-/// - 1 = pairing check failed
-/// - 2 = error: G1 point not on curve
-/// - 3 = error: G1 point not in subgroup
-/// - 4 = error: G2 point not on curve
-/// - 5 = error: G2 point not in subgroup
+/// - [PAIRING_CHECK_SUCCESS] = pairing check passed
+/// - [PAIRING_CHECK_FAILED] = pairing check failed
+/// - [PAIRING_CHECK_ERR_G1_NOT_IN_FIELD] = error (at least one G1 point coordinate not in field)
+/// - [PAIRING_CHECK_ERR_G1_NOT_ON_CURVE] = error (at least one G1 point not on curve)
+/// - [PAIRING_CHECK_ERR_G1_NOT_IN_SUBGROUP] = error (at least one G1 point not in subgroup)
+/// - [PAIRING_CHECK_ERR_G2_NOT_IN_FIELD] = error (at least one G2 point coordinate not in field)
+/// - [PAIRING_CHECK_ERR_G2_NOT_ON_CURVE] = error (at least one G2 point not on curve)
+/// - [PAIRING_CHECK_ERR_G2_NOT_IN_SUBGROUP] = error (at least one G2 point not in subgroup)
 #[cfg_attr(not(feature = "hints"), no_mangle)]
 #[cfg_attr(feature = "hints", export_name = "hints_bls12_381_pairing_check_c")]
 pub unsafe extern "C" fn bls12_381_pairing_check_c(

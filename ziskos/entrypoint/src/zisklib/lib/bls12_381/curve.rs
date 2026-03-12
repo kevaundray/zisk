@@ -704,9 +704,10 @@ pub fn sigma_endomorphism_bls12_381(
 /// - `ret` must point to a valid `[u8; 96]` for the output
 ///
 /// Returns:
-/// - 0 = success (regular point)
-/// - 1 = success (point at infinity)
-/// - 2 = error (point not on curve)
+/// - [G1_ADD_SUCCESS] = success (result is valid and not infinity)
+/// - [G1_ADD_SUCCESS_INFINITY] = success (result is infinity)
+/// - [G1_ADD_ERR_NOT_IN_FIELD] = error (one of the input points has coordinates not in the field)
+/// - [G1_ADD_ERR_NOT_ON_CURVE] = error (one of the input points is not on the curve)
 #[cfg_attr(not(feature = "hints"), no_mangle)]
 #[cfg_attr(feature = "hints", export_name = "hints_bls12_381_g1_add_c")]
 pub unsafe extern "C" fn bls12_381_g1_add_c(
@@ -753,10 +754,11 @@ pub unsafe extern "C" fn bls12_381_g1_add_c(
 /// - `ret` must point to a valid `[u8; 96]` for the output
 ///
 /// Returns:
-/// - 0 = success (regular point)
-/// - 1 = success (point at infinity)
-/// - 2 = error (point not on curve)
-/// - 3 = error (point not in subgroup)
+/// - [G1_MSM_SUCCESS] = success (result is valid and not infinity)
+/// - [G1_MSM_SUCCESS_INFINITY] = success (result is infinity)
+/// - [G1_MSM_ERR_NOT_IN_FIELD] = error (one of the input points has coordinates not in the field)
+/// - [G1_MSM_ERR_NOT_ON_CURVE] = error (one of the input points is not on the curve)
+/// - [G1_MSM_ERR_NOT_IN_SUBGROUP] = error (one of the input points is not in the subgroup)
 #[cfg_attr(not(feature = "hints"), no_mangle)]
 #[cfg_attr(feature = "hints", export_name = "hints_bls12_381_g1_msm_c")]
 pub unsafe extern "C" fn bls12_381_g1_msm_c(

@@ -18,7 +18,7 @@ use super::{
 /// G2 add result codes
 pub const G2_ADD_SUCCESS: u8 = 0;
 pub const G2_ADD_SUCCESS_INFINITY: u8 = 1;
-pub const G1_ADD_ERR_NOT_IN_FIELD: u8 = 2;
+pub const G2_ADD_ERR_NOT_IN_FIELD: u8 = 2;
 pub const G2_ADD_ERR_NOT_ON_CURVE: u8 = 3;
 
 /// G2 MSM result codes
@@ -486,7 +486,7 @@ pub fn add_complete_twist_bls12_381(
         let y2_0: [u64; 6] = p2[12..18].try_into().unwrap();
         let y2_1: [u64; 6] = p2[18..24].try_into().unwrap();
         if !lt(&x2_0, &P) || !lt(&x2_1, &P) || !lt(&y2_0, &P) || !lt(&y2_1, &P) {
-            return Err(G1_ADD_ERR_NOT_IN_FIELD);
+            return Err(G2_ADD_ERR_NOT_IN_FIELD);
         }
         if !is_on_curve_twist_bls12_381(
             p2,
@@ -505,7 +505,7 @@ pub fn add_complete_twist_bls12_381(
         let y1_0: [u64; 6] = p1[12..18].try_into().unwrap();
         let y1_1: [u64; 6] = p1[18..24].try_into().unwrap();
         if !lt(&x1_0, &P) || !lt(&x1_1, &P) || !lt(&y1_0, &P) || !lt(&y1_1, &P) {
-            return Err(G1_ADD_ERR_NOT_IN_FIELD);
+            return Err(G2_ADD_ERR_NOT_IN_FIELD);
         }
         if !is_on_curve_twist_bls12_381(
             p1,
@@ -523,7 +523,7 @@ pub fn add_complete_twist_bls12_381(
     let y1_0: [u64; 6] = p1[12..18].try_into().unwrap();
     let y1_1: [u64; 6] = p1[18..24].try_into().unwrap();
     if !lt(&x1_0, &P) || !lt(&x1_1, &P) || !lt(&y1_0, &P) || !lt(&y1_1, &P) {
-        return Err(G1_ADD_ERR_NOT_IN_FIELD);
+        return Err(G2_ADD_ERR_NOT_IN_FIELD);
     }
     if !is_on_curve_twist_bls12_381(
         p1,
@@ -538,7 +538,7 @@ pub fn add_complete_twist_bls12_381(
     let y2_0: [u64; 6] = p2[12..18].try_into().unwrap();
     let y2_1: [u64; 6] = p2[18..24].try_into().unwrap();
     if !lt(&x2_0, &P) || !lt(&x2_1, &P) || !lt(&y2_0, &P) || !lt(&y2_1, &P) {
-        return Err(G1_ADD_ERR_NOT_IN_FIELD);
+        return Err(G2_ADD_ERR_NOT_IN_FIELD);
     }
     if !is_on_curve_twist_bls12_381(
         p2,
@@ -1026,9 +1026,10 @@ pub fn utf_endomorphism_twist_bls12_381(
 /// - `ret` must point to a valid `[u8; 192]` for the output
 ///
 /// Returns:
-/// - 0 = success (regular point)
-/// - 1 = success (point at infinity)
-/// - 2 = error (point not on curve)
+/// - [G2_ADD_SUCCESS] = success (regular point)
+/// - [G2_ADD_SUCCESS_INFINITY] = success (point at infinity)
+/// - [G2_ADD_ERR_NOT_IN_FIELD] = error (at least one point coordinate not in field)
+/// - [G2_ADD_ERR_NOT_ON_CURVE] = error (at least one point not on curve)
 #[cfg_attr(not(feature = "hints"), no_mangle)]
 #[cfg_attr(feature = "hints", export_name = "hints_bls12_381_g2_add_c")]
 pub unsafe extern "C" fn bls12_381_g2_add_c(
@@ -1075,10 +1076,11 @@ pub unsafe extern "C" fn bls12_381_g2_add_c(
 /// - `ret` must point to a valid `[u8; 192]` for the output
 ///
 /// Returns:
-/// - 0 = success (regular point)
-/// - 1 = success (point at infinity)
-/// - 2 = error (point not on curve)
-/// - 3 = error (point not in subgroup)
+/// - [G2_MSM_SUCCESS] = success (regular point)
+/// - [G2_MSM_SUCCESS_INFINITY] = success (point at infinity)
+/// - [G2_MSM_ERR_NOT_IN_FIELD] = error (at least one point coordinate not in field)
+/// - [G2_MSM_ERR_NOT_ON_CURVE] = error (at least one point not on curve)
+/// - [G2_MSM_ERR_NOT_IN_SUBGROUP] = error (at least one point not in subgroup)
 #[cfg_attr(not(feature = "hints"), no_mangle)]
 #[cfg_attr(feature = "hints", export_name = "hints_bls12_381_g2_msm_c")]
 pub unsafe extern "C" fn bls12_381_g2_msm_c(
