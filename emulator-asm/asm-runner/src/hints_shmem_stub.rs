@@ -1,3 +1,4 @@
+use crate::{AsmService, ControlShmem};
 use anyhow::Result;
 use zisk_common::io::StreamSink;
 
@@ -9,9 +10,17 @@ impl HintsShmem {
         _base_port: Option<u16>,
         _local_rank: i32,
         _unlock_mapped_memory: bool,
+        _control_writer: Arc<ControlShmem>,
+        _active_services: &[AsmService],
     ) -> Result<Self> {
         unreachable!(
             "HintsShmem::new() is not supported on this platform. Only Linux x86_64 is supported."
+        );
+    }
+
+    pub fn set_active_services(&self, _active_services: &[AsmService]) {
+        unreachable!(
+            "HintsShmem::set_active_services() is not supported on this platform. Only Linux x86_64 is supported."
         );
     }
 }
