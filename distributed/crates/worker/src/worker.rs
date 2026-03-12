@@ -1,6 +1,5 @@
 use anyhow::Result;
 use cargo_zisk::commands::get_proving_key;
-use precompiles_hints::HintsProcessor;
 use proofman::{AggProofs, AggProofsRegister, ContributionsInfo};
 use rom_setup::{get_elf_data_hash, DEFAULT_CACHE_PATH};
 use std::fs;
@@ -80,6 +79,9 @@ pub struct ProverConfig {
 
     /// Flag to unlock mapped memory
     pub unlock_mapped_memory: bool,
+
+    /// Flag to redirect ASM emulator output to file
+    pub asm_out_file: bool,
 
     /// Flag to verify constraints
     pub verify_constraints: bool,
@@ -212,6 +214,7 @@ impl ProverConfig {
             debug_info,
             asm_port: prover_service_config.asm_port,
             unlock_mapped_memory: prover_service_config.unlock_mapped_memory,
+            asm_out_file: prover_service_config.asm_out_file,
             verify_constraints: prover_service_config.verify_constraints,
             aggregation: prover_service_config.aggregation,
             gpu_params,
@@ -301,6 +304,7 @@ impl<T: ZiskBackend + 'static> Worker<T> {
                 .asm_path_opt(prover_config.asm.clone())
                 .base_port_opt(prover_config.asm_port)
                 .unlock_mapped_memory(prover_config.unlock_mapped_memory)
+                .asm_out_file(prover_config.asm_out_file)
                 .gpu(prover_config.gpu_params.clone())
                 .is_distributed(true)
                 .build()?,
@@ -632,23 +636,16 @@ impl<T: ZiskBackend + 'static> Worker<T> {
 
                 self.pk.reset();
 
-                let processor_trait = self.pk.get_hints_processor().ok_or_else(|| {
+                let processor = self.pk.get_hints_processor().ok_or_else(|| {
                     anyhow::anyhow!("HintsProcessor not found for job {}", job_id)
                 })?;
 
-                // Downcast Arc<dyn StreamProcessor> to Arc<HintsProcessor>
-                let hints_processor =
-                    processor_trait.as_any().downcast::<HintsProcessor>().map_err(|_| {
-                        anyhow::anyhow!(
-                            "Failed to downcast StreamProcessor to HintsProcessor for job {}",
-                            job_id
-                        )
-                    })?;
-
-                hints_processor.set_has_rom_sm(is_first_partition);
+                if let Some(r) = self.pk.asm_resources.as_ref() {
+                    r.set_active_services(is_first_partition)?;
+                }
 
                 // Replace any existing actor (handles reconnect / job restart)
-                self.stream_actor = Some(StreamOrderingActor::new(hints_processor, job_id));
+                self.stream_actor = Some(StreamOrderingActor::new(processor, job_id));
             }
             StreamMessageKind::Data | StreamMessageKind::End => match &self.stream_actor {
                 Some(actor) => actor.send(stream_data)?,
@@ -853,17 +850,33 @@ impl<T: ZiskBackend + 'static> Worker<T> {
         let options = self.get_proof_options(false);
 
         if phase == JobPhase::ContributionsHintsStream {
-            if let Some(hints_sink) = pk.asm_resources.as_ref().and_then(|r| r.hints_sink.clone()) {
+            if let Some(r) = pk.asm_resources.as_ref() {
                 let message: StreamMessage = borsh::from_slice(&bytes[1..]).unwrap();
-                if let Err(e) = hints_sink.submit(&message.data) {
+                if let Err(e) = r.submit_hint_direct(&message.data) {
                     tracing::error!("Failed to submit hints: {}", e);
                 }
             } else {
                 tracing::error!("Hints sink is not configured for ContributionsHintsStream");
             }
+        } else if phase == JobPhase::ContributionsInputsStream {
+            if let Some(inputs_shmem_writer) =
+                pk.asm_resources.as_ref().map(|r| r.inputs_shmem_writer.clone())
+            {
+                let message: StreamMessage = borsh::from_slice(&bytes[1..]).unwrap();
+                let reinterpreted_data = unsafe {
+                    std::slice::from_raw_parts(
+                        message.data.as_ptr() as *const u8,
+                        message.data.len() * std::mem::size_of::<u64>(),
+                    )
+                };
+                if let Err(e) = inputs_shmem_writer.append_input(reinterpreted_data) {
+                    tracing::error!("Failed to submit inputs: {}", e);
+                }
+            } else {
+                tracing::error!("Inputs sink is not configured for ContributionsInputsStream");
+            }
         } else {
-            tokio::task::spawn_blocking(move || {
-                match phase {
+            tokio::task::spawn_blocking(move || match phase {
                 JobPhase::Contributions => {
                     let message: ContributionsMessage = borsh::from_slice(&bytes[1..]).unwrap();
 
@@ -879,9 +892,9 @@ impl<T: ZiskBackend + 'static> Worker<T> {
                     );
                     if let Err(e) = result {
                         tracing::error!(
-                            "Error during Contributions MPI broadcast execution: {}. Waiting for new job...",
-                            e
-                        );
+                                "Error during Contributions MPI broadcast execution: {}. Waiting for new job...",
+                                e
+                            );
                     }
                 }
                 JobPhase::Prove => {
@@ -895,16 +908,20 @@ impl<T: ZiskBackend + 'static> Worker<T> {
                     );
                     if let Err(e) = result {
                         error!(
-                        "Error during Prove MPI broadcast execution: {}. Waiting for new job...",
-                        e
-                    );
+                            "Error during Prove MPI broadcast execution: {}. Waiting for new job...",
+                            e
+                        );
                     }
                 }
+
                 JobPhase::Aggregate => {
                     unreachable!("Aggregate phase is not supported in MPI broadcast");
                 }
-                JobPhase::ContributionsHintsStream => unreachable!("ContributionsHintsStream is handled separately and should not reach this point"),
-            }
+                JobPhase::ContributionsHintsStream | JobPhase::ContributionsInputsStream => {
+                    unreachable!(
+                        "Stream phases should be handled separately and not reach this point"
+                    );
+                }
             });
         }
         Ok(())

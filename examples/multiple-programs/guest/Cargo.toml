@@ -1,5 +1,5 @@
 [package]
-name = "fibonacci-guest"
+name = "multiple-program-guest"
 version = "0.1.0"
 edition = "2021"
 

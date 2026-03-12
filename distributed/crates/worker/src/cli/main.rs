@@ -80,6 +80,11 @@ struct Cli {
     #[clap(long, conflicts_with = "emulator")]
     pub unlock_mapped_memory: bool,
 
+    /// Redirect ASM emulator output to file
+    /// This option is mutually exclusive with `--emulator`
+    #[clap(long, conflicts_with = "emulator", default_value_t = false)]
+    pub asm_out_file: bool,
+
     /// Verbosity (-v, -vv)
     #[arg(short ='v', long, action = clap::ArgAction::Count, help = "Increase verbosity level")]
     pub verbose: u8, // Using u8 to hold the number of `-v`
@@ -138,6 +143,7 @@ async fn main() -> Result<()> {
         proving_key: cli.proving_key.clone(),
         asm_port: cli.asm_port,
         unlock_mapped_memory: cli.unlock_mapped_memory,
+        asm_out_file: cli.asm_out_file,
         verbose: cli.verbose,
         debug: cli.debug.clone(),
         verify_constraints: cli.verify_constraints,

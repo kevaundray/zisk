@@ -424,6 +424,7 @@ pub enum JobPhase {
     Contributions,
     Prove,
     Aggregate,
+    ContributionsInputsStream,
     ContributionsHintsStream,
 }
 
@@ -435,7 +436,8 @@ impl TryFrom<u8> for JobPhase {
             0 => Ok(JobPhase::Contributions),
             1 => Ok(JobPhase::Prove),
             2 => Ok(JobPhase::Aggregate),
-            3 => Ok(JobPhase::ContributionsHintsStream),
+            3 => Ok(JobPhase::ContributionsInputsStream),
+            4 => Ok(JobPhase::ContributionsHintsStream),
             _ => Err(anyhow::anyhow!("Invalid JobPhase byte: {}", value)),
         }
     }
@@ -447,6 +449,7 @@ impl fmt::Display for JobPhase {
             JobPhase::Contributions => write!(f, "Contributions"),
             JobPhase::Prove => write!(f, "Prove"),
             JobPhase::Aggregate => write!(f, "Aggregate"),
+            JobPhase::ContributionsInputsStream => write!(f, "ContributionsInputsStream"),
             JobPhase::ContributionsHintsStream => write!(f, "ContributionsHintsStream"),
         }
     }

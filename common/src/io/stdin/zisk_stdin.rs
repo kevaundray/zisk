@@ -5,14 +5,13 @@ use std::path::Path;
 use std::sync::Arc;
 
 pub trait ZiskIO: Send + Sync {
+    fn read_raw_bytes(&self) -> Vec<u8>;
+
     /// Read a value from the buffer.
     fn read_bytes(&self) -> Vec<u8>;
 
     /// Read a slice of bytes from the buffer.
     fn read_slice(&self, slice: &mut [u8]);
-
-    /// Read bytes into the provided buffer.
-    fn read_into(&self, buffer: &mut [u8]);
 
     /// Read and deserialize a value from the buffer.
     fn read<T: DeserializeOwned>(&self) -> Result<T>;
@@ -22,6 +21,9 @@ pub trait ZiskIO: Send + Sync {
 
     /// Write a slice of bytes to the buffer.
     fn write_slice(&self, data: &[u8]);
+
+    /// Write proof
+    fn write_proof(&self, proof: &[u8]);
 
     fn save(&self, path: &Path) -> Result<()>;
 }
@@ -33,6 +35,14 @@ pub enum ZiskIOVariant {
 }
 
 impl ZiskIO for ZiskIOVariant {
+    fn read_raw_bytes(&self) -> Vec<u8> {
+        match self {
+            ZiskIOVariant::File(file_stdin) => file_stdin.read_raw_bytes(),
+            ZiskIOVariant::Null(null_stdin) => null_stdin.read_raw_bytes(),
+            ZiskIOVariant::Memory(memory_stdin) => memory_stdin.read_raw_bytes(),
+        }
+    }
+
     fn read_bytes(&self) -> Vec<u8> {
         match self {
             ZiskIOVariant::File(file_stdin) => file_stdin.read_bytes(),
@@ -46,14 +56,6 @@ impl ZiskIO for ZiskIOVariant {
             ZiskIOVariant::File(file_stdin) => file_stdin.read_slice(slice),
             ZiskIOVariant::Null(null_stdin) => null_stdin.read_slice(slice),
             ZiskIOVariant::Memory(memory_stdin) => memory_stdin.read_slice(slice),
-        }
-    }
-
-    fn read_into(&self, buffer: &mut [u8]) {
-        match self {
-            ZiskIOVariant::File(file_stdin) => file_stdin.read_into(buffer),
-            ZiskIOVariant::Null(null_stdin) => null_stdin.read_into(buffer),
-            ZiskIOVariant::Memory(memory_stdin) => memory_stdin.read_into(buffer),
         }
     }
 
@@ -81,6 +83,14 @@ impl ZiskIO for ZiskIOVariant {
         }
     }
 
+    fn write_proof(&self, proof: &[u8]) {
+        match self {
+            ZiskIOVariant::File(file_stdin) => file_stdin.write_proof(proof),
+            ZiskIOVariant::Null(null_stdin) => null_stdin.write_proof(proof),
+            ZiskIOVariant::Memory(memory_stdin) => memory_stdin.write_proof(proof),
+        }
+    }
+
     fn save(&self, path: &Path) -> Result<()> {
         match self {
             ZiskIOVariant::File(file_stdin) => file_stdin.save(path),
@@ -96,16 +106,16 @@ pub struct ZiskStdin {
 }
 
 impl ZiskIO for ZiskStdin {
+    fn read_raw_bytes(&self) -> Vec<u8> {
+        self.io.read_raw_bytes()
+    }
+
     fn read_bytes(&self) -> Vec<u8> {
         self.io.read_bytes()
     }
 
     fn read_slice(&self, slice: &mut [u8]) {
         self.io.read_slice(slice)
-    }
-
-    fn read_into(&self, buffer: &mut [u8]) {
-        self.io.read_into(buffer)
     }
 
     fn read<T: DeserializeOwned>(&self) -> Result<T> {
@@ -118,6 +128,10 @@ impl ZiskIO for ZiskStdin {
 
     fn write_slice(&self, data: &[u8]) {
         self.io.write_slice(data)
+    }
+
+    fn write_proof(&self, proof: &[u8]) {
+        self.io.write_proof(proof)
     }
 
     fn save(&self, path: &Path) -> Result<()> {
@@ -176,5 +190,48 @@ impl ZiskStdin {
             // No "://" found - fallback as a file path
             ZiskStdin::from_file(uri.as_str())
         }
+    }
+
+    // Inherent methods that delegate to ZiskIO trait
+    // This allows using these methods without importing the trait
+
+    /// Read raw bytes
+    pub fn read_raw_bytes(&self) -> Vec<u8> {
+        ZiskIO::read_raw_bytes(self)
+    }
+
+    /// Read a value from the buffer.
+    pub fn read_bytes(&self) -> Vec<u8> {
+        ZiskIO::read_bytes(self)
+    }
+
+    /// Read a slice of bytes from the buffer.
+    pub fn read_slice(&self, slice: &mut [u8]) {
+        ZiskIO::read_slice(self, slice)
+    }
+
+    /// Read and deserialize a value from the buffer.
+    pub fn read<T: DeserializeOwned>(&self) -> Result<T> {
+        ZiskIO::read(self)
+    }
+
+    /// Write a serialized value to the buffer.
+    pub fn write<T: Serialize>(&self, data: &T) {
+        ZiskIO::write(self, data)
+    }
+
+    /// Write a slice of bytes to the buffer.
+    pub fn write_slice(&self, data: &[u8]) {
+        ZiskIO::write_slice(self, data)
+    }
+
+    /// Write proof
+    pub fn write_proof(&self, proof: &[u8]) {
+        ZiskIO::write_proof(self, proof)
+    }
+
+    /// Save to file
+    pub fn save(&self, path: &Path) -> Result<()> {
+        ZiskIO::save(self, path)
     }
 }

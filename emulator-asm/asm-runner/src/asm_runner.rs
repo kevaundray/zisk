@@ -40,6 +40,7 @@ pub struct AsmRunnerOptions {
     pub local_rank: i32,
     pub base_port: Option<u16>,
     pub unlock_mapped_memory: bool,
+    pub asm_out_file: bool,
     pub share_input_shmem: bool,
     pub open_input_shmem: bool,
 }
@@ -63,6 +64,7 @@ impl AsmRunnerOptions {
             local_rank: 0,
             base_port: None,
             unlock_mapped_memory: false,
+            asm_out_file: false,
             share_input_shmem: false,
             open_input_shmem: false,
         }
@@ -118,6 +120,11 @@ impl AsmRunnerOptions {
         self
     }
 
+    pub fn with_asm_out_file(mut self, value: bool) -> Self {
+        self.asm_out_file = value;
+        self
+    }
+
     pub fn with_share_input_shmem(mut self, value: bool) -> Self {
         self.share_input_shmem = value;
         self
@@ -149,6 +156,10 @@ impl AsmRunnerOptions {
 
         if self.unlock_mapped_memory {
             command.arg("-u");
+        }
+
+        if self.asm_out_file {
+            command.arg("--redirect-output-to-file");
         }
 
         command.arg("--shm_prefix").arg(shm_prefix);

@@ -35,7 +35,6 @@ impl ZiskBackend for Asm {
 
 pub struct AsmProver {
     pub(crate) core_prover: AsmCoreProver,
-    pub n_setups: AtomicU64,
 }
 
 impl AsmProver {
@@ -50,6 +49,7 @@ impl AsmProver {
         shared_tables: bool,
         base_port: Option<u16>,
         unlock_mapped_memory: bool,
+        asm_out_file: bool,
         no_auto_setup: bool,
         gpu_params: ParamsGPU,
         is_distributed: bool,
@@ -65,19 +65,20 @@ impl AsmProver {
             shared_tables,
             base_port,
             unlock_mapped_memory,
+            asm_out_file,
             no_auto_setup,
             gpu_params,
             is_distributed,
             logging_config,
         )?;
 
-        Ok(Self { core_prover, n_setups: AtomicU64::new(0) })
+        Ok(Self { core_prover })
     }
 
     pub fn new_verifier(proving_key: PathBuf, proving_key_snark: PathBuf) -> Result<Self> {
         let core_prover = AsmCoreProver::new_verifier(proving_key, proving_key_snark)?;
 
-        Ok(Self { core_prover, n_setups: AtomicU64::new(0) })
+        Ok(Self { core_prover })
     }
 }
 
@@ -113,14 +114,15 @@ impl ProverEngine for AsmProver {
         let world_rank = self.core_prover.rank_info.world_rank;
         let local_rank = self.core_prover.rank_info.local_rank;
         let n_processes = self.core_prover.rank_info.n_processes;
-        let is_distributed = self.core_prover.is_distributed;
-        let unlock_mapped_memory = self.core_prover.unlock_mapped_memory;
-        let verbose_mode = self.core_prover.verbose;
+        let is_distributed = self.core_prover.asm_info.is_distributed;
+        let unlock_mapped_memory = self.core_prover.asm_info.unlock_mapped_memory;
+        let asm_out_file = self.core_prover.asm_info.asm_out_file;
+        let verbose_mode = self.core_prover.asm_info.verbose;
         let rank_info = self.core_prover.rank_info.clone();
         let base_port = Some(AsmServices::port_base_offset(
-            self.core_prover.base_port,
+            self.core_prover.asm_info.base_port,
             n_processes,
-            self.n_setups.load(Ordering::SeqCst),
+            self.core_prover.asm_info.n_setups.load(Ordering::SeqCst),
         ));
 
         let rv2zk = Riscv2zisk::new(elf.elf());
@@ -139,7 +141,7 @@ impl ProverEngine for AsmProver {
         let asm_rh_path = default_cache_path.join(asm_rh_filename);
 
         if check_paths_exist(&asm_mt_path).is_err() || check_paths_exist(&asm_rh_path).is_err() {
-            if self.core_prover.no_auto_setup {
+            if self.core_prover.asm_info.no_auto_setup {
                 return Err(anyhow::anyhow!(
                         "Assembly files not found for ELF {}. Force ROM setup is enabled, but assembly files are still missing. Please ensure that the assembly generation process has been completed successfully.",
                         elf.name()
@@ -158,7 +160,7 @@ impl ProverEngine for AsmProver {
                     elf.name(),
                     &output_path,
                     elf.with_hints(),
-                    self.core_prover.verbose != VerboseMode::Info,
+                    self.core_prover.asm_info.verbose != VerboseMode::Info,
                 )?;
                 timer_stop_and_log_info!(ROM_SETUP);
                 tracing::info!("<<< ROM SETUP complete - Assembly files cached for future use");
@@ -177,7 +179,8 @@ impl ProverEngine for AsmProver {
             .with_local_rank(local_rank)
             .with_verbose(verbose_mode == VerboseMode::Debug)
             .with_metrics(verbose_mode == VerboseMode::Debug)
-            .with_unlock_mapped_memory(unlock_mapped_memory);
+            .with_unlock_mapped_memory(unlock_mapped_memory)
+            .with_asm_out_file(asm_out_file);
 
         asm_services.start_asm_services(&asm_mt_path, asm_runner_options)?;
         timer_stop_and_log_info!(STARTING_ASM_MICROSERVICES);
@@ -190,6 +193,8 @@ impl ProverEngine for AsmProver {
             }) as Arc<dyn Fn(&mut Vec<u8>) -> Result<()> + Send + Sync>
         });
 
+        let init_rom = !is_distributed && world_rank == 0;
+
         let asm_resources = AsmResources::new(
             local_rank,
             base_port,
@@ -197,9 +202,10 @@ impl ProverEngine for AsmProver {
             verbose_mode,
             elf.with_hints(),
             mpi_broadcast_fn,
-        );
+            init_rom,
+        )?;
 
-        self.n_setups.fetch_add(1, Ordering::SeqCst);
+        self.core_prover.asm_info.n_setups.fetch_add(1, Ordering::SeqCst);
 
         Ok((
             ZiskProgramPK {
@@ -350,16 +356,31 @@ impl ProverEngine for AsmProver {
     fn mpi_broadcast(&self, data: &mut Vec<u8>) -> Result<()> {
         self.core_prover.backend.mpi_broadcast(data)
     }
+
+    fn prepare_send_proof(
+        &self,
+        proof: &ZiskProof,
+        publics: &ZiskPublics,
+        program_vk: &ZiskProgramVK,
+    ) -> Result<Vec<u8>> {
+        self.core_prover.backend.prepare_send_proof(proof, publics, program_vk)
+    }
+}
+
+pub struct AsmInfo {
+    pub is_distributed: bool,
+    pub base_port: Option<u16>,
+    pub unlock_mapped_memory: bool,
+    pub asm_out_file: bool,
+    pub verbose: VerboseMode,
+    pub no_auto_setup: bool,
+    pub n_setups: AtomicU64,
 }
 
 pub struct AsmCoreProver {
     backend: ProverBackend,
     rank_info: RankInfo,
-    is_distributed: bool,
-    base_port: Option<u16>,
-    unlock_mapped_memory: bool,
-    verbose: VerboseMode,
-    no_auto_setup: bool,
+    asm_info: AsmInfo,
 }
 
 impl AsmCoreProver {
@@ -374,6 +395,7 @@ impl AsmCoreProver {
         shared_tables: bool,
         base_port: Option<u16>,
         unlock_mapped_memory: bool,
+        asm_out_file: bool,
         no_auto_setup: bool,
         gpu_params: ParamsGPU,
         is_distributed: bool,
@@ -431,11 +453,15 @@ impl AsmCoreProver {
         Ok(Self {
             backend: core,
             rank_info,
-            base_port,
-            unlock_mapped_memory,
-            verbose: verbose.into(),
-            no_auto_setup,
-            is_distributed,
+            asm_info: AsmInfo {
+                is_distributed,
+                base_port,
+                unlock_mapped_memory,
+                asm_out_file,
+                verbose: verbose.into(),
+                no_auto_setup,
+                n_setups: AtomicU64::new(0),
+            },
         })
     }
 
@@ -446,11 +472,15 @@ impl AsmCoreProver {
         Ok(Self {
             backend: core_prover,
             rank_info: RankInfo { world_rank: 0, local_rank: 0, n_processes: 1 },
-            base_port: None,
-            unlock_mapped_memory: false,
-            verbose: VerboseMode::Info,
-            no_auto_setup: false,
-            is_distributed: false,
+            asm_info: AsmInfo {
+                is_distributed: false,
+                base_port: None,
+                unlock_mapped_memory: false,
+                asm_out_file: false,
+                verbose: VerboseMode::Info,
+                no_auto_setup: false,
+                n_setups: AtomicU64::new(0),
+            },
         })
     }
 }

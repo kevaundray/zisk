@@ -8,6 +8,7 @@ repository = { workspace = true }
 categories = { workspace = true }
 
 [dependencies]
+proofman-verifier = { workspace = true }
 proofman-common = { workspace = true }
 proofman-util = { workspace = true }
 zisk-common = { workspace = true }
@@ -21,12 +22,12 @@ tracing = { workspace = true }
 zisk-distributed-common = { workspace = true }
 ziskemu = { workspace = true }
 zisk-core = { workspace = true }
-zisk-verifier = { workspace = true }
 zisk-build = { workspace = true }
 sha2 = { workspace = true }
 executor = { workspace = true }
 bincode = { workspace = true }
 serde = { workspace = true }
+precompiles-hints = { workspace = true }
 
 [features]
 default = []
@@ -36,9 +37,9 @@ gpu = [
     "rom-setup/gpu",
     "executor/gpu",
     "ziskemu/gpu",
-    "packed"
+    "packed",
 ]
-packed = ["proofman-common/packed", "executor/packed"]
+packed = ["proofman/packed", "proofman-common/packed", "executor/packed"]
 stats = []
 disable_distributed = [
     "proofman/disable_distributed",

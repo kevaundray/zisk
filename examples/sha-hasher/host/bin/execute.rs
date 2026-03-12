@@ -1,6 +1,6 @@
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
-use zisk_sdk::{include_elf, ElfBinary, ProverClient, ZiskIO, ZiskStdin};
+use zisk_sdk::{include_elf, ElfBinary, ProverClient, ZiskStdin};
 
 pub const ELF: ElfBinary = include_elf!("sha-hasher-guest");
 
@@ -22,7 +22,7 @@ fn main() -> Result<()> {
 
     // Create a `ProverClient` method.
     println!("Building prover client...");
-    let client = ProverClient::builder().asm().base_port(54321).build().unwrap();
+    let client = ProverClient::builder().emu().verify_constraints().build().unwrap();
 
     println!("Setting up program...");
     let (pk, _) = client.setup(&ELF)?;

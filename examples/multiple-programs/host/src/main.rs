@@ -1,8 +1,8 @@
 use anyhow::Result;
-use zisk_sdk::{include_elf, ElfBinary, ProofOpts, ProverClient, ZiskIO, ZiskStdin};
+use zisk_sdk::{include_elf, ElfBinary, ProofOpts, ProverClient, ZiskStdin};
 
-pub const ELF: ElfBinary = include_elf!("fibonacci-guest");
-pub const ELF2: ElfBinary = include_elf!("fibonacci-guest-2");
+pub const ELF: ElfBinary = include_elf!("multiple-program-guest");
+pub const ELF2: ElfBinary = include_elf!("multiple-program-guest-2");
 
 fn main() -> Result<()> {
     println!("Starting ZisK Prover Client...\n");
@@ -27,7 +27,8 @@ fn main() -> Result<()> {
 
     println!(
         "Program executed successfully: {} cycles in {:.2?}",
-        result.get_execution_steps(), result.get_duration()
+        result.get_execution_steps(),
+        result.get_duration()
     );
 
     println!("Generating proof for first program...");
@@ -49,7 +50,8 @@ fn main() -> Result<()> {
 
     println!(
         "Program executed successfully: {} cycles in {:.2?}",
-        result2.get_execution_steps(), result2.get_duration()
+        result2.get_execution_steps(),
+        result2.get_duration()
     );
 
     println!("Generating proof for second program...");

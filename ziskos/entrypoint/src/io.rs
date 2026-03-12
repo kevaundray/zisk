@@ -2,7 +2,7 @@
 //!
 //! This module provides a high-level API for reading inputs and committing public outputs.
 
-use crate::{read_input, read_input_slice, set_output};
+use crate::{read_input, set_output};
 use serde::{de::DeserializeOwned, Serialize};
 
 /// Read a deserializable object from the input stream.
@@ -19,6 +19,8 @@ use serde::{de::DeserializeOwned, Serialize};
 ///
 /// let data: MyStruct = ziskos::io::read();
 /// ```
+///
+/// Note: This uses zero-copy deserialization on zkvm to avoid unnecessary data copies.
 pub fn read<T: DeserializeOwned>() -> T {
     let bytes = read_input_slice();
     bincode::deserialize(&bytes).expect("Deserialization failed")
@@ -32,6 +34,28 @@ pub fn read<T: DeserializeOwned>() -> T {
 /// ```
 pub fn read_vec() -> Vec<u8> {
     read_input()
+}
+
+#[cfg(all(target_os = "zkvm", target_vendor = "zisk"))]
+pub fn read_input_slice<'a>() -> &'a [u8] {
+    crate::read_slice_zerocopy()
+}
+
+#[allow(unused)]
+#[cfg(not(all(target_os = "zkvm", target_vendor = "zisk")))]
+pub fn read_input_slice() -> Box<[u8]> {
+    read_input().into_boxed_slice()
+}
+
+#[cfg(all(target_os = "zkvm", target_vendor = "zisk"))]
+pub fn read_proof<'a>() -> &'a [u8] {
+    crate::read_slice_zerocopy()
+}
+
+#[allow(unused)]
+#[cfg(not(all(target_os = "zkvm", target_vendor = "zisk")))]
+pub fn read_proof() -> Box<[u8]> {
+    read_input().into_boxed_slice()
 }
 
 /// Commit a serializable value to public outputs.
@@ -54,4 +78,9 @@ pub fn write(buf: &[u8]) {
         let val = u32::from_le_bytes(bytes);
         set_output(i, val);
     }
+}
+
+pub fn verify_zisk_proof(zisk_proof: &[u8]) -> bool {
+    let (proof, vk) = zisk_proof.split_at(zisk_proof.len() - 32);
+    zisk_verifier::verify_vadcop_final_proof(proof, vk)
 }
