@@ -1,6 +1,11 @@
-# Precompile Hints System
+# Hints Stream
 
-Cryptographic precompiles (SHA-256, Keccak-256, elliptic curve operations, pairings, etc.) are computationally expensive inside a zkVM. The precompile hints system accelerates proof generation by offloading these expensive computations outside the zkVM execution, then feeding the results back as verifiable data through a high-performance, parallel pipeline. Hints are preprocessed results that allow cryptographic operations to be handled externally while remaining fully verifiable inside the VM. The system is designed around three core principles:
+The hints stream accelerates proof generation by offloading expensive operations outside the zkVM execution, then feeding the results back as verifiable data through a high-performance, parallel pipeline. Hints are preprocessed results that allow operations to be handled externally while remaining fully verifiable inside the VM. The system supports two categories of hints:
+
+1. **Precompile hints**: Cryptographic operations (SHA-256, Keccak-256, elliptic curve operations, pairings, etc.) that are computationally expensive inside a zkVM.
+2. **Input hints**: Data that needs to be passed to the zkVM as input during execution.
+
+The system is designed around three core principles:
 
 1. **Pre-computing results outside the VM**: The guest program emits hint requests describing the operation and its inputs.
 2. **Streaming results back**: A dedicated pipeline processes these requests in parallel, maintaining order, and feeds results to the prover via shared memory.
@@ -43,8 +48,9 @@ Hints are transmitted as a stream of `u64` values. Each hint request consists of
 ├─────────────────────────────────────────────────────────────┤
 │                             ...                             │
 ├─────────────────────────────────────────────────────────────┤
-│                     Data[length-1] (u64)                    │
+│                       Data[N-1] (u64)                       │
 └─────────────────────────────────────────────────────────────┘
+where N = ceil(Length / 8)
 ```
 - **Hint Code** (upper 32 bits): Control code or Data Hint Type
 - **Length** (lower 32 bits): Payload data size in **bytes**. The last `u64` may contain padding bytes.
@@ -101,11 +107,12 @@ When bit 31 of the hint code is set (e.g., `0x8000_0000 | actual_code`), the hin
 
 ### 1.4. Hint Code Types
 
-| Category     | Code Range        | Description                         |
-|--------------|-------------------|-------------------------------------|
-| **Control**  | `0x0000`-`0x000F` | Stream lifecycle management         |
-| **Built-in** | `0x0100`-`0x0700` | Cryptographic precompile operations |
-| **Custom**   | User-defined      | Application-specific handlers       |
+| Category     | Code Range          | Description                         |
+|--------------|---------------------|-------------------------------------|
+| **Control**  | `0x0000`-`0x000F`   | Stream lifecycle management         |
+| **Built-in** | `0x0100`-`0x0800`   | Cryptographic precompile operations |
+| **Input**    | `0xF0000`           | Input data hints                    |
+| **Custom**   | User-defined        | Application-specific handlers       |
 
 > **Note:** Custom hint codes can technically use any value not occupied by control or built-in codes. By convention, codes `0xA000`-`0xFFFF` are recommended for custom use to avoid future conflicts as new built-in types are added. The processor does not enforce a range restriction — any unrecognized code is treated as custom.
 
@@ -141,10 +148,25 @@ Control codes manage the stream lifecycle and do not carry computational data:
 | `0x0500` | `ModExp` | Modular exponentiation |
 | `0x0600` | `VerifyKzgProof` | KZG polynomial commitment proof verification |
 | `0x0700` | `Keccak256` | Keccak-256 hash computation |
+| `0x0800` | `Blake2bCompress` | Blake2b compression function |
 
-#### 1.4.3. Custom Hint Types
+#### 1.4.3. Input Hint Type
 
-Custom hint types allow users to define their own hint handlers for application-specific logic. Users can register custom handlers via the `HintsProcessor` builder API, providing a mapping from hint code to a processing function (see [Custom Hint Handlers](#4-custom-hint-handlers)). By convention, codes in the range `0xA000`-`0xFFFF` are recommended for custom use to avoid conflicts with current and future built-in types. If a data hint is received with an unregistered code, the processor returns an error and stops processing immediately.
+Input hints allow passing data to the zkVM during execution. Unlike precompile hints that are processed by worker threads, input hints are forwarded directly to a separate inputs sink.
+
+| Code | Name | Description |
+|------|------|-------------|
+| `0xF0000` | `Input` | Input data for the zkVM |
+
+The input hint payload format is:
+- **First 8 bytes**: Length of the input data (as `u64` little-endian)
+- **Remaining bytes**: The actual input data, padded to 8-byte alignment
+
+Input hints are not processed by the parallel worker pool; instead, they are immediately submitted to the inputs sink for consumption by the zkVM.
+
+#### 1.4.4. Custom Hint Types
+
+Custom hint types allow users to define their own hint handlers for application-specific logic. Users can register custom handlers via the `HintsProcessor` builder API, providing a mapping from hint code to a processing function (see [Custom Hint Handlers](#4-custom-hint-handlers)). By convention, codes in the range `0xA000`-`0xEFFFF` are recommended for custom use to avoid conflicts with current and future built-in types. If a data hint is received with an unregistered code, the processor returns an error and stops processing immediately.
 
 ### 1.5. Stream Protocol
 
@@ -152,7 +174,7 @@ A valid hint stream follows this protocol:
 
 ```
 CTRL_START                          ← Reset state, begin stream
-  [Hint_1] [Hint_2] ... [Hint_N]   ← Data hints (any order of types)
+  [Hint_1] [Hint_2] ... [Hint_N]   ← Data hints (precompile, input, or custom)
 CTRL_END                            ← Wait for completion, end stream
 ```
 
@@ -239,7 +261,7 @@ zisk-coordinator prove --hints-uri unix:///tmp/hints.sock --stream-hints ...
 
 #### 3.2.2 Worker Hints non-Streaming Mode
 
-To start a worker in non-streaming mode, provide the `--hints-uri` option with a URI that points to the local workers path where hints are stored, without the `--stream-hints` option. In this mode the worker(s) will load the precompile hints from the specified URI instead of receiving them from the coordinator. This mode is useful for debugging or when hints are pre-generated and stored in a file.
+To start a worker in non-streaming mode, provide the `--hints-uri` option with a URI that points to the local workers path where hints are stored, without the `--stream-hints` option. In this mode the worker(s) will load hints from the specified URI instead of receiving them from the coordinator. This mode is useful for debugging or when hints are pre-generated and stored in a file.
 
 ## 4. Custom Hint Handlers
 
@@ -395,9 +417,11 @@ Using threads or iterating over non-deterministically ordered data structures ma
 | `0x0500` | `fn hint_modexp_bytes(base_ptr: *const u8, base_len: usize, exp_ptr: *const u8, exp_len: usize, modulus_ptr: *const u8, modulus_len: usize);` |
 | `0x0600` | `fn hint_verify_kzg_proof(z: *const u8, y: *const u8, commitment: *const u8, proof: *const u8);` |
 | `0x0700` | `fn hint_keccak256(input_ptr: *const u8, input_len: usize);` |
+| `0x0800` | `fn hint_blake2b_compress(...);` |
+| `0xF0000` | `fn hint_input_data(input_data_ptr: *const u8, input_data_len: usize);` |
 
 ### 5.6 Custom Hints Generation
-To extend the built-in precompile hints, you can generate custom hints for new precompiles. The first step is to register the new hint in the `HintsProcessor`, as explained in section [Custom Hint Handlers](#4-custom-hint-handlers). Once the precompile hint is registered, you can generate hints for it from the guest program using the following FFI function:
+To extend the built-in hints, you can generate custom hints for new operations. The first step is to register the new hint in the `HintsProcessor`, as explained in section [Custom Hint Handlers](#4-custom-hint-handlers). Once the hint is registered, you can generate hints for it from the guest program using the following FFI function:
 
 ```rust
 fn hint_custom(hint_id: u32, data_ptr: *const u8, data_len: usize, is_result: u8);
