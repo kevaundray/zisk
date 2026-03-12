@@ -302,24 +302,24 @@ https://github.com/0xPolygonHermez/zisk-eth-client/tree/main-reth/bin/guest
 
 `zec-reth` relies on `reth` crates, which expose a `Crypto` trait that allows a guest program to override precompile implementations. This enables zkVM-optimized implementations while also emitting hints so the computation can be performed outside the zkVM.
 
-For example, the SHA-256 implementation for the `Crypto` trait can be found here:
+For example, the BN254 elliptic curve addition (`bn254_g1_add`) implementation for the `Crypto` trait can be found here:
 
-https://github.com/0xPolygonHermez/zisk-eth-client/blob/c855d2fb401648828cc3ac044da2999b4f641917/crates/crypto/src/lib.rs#L164
+https://github.com/0xPolygonHermez/zisk-eth-client/blob/86b71b39d35efb9894696cab115a1177f3e47dbf/crates/guest-reth/src/crypto/impls.rs#L87
 
 In that file, two target-specific implementations are provided: one for `zkvm/zisk` and one for native (non-zkVM) targets. When compiling with `--cfg zisk_hints` for the native target, the zkVM-specific implementation emits a hint request using the FFI helper:
 
 ```rust
 #[cfg(zisk_hints)]
 unsafe {
-    hint_sha256(input.as_ptr(), input.len());
+    pub fn hint_bn254_g1_add(p1: *const u8, p2: *const u8);
 }
 ```
 
-This call generates the hint input data using the exact input values that will later be used by the ZisK zkVM when executing the `zkvm/zisk` target code. This hint input data is consumed later by the `HintsProcessor`, allowing the SHA-256 computation to be performed outside the zkVM while remaining fully verifiable inside the circuit.
+This call generates the hint input data using the exact input values that will later be used by the ZisK zkVM when executing the `zkvm/zisk` target code. This hint input data is consumed later by the `HintsProcessor`, allowing the `bn254_g1_add` computation to be performed outside the zkVM while remaining fully verifiable inside the circuit.
 
-After the hint generation, execution continues in the native target code to compute the SHA-256 result.
+After the hint generation, execution continues in the native target code to compute the `bn254_g1_add` result.
 
-From the guest program, we generate hints containing the input data for the corresponding `zisklib` functions (in this example, the `sha256_c` function). These `zisklib` functions may internally invoke one or more precompiles to produce the final result.
+From the guest program, we generate hints containing the input data for the corresponding `zisklib` functions (in this example, the `bn254_g1_add_c` function). These `zisklib` functions may internally invoke one or more precompiles to produce the final result.
 
 When the hints are processed by the `HintsProcessor`, it executes the same `zisklib` function using the implementation code for the zkvm/zisk target. This produces the exact precompile results expected when executing the guest ELF inside the zkVM.
 
