@@ -94,6 +94,7 @@ pub fn execute_build_program(
     execute_command(cmd)?;
 
     // Generate assembly for all ELF files (only if not already generated)
+    let asm = args.asm.unwrap_or(false);
     let hints = args.hints.unwrap_or(false);
     println!("cargo:rerun-if-env-changed=ZISK_HINTS");
 
@@ -113,7 +114,7 @@ pub fn execute_build_program(
             Err(_) => true,
         };
 
-        if !assembly_exists || hints_changed {
+        if asm && (!assembly_exists || hints_changed) {
             gen_assembly(elf_path_std, &None, hints, true)?;
             std::fs::write(&hints_marker, new_value)?;
         }
