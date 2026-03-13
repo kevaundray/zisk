@@ -510,11 +510,11 @@ extern int _opcode_keccak(uint64_t address)
 #endif
 #ifdef DEBUG
 #ifdef ASM_CALL_METRICS
-    if (emu_verbose) printf("opcode_keccak() calling keccakf1600_generic() counter=%lu address=%08lx\n", asm_call_metrics.keccak_counter, address);
+    if (emu_verbose) printf("opcode_keccak() calling zisk_keccakf1600() counter=%lu address=%08lx\n", asm_call_metrics.keccak_counter, address);
 #else
     if (emu_verbose)
     {
-        printf("opcode_keccak() calling keccakf1600_generic() address=%08lx\n", address);
+        printf("opcode_keccak() calling zisk_keccakf1600() address=%08lx\n", address);
         for (uint64_t i=0; i<200; i++)
         {
             printf("%02x", ((uint8_t *)(uintptr_t)address)[i]);
@@ -545,7 +545,7 @@ extern int _opcode_keccak(uint64_t address)
 #ifdef DEBUG
     if (emu_verbose)
     {
-        printf("opcode_keccak() called keccakf1600_generic()\n");
+        printf("opcode_keccak() called zisk_keccakf1600()\n");
         for (uint64_t i=0; i<200; i++)
         {
             printf("%02x", ((uint8_t *)(uintptr_t)address)[i]);

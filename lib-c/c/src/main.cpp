@@ -1315,7 +1315,7 @@ int main(int argc, char *argv[])
         printf("  -v: verbose output\n");
         printf("  -k|keccak: run only Keccakf benchmark\n");
         fflush(stdout);
-        exit(-1);
+        exit(EXIT_FAILURE);
     }
 
     setlocale(LC_NUMERIC, "en_US.UTF-8");  // usa locale del sistema
