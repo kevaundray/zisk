@@ -46,14 +46,32 @@ void server_setup (void)
     /*******/
     if ((gen_method != ChunkPlayerMTCollectMem) && (gen_method != ChunkPlayerMemReadsCollectMain))
     {
-
+        // Get the start time
         if (verbose) gettimeofday(&start_time, NULL);
-        void * pRom = mmap((void *)ROM_ADDR, ROM_SIZE, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS | MAP_FIXED | map_locked_flag, -1, 0);
-        if (verbose)
+
+        // Make sure the rom shared memory is deleted
+        shm_unlink(shmem_rom_name);
+
+        // Create the rom shared memory
+        shmem_rom_fd = shm_open(shmem_rom_name, O_RDWR | O_CREAT | O_EXCL, 0666);
+        if (shmem_rom_fd < 0)
         {
-            gettimeofday(&stop_time, NULL);
-            duration = TimeDiff(start_time, stop_time);
+            asm_printf("ERROR: Failed calling rom RW shm_open(%s) as read-write errno=%d=%s\n", shmem_rom_name, errno, strerror(errno));
+            exit(-1);
         }
+
+        // Size it
+        result = ftruncate(shmem_rom_fd, ROM_SIZE);
+        if (result != 0)
+        {
+            asm_printf("ERROR: Failed calling ftruncate(%s) errno=%d=%s\n", shmem_rom_name, errno, strerror(errno));
+            exit(-1);
+        }
+
+        // Sync
+        fsync(shmem_rom_fd);
+
+        void * pRom = mmap((void *)ROM_ADDR, ROM_SIZE, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS | MAP_FIXED | map_locked_flag, shmem_rom_fd, 0);
         if (pRom == MAP_FAILED)
         {
             asm_printf("ERROR: Failed calling mmap(rom) errno=%d=%s\n", errno, strerror(errno));
@@ -64,7 +82,12 @@ void server_setup (void)
             asm_printf("ERROR: Called mmap(rom) but returned address = %p != 0x%lx\n", pRom, ROM_ADDR);
             exit(-1);
         }
-        if (verbose) asm_printf("mmap(rom) mapped %lu B and returned address %p in %lu us\n", ROM_SIZE, pRom, duration);
+        if (verbose)
+        {
+            gettimeofday(&stop_time, NULL);
+            duration = TimeDiff(start_time, stop_time);
+            asm_printf("mmap(rom) mapped %lu B and returned address %p in %lu us\n", ROM_SIZE, pRom, duration);
+        }
     }
 
     /*********/
@@ -355,14 +378,33 @@ void server_setup (void)
 
     if ((gen_method != ChunkPlayerMTCollectMem) && (gen_method != ChunkPlayerMemReadsCollectMain))
     {
-
+        // Get the start time
         if (verbose) gettimeofday(&start_time, NULL);
-        void * pRam = mmap((void *)RAM_ADDR, RAM_SIZE, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS | MAP_FIXED | map_locked_flag, -1, 0);
-        if (verbose)
+
+        // Make sure the ram shared memory is deleted
+        shm_unlink(shmem_ram_name);
+
+        // Create the ram shared memory
+        shmem_ram_fd = shm_open(shmem_ram_name, O_RDWR | O_CREAT | O_EXCL, 0666);
+        if (shmem_ram_fd < 0)
         {
-            gettimeofday(&stop_time, NULL);
-            duration = TimeDiff(start_time, stop_time);
+            asm_printf("ERROR: Failed calling rom RW shm_open(%s) as read-write errno=%d=%s\n", shmem_ram_name, errno, strerror(errno));
+            exit(-1);
         }
+
+        // Size it
+        result = ftruncate(shmem_ram_fd, RAM_SIZE);
+        if (result != 0)
+        {
+            asm_printf("ERROR: Failed calling ftruncate(%s) errno=%d=%s\n", shmem_ram_name, errno, strerror(errno));
+            exit(-1);
+        }
+
+        // Sync
+        fsync(shmem_ram_fd);
+
+        // Map it to the ram address
+        void * pRam = mmap((void *)RAM_ADDR, RAM_SIZE, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS | MAP_FIXED | map_locked_flag, shmem_ram_fd, 0);
         if (pRam == MAP_FAILED)
         {
             asm_printf("ERROR: Failed calling mmap(ram) errno=%d=%s\n", errno, strerror(errno));
@@ -373,7 +415,14 @@ void server_setup (void)
             asm_printf("ERROR: Called mmap(ram) but returned address = %p != 0x%08lx\n", pRam, RAM_ADDR);
             exit(-1);
         }
-        if (verbose) asm_printf("mmap(ram) mapped %lu B and returned address %p in %lu us\n", RAM_SIZE, pRam, duration);
+
+        // Report duration
+        if (verbose)
+        {
+            gettimeofday(&stop_time, NULL);
+            duration = TimeDiff(start_time, stop_time);
+            asm_printf("mmap(ram) mapped %lu B and returned address %p in %lu us\n", RAM_SIZE, pRam, duration);
+        }
     }
 
     /****************/
@@ -519,17 +568,18 @@ void server_reset_fast (void)
 
 void server_reset_slow (void)
 {
-    // Reset RAM data for next emulation
+    // Reset RAM and ROM data for next emulation
     if ((gen_method != ChunkPlayerMTCollectMem) && (gen_method != ChunkPlayerMemReadsCollectMain))
     {
 #ifdef DEBUG
         gettimeofday(&start_time, NULL);
 #endif
         memset((void *)RAM_ADDR, 0, RAM_SIZE);
+        memset((void *)ROM_ADDR, 0, ROM_SIZE);
 #ifdef DEBUG
         gettimeofday(&stop_time, NULL);
         duration = TimeDiff(start_time, stop_time);
-        if (verbose) asm_printf("server_reset_slow() memset(ram) in %lu us\n", duration);
+        if (verbose) asm_printf("server_reset_slow() memset(ram) and memset(rom) in %lu us\n", duration);
 #endif
     }
 }
@@ -798,12 +848,22 @@ void server_cleanup (void)
     {
         asm_printf("ERROR: Failed calling munmap(rom) errno=%d=%s\n", errno, strerror(errno));
     }
+    result = shm_unlink(shmem_rom_name);
+    if (result == -1)
+    {
+        asm_printf("ERROR: Failed calling shm_unlink(%s) errno=%d=%s\n", shmem_rom_name, errno, strerror(errno));
+    }
 
     // Cleanup RAM
     result = munmap((void *)RAM_ADDR, RAM_SIZE);
     if (result == -1)
     {
         asm_printf("ERROR: Failed calling munmap(ram) errno=%d=%s\n", errno, strerror(errno));
+    }
+    result = shm_unlink(shmem_ram_name);
+    if (result == -1)
+    {
+        asm_printf("ERROR: Failed calling shm_unlink(%s) errno=%d=%s\n", shmem_ram_name, errno, strerror(errno));
     }
 
     // Cleanup INPUT

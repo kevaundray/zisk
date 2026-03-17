@@ -520,6 +520,10 @@ void configure (void)
                 strcpy(sem_prec_read_name, "");
             }
             strcpy(shmem_output_name, "");
+            strcpy(shmem_rom_name, shm_prefix);
+            strcat(shmem_rom_name, "_FT_rom");
+            strcpy(shmem_ram_name, shm_prefix);
+            strcat(shmem_ram_name, "_FT_ram");
             strcpy(sem_chunk_done_name, "");
             strcpy(sem_shutdown_done_name, shm_prefix);
             strcat(sem_shutdown_done_name, "_FT_shutdown_done");
@@ -568,6 +572,10 @@ void configure (void)
             }
             strcpy(shmem_output_name, shm_prefix);
             strcat(shmem_output_name, "_MT_output");
+            strcpy(shmem_rom_name, shm_prefix);
+            strcat(shmem_rom_name, "_MT_rom");
+            strcpy(shmem_ram_name, shm_prefix);
+            strcat(shmem_ram_name, "_MT_ram");
             strcpy(sem_chunk_done_name, shm_prefix);
             strcat(sem_chunk_done_name, "_MT_chunk_done");
             strcpy(sem_shutdown_done_name, shm_prefix);
@@ -618,6 +626,10 @@ void configure (void)
             }
             strcpy(shmem_output_name, shm_prefix);
             strcat(shmem_output_name, "_RH_output");
+            strcpy(shmem_rom_name, shm_prefix);
+            strcat(shmem_rom_name, "_RH_rom");
+            strcpy(shmem_ram_name, shm_prefix);
+            strcat(shmem_ram_name, "_RH_ram");
             strcpy(sem_chunk_done_name, shm_prefix);
             strcat(sem_chunk_done_name, "_RH_chunk_done");
             strcpy(sem_shutdown_done_name, shm_prefix);
@@ -668,6 +680,10 @@ void configure (void)
             }
             strcpy(shmem_output_name, shm_prefix);
             strcat(shmem_output_name, "_MA_output");
+            strcpy(shmem_rom_name, shm_prefix);
+            strcat(shmem_rom_name, "_MA_rom");
+            strcpy(shmem_ram_name, shm_prefix);
+            strcat(shmem_ram_name, "_MA_ram");
             strcpy(sem_chunk_done_name, shm_prefix);
             strcat(sem_chunk_done_name, "_MA_chunk_done");
             strcpy(sem_shutdown_done_name, shm_prefix);
@@ -704,6 +720,10 @@ void configure (void)
             strcpy(sem_input_avail_name, "");
             strcpy(shmem_output_name, shm_prefix);
             strcat(shmem_output_name, "_CH_output");
+            strcpy(shmem_rom_name, shm_prefix);
+            strcat(shmem_rom_name, "_CH_rom");
+            strcpy(shmem_ram_name, shm_prefix);
+            strcat(shmem_ram_name, "_CH_ram");
             strcpy(sem_chunk_done_name, shm_prefix);
             strcat(sem_chunk_done_name, "_CH_chunk_done");
             strcpy(sem_shutdown_done_name, shm_prefix);
@@ -761,6 +781,10 @@ void configure (void)
             }
             strcpy(shmem_output_name, shm_prefix);
             strcat(shmem_output_name, "_ZP_output");
+            strcpy(shmem_rom_name, shm_prefix);
+            strcat(shmem_rom_name, "_ZP_rom");
+            strcpy(shmem_ram_name, shm_prefix);
+            strcat(shmem_ram_name, "_ZP_ram");
             strcpy(sem_chunk_done_name, shm_prefix);
             strcat(sem_chunk_done_name, "_ZP_chunk_done");
             strcpy(sem_shutdown_done_name, shm_prefix);
@@ -811,6 +835,10 @@ void configure (void)
             }
             strcpy(shmem_output_name, shm_prefix);
             strcat(shmem_output_name, "_MO_output");
+            strcpy(shmem_rom_name, shm_prefix);
+            strcat(shmem_rom_name, "_MO_rom");
+            strcpy(shmem_ram_name, shm_prefix);
+            strcat(shmem_ram_name, "_MO_ram");
             strcpy(sem_chunk_done_name, shm_prefix);
             strcat(sem_chunk_done_name, "_MO_chunk_done");
             strcpy(sem_shutdown_done_name, shm_prefix);
@@ -843,6 +871,10 @@ void configure (void)
             strcpy(sem_input_avail_name, "");
             strcpy(shmem_output_name, shm_prefix);
             strcat(shmem_output_name, "_CM_output");
+            strcpy(shmem_rom_name, shm_prefix);
+            strcat(shmem_rom_name, "_CM_rom");
+            strcpy(shmem_ram_name, shm_prefix);
+            strcat(shmem_ram_name, "_CM_ram");
             strcpy(sem_chunk_done_name, "");
             strcpy(sem_shutdown_done_name, "");
             strcpy(shmem_mt_name, shm_prefix);
@@ -890,6 +922,10 @@ void configure (void)
             }
             strcpy(shmem_output_name, shm_prefix);
             strcat(shmem_output_name, "_MT_output");
+            strcpy(shmem_rom_name, shm_prefix);
+            strcat(shmem_rom_name, "_MT_rom");
+            strcpy(shmem_ram_name, shm_prefix);
+            strcat(shmem_ram_name, "_MT_ram");
             strcpy(sem_chunk_done_name, shm_prefix);
             strcat(sem_chunk_done_name, "_MT_chunk_done");
             strcpy(sem_shutdown_done_name, shm_prefix);
@@ -922,6 +958,10 @@ void configure (void)
             strcpy(sem_input_avail_name, "");
             strcpy(shmem_output_name, shm_prefix);
             strcat(shmem_output_name, "_CA_output");
+            strcpy(shmem_rom_name, shm_prefix);
+            strcat(shmem_rom_name, "_CA_rom");
+            strcpy(shmem_ram_name, shm_prefix);
+            strcat(shmem_ram_name, "_CA_ram");
             strcpy(sem_chunk_done_name, "");
             strcpy(sem_shutdown_done_name, "");
             strcpy(shmem_mt_name, shm_prefix);
@@ -969,6 +1009,8 @@ void configure (void)
         asm_printf("\tshmem_precompile=%s\n", shmem_precompile_name);
         asm_printf("\tshmem_output=%s\n", shmem_output_name);
         asm_printf("\tshmem_mt=%s\n", shmem_mt_name);
+        asm_printf("\tshmem_rom=%s\n", shmem_rom_name);
+        asm_printf("\tshmem_ram=%s\n", shmem_ram_name);
         asm_printf("\tsem_chunk_done=%s\n", sem_chunk_done_name);
         asm_printf("\tsem_shutdown_done=%s\n", sem_shutdown_done_name);
         asm_printf("\tsem_prec_avail=%s\n", sem_prec_avail_name);

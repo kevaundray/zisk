@@ -32,18 +32,24 @@ extern uint16_t port; // Service TCP port
 extern uint64_t chunk_player_address; // Chunk player address, used for generation methods that use the chunk player, i.e. gen_method=8 or gen_method=10
 extern bool wait_flag; // If true, the shmem will get a flag set to 1 if we are waiting for a semaphore, and set it back to 0 when we are not waiting anymore. This can be used for debugging purposes to know if the assembly code is waiting for a semaphore or not.
 
-extern char precompile_file_name[4096]; // Precompile results file name (used by client)
+// Shared memory names
 extern char shmem_control_input_name[128];
 extern char shmem_control_output_name[128];
 extern char shmem_input_name[128];
 extern char shmem_output_name[128];
 extern char shmem_mt_name[128];
 extern char shmem_precompile_name[128];
+extern char shmem_rom_name[128];
+extern char shmem_ram_name[128];
+
+// Semaphore names
 extern char sem_prec_avail_name[128];
 extern char sem_prec_read_name[128];
 extern char sem_chunk_done_name[128];
 extern char sem_shutdown_done_name[128];
 extern char sem_input_avail_name[128];
+
+extern char precompile_file_name[4096]; // Precompile results file name (used by client)
 extern char file_lock_name[128];
 extern char log_name[128];
 extern bool call_chunk_done;
@@ -96,6 +102,12 @@ extern int shmem_output_fd;
 
 // Input MT trace shared memory
 extern int shmem_mt_fd;
+
+// ROM shared memory
+extern int shmem_rom_fd;
+
+// RAM shared memory
+extern int shmem_ram_fd;
 
 // Chunk done semaphore: notifies the caller when a new chunk has been processed
 extern sem_t * sem_chunk_done;
