@@ -26,6 +26,19 @@
 /* SERVER */
 /**********/
 
+// Huge pages setup:
+//
+// # Check current huge page status
+// cat /proc/meminfo | grep -i huge
+//
+// # Temporarily reserve 20 huge pages (2MB each)
+// echo 20 | sudo tee /proc/sys/vm/nr_hugepages
+//
+// # Make permanent
+// echo "vm.nr_hugepages=20" | sudo tee -a /etc/sysctl.conf
+
+//#define USE_HUGE_PAGES
+
 // ROM histogram
 uint64_t histogram_size = 0;
 uint64_t bios_size = 0;
@@ -84,7 +97,16 @@ void server_setup (void)
             }
         }
 
+#ifdef USE_HUGE_PAGES
+        void * pRom = mmap((void *)ROM_ADDR, ROM_SIZE, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS | MAP_FIXED | map_locked_flag | MAP_HUGETLB, shmem_rom_fd, 0);
+        if (pRom == MAP_FAILED)
+        {
+            asm_printf("ERROR: Failed calling mmap(rom) with huge pages errno=%d=%s\n", errno, strerror(errno));
+            pRom = mmap((void *)ROM_ADDR, ROM_SIZE, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS | MAP_FIXED | map_locked_flag, shmem_rom_fd, 0);
+        }
+#else
         void * pRom = mmap((void *)ROM_ADDR, ROM_SIZE, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS | MAP_FIXED | map_locked_flag, shmem_rom_fd, 0);
+#endif
         if (pRom == MAP_FAILED)
         {
             asm_printf("ERROR: Failed calling mmap(rom) errno=%d=%s\n", errno, strerror(errno));
@@ -153,7 +175,16 @@ void server_setup (void)
         }
 
         // Map input address space
+#ifdef USE_HUGE_PAGES
+        void * pInput = mmap((void *)INPUT_ADDR, MAX_INPUT_SIZE, PROT_READ, MAP_SHARED | MAP_FIXED | map_locked_flag | MAP_HUGETLB, shmem_input_fd, 0);
+        if (pInput == MAP_FAILED)
+        {
+            asm_printf("ERROR: Failed calling mmap(input) with huge pages errno=%d=%s\n", errno, strerror(errno));
+            pInput = mmap((void *)INPUT_ADDR, MAX_INPUT_SIZE, PROT_READ, MAP_SHARED | MAP_FIXED | map_locked_flag, shmem_input_fd, 0);
+        }
+#else
         void * pInput = mmap((void *)INPUT_ADDR, MAX_INPUT_SIZE, PROT_READ, MAP_SHARED | MAP_FIXED | map_locked_flag, shmem_input_fd, 0);
+#endif
         if (pInput == MAP_FAILED)
         {
             asm_printf("ERROR: Failed calling mmap(input) errno=%d=%s\n", errno, strerror(errno));
@@ -480,7 +511,16 @@ void server_setup (void)
         }
 
         // Map it to the ram address
+#ifdef USE_HUGE_PAGES
+        void * pRam = mmap((void *)RAM_ADDR, RAM_SIZE, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS | MAP_FIXED | map_locked_flag | MAP_HUGETLB, shmem_ram_fd, 0);
+        if (pRam == MAP_FAILED)
+        {
+            asm_printf("ERROR: Failed calling mmap(ram) with huge pages errno=%d=%s\n", errno, strerror(errno));
+            pRam = mmap((void *)RAM_ADDR, RAM_SIZE, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS | MAP_FIXED | map_locked_flag, shmem_ram_fd, 0);
+        }
+#else
         void * pRam = mmap((void *)RAM_ADDR, RAM_SIZE, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS | MAP_FIXED | map_locked_flag, shmem_ram_fd, 0);
+#endif
         if (pRam == MAP_FAILED)
         {
             asm_printf("ERROR: Failed calling mmap(ram) errno=%d=%s\n", errno, strerror(errno));
