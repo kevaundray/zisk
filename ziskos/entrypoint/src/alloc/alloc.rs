@@ -1,5 +1,10 @@
-pub static mut HEAP_POS: usize = 0;
-pub static mut HEAP_TOP: usize = 0;
+#[used]
+#[export_name = "ZISK_BUMP_HEAP_POS"]
+static mut HEAP_POS: usize = 0;
+
+#[used]
+#[export_name = "ZISK_BUMP_HEAP_TOP"]
+static mut HEAP_TOP: usize = 0;
 
 #[cfg(all(target_os = "zkvm", target_vendor = "zisk"))]
 #[no_mangle]
