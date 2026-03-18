@@ -10,6 +10,9 @@ void asm_printf(const char *format, ...)
     fflush(stderr);
 
     // Get current date and time
+    struct timeval tv;
+    gettimeofday(&tv, NULL);
+    struct tm *tm_info = localtime(&tv.tv_sec);
     time_t now = time(NULL);
     
     // Custom format: YYYY-MM-DD HH:MM:SS
@@ -30,7 +33,7 @@ void asm_printf(const char *format, ...)
     }
 
     // Print the prefix first
-    printf("[ASM %s %s] ", log_name, date_and_time);
+    printf("[ASM %s %s.%06ld] ", log_name, date_and_time, tv.tv_usec);
     
     // Handle the variable arguments
     va_list args;

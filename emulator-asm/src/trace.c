@@ -94,20 +94,23 @@ void trace_cleanup (void)
 
 void trace_preventive_cleanup (void)
 {
-    // Unmap all mapped chunks
-    for (uint64_t chunk_id = 0; chunk_id < TRACE_NUMBER_OF_CHUNKS; chunk_id++)
+    if (create_output_shm)
     {
-        // Build the chunk shared memory name
-        char shmem_chunk_name[128];
-        trace_generate_shmem_chunk_name(shmem_chunk_name, sizeof(shmem_chunk_name), chunk_id);
-
-        // Make sure the chunk shared memory is deleted
-        int result = shm_unlink(shmem_chunk_name);
-        if (result != 0)
+        // Unmap all mapped chunks
+        for (uint64_t chunk_id = 0; chunk_id < TRACE_NUMBER_OF_CHUNKS; chunk_id++)
         {
-            break;
+            // Build the chunk shared memory name
+            char shmem_chunk_name[128];
+            trace_generate_shmem_chunk_name(shmem_chunk_name, sizeof(shmem_chunk_name), chunk_id);
+
+            // Make sure the chunk shared memory is deleted
+            int result = shm_unlink(shmem_chunk_name);
+            if (result != 0)
+            {
+                break;
+            }
+            if (verbose) asm_printf("trace_preventive_cleanup() unlinked chunk shared memory %s\n", shmem_chunk_name);
         }
-        if (verbose) asm_printf("trace_preventive_cleanup() unlinked chunk shared memory %s\n", shmem_chunk_name);
     }
 }
 
@@ -129,27 +132,37 @@ void trace_map_next_chunk (void)
     char shmem_chunk_name[128];
     trace_generate_shmem_chunk_name(shmem_chunk_name, sizeof(shmem_chunk_name), chunk_id);
 
-    // Make sure the chunk shared memory is deleted
-    shm_unlink(shmem_chunk_name);
-
-    // Create the output shared memory
-    trace_chunk_fd[chunk_id] = shm_open(shmem_chunk_name, O_RDWR | O_CREAT | O_EXCL, 0666);
-    if (trace_chunk_fd[chunk_id] < 0)
+    if (!create_output_shm)
     {
-        asm_printf("ERROR: trace_map_next_chunk() failed calling trace shm_open(%s) errno=%d=%s\n", shmem_chunk_name, errno, strerror(errno));
-        exit(-1);
+        // Open the chunk shared memory as read-write
+        trace_chunk_fd[chunk_id] = shm_open(shmem_chunk_name, O_RDWR, 0666);
     }
 
-    // Size it
-    int result = ftruncate(trace_chunk_fd[chunk_id], chunk_size);
-    if (result != 0)
+    // If we failed opening the existing shared memory, create it now
+    if (create_output_shm || (trace_chunk_fd[chunk_id] < 0))
     {
-        asm_printf("ERROR: trace_map_next_chunk() failed calling ftruncate(%s) errno=%d=%s\n", shmem_chunk_name, errno, strerror(errno));
-        exit(-1);
-    }
+        // Make sure the chunk shared memory is deleted
+        shm_unlink(shmem_chunk_name);
 
-    // Sync
-    fsync(trace_chunk_fd[chunk_id]);
+        // Create the output shared memory
+        trace_chunk_fd[chunk_id] = shm_open(shmem_chunk_name, O_RDWR | O_CREAT | O_EXCL, 0666);
+        if (trace_chunk_fd[chunk_id] < 0)
+        {
+            asm_printf("ERROR: trace_map_next_chunk() failed calling trace shm_open(%s) errno=%d=%s\n", shmem_chunk_name, errno, strerror(errno));
+            exit(-1);
+        }
+
+        // Size it
+        int result = ftruncate(trace_chunk_fd[chunk_id], chunk_size);
+        if (result != 0)
+        {
+            asm_printf("ERROR: trace_map_next_chunk() failed calling ftruncate(%s) errno=%d=%s\n", shmem_chunk_name, errno, strerror(errno));
+            exit(-1);
+        }
+
+        // Sync
+        fsync(trace_chunk_fd[chunk_id]);
+    }
 
     // Map it to the trace address
     if (verbose) gettimeofday(&start_time, NULL);

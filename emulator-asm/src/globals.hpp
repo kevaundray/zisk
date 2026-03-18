@@ -18,7 +18,9 @@ extern bool trace_trace;
 extern bool verbose;
 extern bool save_to_file;
 extern bool share_input_shm; // Shares input shared memories: input, precompile results and control input, using a common name
-extern bool open_input_shm; // Opens existing input shared memories, without creating them.  They must be previously created by another process (assembly emulator or witness computation)
+extern bool create_input_shm; // Create input shared memories.  If false, open them without creating them.  They must be previously created by another process (assembly emulator or witness computation)
+extern bool create_internal_shm; // Create internal shared memories.  If false, open them without creating them.  They must be previously created by another process (assembly emulator or witness computation)
+extern bool create_output_shm; // Create output shared memories.  If false, open them without creating them.  They must be previously created by another process (assembly emulator or witness computation)
 extern char input_file[4096];
 extern bool redirect_output_to_file;
 extern bool server; // Indicates that this process is a server

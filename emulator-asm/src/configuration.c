@@ -47,6 +47,7 @@ void print_usage (void)
     asm_printf("\t-u unlock physical memory in mmap\n");
     asm_printf("\t--share_input_shm share input shared memories\n");
     asm_printf("\t--open_input_shm open existing input shared memories\n");
+    asm_printf("\t--open_all_shm open existing shared memories: input, output and internal ones\n");
 #ifdef ASM_PRECOMPILE_CACHE
     asm_printf("\t--precompile-cache-store store precompile results in cache file\n");
     asm_printf("\t--precompile-cache-load load precompile results from cache file\n");
@@ -384,7 +385,14 @@ void parse_arguments(int argc, char *argv[])
             }
             if (strcmp(argv[i], "--open_input_shm") == 0)
             {
-                open_input_shm = true;
+                create_input_shm = false;
+                continue;
+            }
+            if (strcmp(argv[i], "--open_all_shm") == 0)
+            {
+                create_input_shm = false;
+                create_output_shm = false;
+                create_internal_shm = false;
                 continue;
             }
             if (strcmp(argv[i], "--redirect-output-to-file") == 0)
@@ -1020,5 +1028,10 @@ void configure (void)
         asm_printf("\toutput=%u\n", output);
         asm_printf("\tprecompile_results_enabled=%u\n", precompile_results_enabled);
         asm_printf("\toutput_riscof=%u\n", output_riscof);
+        asm_printf("\tsilent=%u\n", silent);
+        asm_printf("\tmetrics=%u\n", metrics);
+        asm_printf("\tcreate_input_shm=%u\n", create_input_shm);
+        asm_printf("\tcreate_internal_shm=%u\n", create_internal_shm);
+        asm_printf("\tcreate_output_shm=%u\n", create_output_shm);
     }
 }
