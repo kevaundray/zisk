@@ -1003,10 +1003,13 @@ void server_cleanup (void)
     {
         asm_printf("ERROR: Failed calling munmap(rom) errno=%d=%s\n", errno, strerror(errno));
     }
-    result = shm_unlink(shmem_rom_name);
-    if (result == -1)
+    if (delete_internal_shm)
     {
-        asm_printf("ERROR: Failed calling shm_unlink(%s) errno=%d=%s\n", shmem_rom_name, errno, strerror(errno));
+        result = shm_unlink(shmem_rom_name);
+        if (result == -1)
+        {
+            asm_printf("ERROR: Failed calling shm_unlink(%s) errno=%d=%s\n", shmem_rom_name, errno, strerror(errno));
+        }
     }
 
     // Cleanup RAM
@@ -1015,10 +1018,13 @@ void server_cleanup (void)
     {
         asm_printf("ERROR: Failed calling munmap(ram) errno=%d=%s\n", errno, strerror(errno));
     }
-    result = shm_unlink(shmem_ram_name);
-    if (result == -1)
+    if (delete_internal_shm)
     {
-        asm_printf("ERROR: Failed calling shm_unlink(%s) errno=%d=%s\n", shmem_ram_name, errno, strerror(errno));
+        result = shm_unlink(shmem_ram_name);
+        if (result == -1)
+        {
+            asm_printf("ERROR: Failed calling shm_unlink(%s) errno=%d=%s\n", shmem_ram_name, errno, strerror(errno));
+        }
     }
 
     // Cleanup INPUT
@@ -1027,10 +1033,13 @@ void server_cleanup (void)
     {
         asm_printf("ERROR: Failed calling munmap(input) errno=%d=%s\n", errno, strerror(errno));
     }
-    result = shm_unlink(shmem_input_name);
-    if (result == -1)
+    if (delete_input_shm)
     {
-        asm_printf("ERROR: Failed calling shm_unlink(%s) errno=%d=%s\n", shmem_input_name, errno, strerror(errno));
+        result = shm_unlink(shmem_input_name);
+        if (result == -1)
+        {
+            asm_printf("ERROR: Failed calling shm_unlink(%s) errno=%d=%s\n", shmem_input_name, errno, strerror(errno));
+        }
     }
 
     if (precompile_results_enabled && (gen_method != ChunkPlayerMTCollectMem) && (gen_method != ChunkPlayerMemReadsCollectMain))
@@ -1041,10 +1050,13 @@ void server_cleanup (void)
         {
             asm_printf("ERROR: Failed calling munmap(precompile) errno=%d=%s\n", errno, strerror(errno));
         }
-        result = shm_unlink(shmem_precompile_name);
-        if (result == -1)
+        if (delete_input_shm)
         {
-            asm_printf("ERROR: Failed calling shm_unlink(%s) errno=%d=%s\n", shmem_precompile_name, errno, strerror(errno));
+            result = shm_unlink(shmem_precompile_name);
+            if (result == -1)
+            {
+                asm_printf("ERROR: Failed calling shm_unlink(%s) errno=%d=%s\n", shmem_precompile_name, errno, strerror(errno));
+            }
         }
 
         // Semaphores cleanup
@@ -1129,9 +1141,19 @@ void server_cleanup (void)
     }
 
     // Post shutdown done semaphore
-    result = sem_post(sem_shutdown_done);
-    if (result == -1)
+    if (just_create_all_shm)
     {
-        asm_printf("ERROR: Failed calling sem_post(%s) errno=%d=%s\n", sem_shutdown_done_name, errno, strerror(errno));
+        result = sem_unlink(sem_shutdown_done_name);
+        if (result == -1)
+        {
+            asm_printf("ERROR: Failed calling sem_unlink(%s) errno=%d=%s\n", sem_shutdown_done_name, errno, strerror(errno));
+        }
+    }
+    else{
+        result = sem_post(sem_shutdown_done);
+        if (result == -1)
+        {
+            asm_printf("ERROR: Failed calling sem_post(%s) errno=%d=%s\n", sem_shutdown_done_name, errno, strerror(errno));
+        }
     }
 }

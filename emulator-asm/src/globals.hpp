@@ -21,11 +21,16 @@ extern bool share_input_shm; // Shares input shared memories: input, precompile 
 extern bool create_input_shm; // Create input shared memories.  If false, open them without creating them.  They must be previously created by another process (assembly emulator or witness computation)
 extern bool create_internal_shm; // Create internal shared memories.  If false, open them without creating them.  They must be previously created by another process (assembly emulator or witness computation)
 extern bool create_output_shm; // Create output shared memories.  If false, open them without creating them.  They must be previously created by another process (assembly emulator or witness computation)
+extern bool delete_input_shm; // Delete input shared memories.  If false, close them without deleting them.  They must be previously deleted by another process (assembly emulator or witness computation)
+extern bool delete_internal_shm; // Delete internal shared memories.  If false, close them without deleting them.  They must be previously deleted by another process (assembly emulator or witness computation)
+extern bool delete_output_shm; // Delete output shared memories.  If false, close them without deleting them.  They must be previously deleted by another process (assembly emulator or witness computation)
+extern bool just_create_all_shm; // Just create all shared memories and exit, without doing any other setup or starting the server.
 extern char input_file[4096];
 extern bool redirect_output_to_file;
 extern bool server; // Indicates that this process is a server
 extern bool client; // Indicates that this process is a client (used for testing the server)
-extern char shm_prefix[MAX_SHM_PREFIX_LENGTH]; // Shared memory prefix
+extern char shm_prefix[MAX_SHM_PREFIX_LENGTH]; // Shared memories prefix
+extern char sem_prefix[MAX_SHM_PREFIX_LENGTH]; // Semaphores prefix
 extern int map_locked_flag; // Flag used in mmap to indicate if the physical memory is locked in RAM (MAP_LOCKED) or can be swapped (0).  By default it is locked, but it can be unlocked with the -u argument, which can be useful for testing and debugging purposes, e.g. to allow core dumps when the assembly code crashes
 extern uint64_t chunk_mask; // ZIP: 0, 1, 2, 3, 4, 5, 6 or 7
 extern bool do_shutdown; // If true, the client will perform a shutdown request to the server when done

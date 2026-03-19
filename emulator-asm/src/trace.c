@@ -85,7 +85,10 @@ void trace_cleanup (void)
         trace_generate_shmem_chunk_name(shmem_chunk_name, sizeof(shmem_chunk_name), chunk_id);
 
         // Make sure the chunk shared memory is deleted
-        shm_unlink(shmem_chunk_name);
+        if (delete_output_shm)
+        {
+            shm_unlink(shmem_chunk_name);
+        }
     }
 
     // Reset next chunk id
