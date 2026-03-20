@@ -100,6 +100,9 @@ pub const HINT_KECCAK256: u32 = 0x0700;
 // Blake2b hint codes
 pub const HINT_BLAKE2B_COMPRESS: u32 = 0x0800;
 
+// RIPEMD-160 hint codes
+pub const HINT_RIPEMD160: u32 = 0x0900;
+
 /// Control code variants for stream control.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[repr(u32)]
@@ -201,6 +204,10 @@ pub enum BuiltInHint {
     // Blake2b hint types.
     /// Blake2b compression function.
     Blake2bCompress = HINT_BLAKE2B_COMPRESS,
+
+    // RIPEMD-160 hint types.
+    /// RIPEMD-160 hash (pure software implementation, no ZK circuit witness).
+    Ripemd160 = HINT_RIPEMD160,
 }
 
 impl Display for BuiltInHint {
@@ -235,6 +242,8 @@ impl Display for BuiltInHint {
             BuiltInHint::Keccak256 => "KECCAK256",
             // Blake2b Hint
             BuiltInHint::Blake2bCompress => "BLAKE2B_COMPRESS",
+            // RIPEMD-160 Hint
+            BuiltInHint::Ripemd160 => "RIPEMD160",
         };
 
         write!(f, "{} ({:#x})", name, *self as u32)
@@ -275,6 +284,8 @@ impl TryFrom<u32> for BuiltInHint {
             HINT_KECCAK256 => Ok(Self::Keccak256),
             // Blake2b Hint
             HINT_BLAKE2B_COMPRESS => Ok(Self::Blake2bCompress),
+            // RIPEMD-160 Hint
+            HINT_RIPEMD160 => Ok(Self::Ripemd160),
             _ => Err(anyhow::anyhow!("Invalid built-in hint code: {:#x}", value)),
         }
     }
@@ -361,6 +372,8 @@ impl HintCode {
 
             // Blake2b Hint
             HintCode::BuiltIn(BuiltInHint::Blake2bCompress) => HINT_BLAKE2B_COMPRESS,
+            // RIPEMD-160 Hint
+            HintCode::BuiltIn(BuiltInHint::Ripemd160) => HINT_RIPEMD160,
 
             // Custom Hints
             HintCode::Custom(code) => code,

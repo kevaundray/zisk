@@ -13,6 +13,7 @@ use ziskos_hints::handlers::bn254::{
 use ziskos_hints::handlers::keccak256::keccak256_hint;
 use ziskos_hints::handlers::kzg::verify_kzg_proof_hint;
 use ziskos_hints::handlers::modexp::modexp_hint;
+use ziskos_hints::handlers::ripemd160::ripemd160_hint;
 use ziskos_hints::handlers::secp256k1::{secp256k1_ecdsa_verify_hint, secp256k1_ecrecover_hint};
 use ziskos_hints::handlers::secp256r1::secp256r1_ecdsa_verify_hint;
 use ziskos_hints::handlers::sha256::sha256_hint;
@@ -107,6 +108,9 @@ impl HintHandlers {
 
             // Blake2b Hint Codes
             BuiltInHint::Blake2bCompress => blake2b_compress_hint(&data),
+
+            // RIPEMD-160 Hint Codes
+            BuiltInHint::Ripemd160 => ripemd160_hint(&data, data_len_bytes),
 
             // Input Hint Codes
             BuiltInHint::Input => unreachable!(

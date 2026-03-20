@@ -73,9 +73,15 @@ pub unsafe extern "C" fn zkvm_ripemd160(
     data: *const u8,
     len: usize,
     output: *mut zkvm_ripemd160_hash,
-    #[cfg(feature = "hints")] _hints: &mut Vec<u64>,
+    #[cfg(feature = "hints")] hints: &mut Vec<u64>,
 ) -> zkvm_status {
-    super::ripemd160_c(data, len, (*output).data.as_mut_ptr());
+    super::ripemd160_c(
+        data,
+        len,
+        (*output).data.as_mut_ptr(),
+        #[cfg(feature = "hints")]
+        hints,
+    );
     ZKVM_EOK
 }
 
