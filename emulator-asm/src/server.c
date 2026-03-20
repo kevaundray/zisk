@@ -706,19 +706,25 @@ void server_setup (void)
 
 void server_reset_fast (void)
 {
-    // Reset precompile read address for next emulation
-    if (precompile_results_enabled)
-    {
-        // Set precompile read counter to 0 for next emulation
-        *precompile_read_address = 0;
+#ifdef DEBUG
+    gettimeofday(&start_time, NULL);
+#endif
+    // Set control output counters to 0 for next emulation
+    *precompile_read_address = 0;
+    *waiting_for_precompile_address = 0;
+    *waiting_for_input_address = 0;
 
-        // Sync control output shared memory so that the writer can see the precompile reads we have
-        // done, and thus update the precompile_written_address if needed
-        if (msync((void *)shmem_control_output_address, CONTROL_OUTPUT_SIZE, MS_SYNC) != 0) {
-            asm_printf("ERROR: server_reset_fast() msync failed for shmem_control_output_address errno=%d=%s\n", errno, strerror(errno));
-            exit(-1);
-        }
+    // Sync control output shared memory so that the writer can see the counters now
+    if (msync((void *)shmem_control_output_address, CONTROL_OUTPUT_SIZE, MS_SYNC) != 0)
+    {
+        asm_printf("ERROR: server_reset_fast() msync failed for shmem_control_output_address errno=%d=%s\n", errno, strerror(errno));
+        exit(-1);
     }
+#ifdef DEBUG
+    gettimeofday(&stop_time, NULL);
+    duration = TimeDiff(start_time, stop_time);
+    if (verbose) asm_printf("server_reset_fast() msync(shmem_control_output_address) in %lu us\n", duration);
+#endif
 }
 
 void server_reset_slow (void)
@@ -1093,7 +1099,7 @@ void server_cleanup (void)
     {
         asm_printf("ERROR: Failed calling munmap(control_input) errno=%d=%s\n", errno, strerror(errno));
     }
-    if (!wait_flag)
+    if (!wait_flag && delete_input_shm)
     {
         result = shm_unlink(shmem_control_input_name);
         if (result == -1)
@@ -1106,7 +1112,7 @@ void server_cleanup (void)
     {
         asm_printf("ERROR: Failed calling munmap(control_output) errno=%d=%s\n", errno, strerror(errno));
     }
-    if (!wait_flag)
+    if (!wait_flag && delete_output_shm)
     {
         result = shm_unlink(shmem_control_output_name);
         if (result == -1)
