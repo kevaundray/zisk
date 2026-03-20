@@ -16,22 +16,7 @@
 #include "trace.hpp"
 #include "emu.hpp"
 #include "log.hpp"
-
-/**************/
-/* TRACE SIZE */
-/**************/
-
-void set_trace_size (uint64_t new_trace_size)
-{
-    // Update trace global variables
-    // asm_printf("%s trace resize (trace_resize_request: %ld):  %ld MB => %ld MB\n", log_name, trace_resize_request, trace_size >> 20, new_trace_size >> 20);
-    
-    // trace_resize_request = 0;
-
-    trace_size = new_trace_size;
-    trace_address_threshold = TRACE_ADDR + trace_size - MAX_CHUNK_TRACE_SIZE;
-    pOutputTrace[2] = trace_size;    
-}
+#include "trace.hpp"
 
 /**************/
 /* PRINT REGS */
@@ -264,9 +249,6 @@ extern void _realloc_trace (void)
 
     // Map next chunk of the trace shared memory
     trace_map_next_chunk();
-
-    // Update trace global variables
-    set_trace_size(trace_total_mapped_size);
 
 #ifdef DEBUG
     if (verbose) asm_printf("realloc_trace() realloc counter=%lu trace_address=0x%lx trace_size=%lu=%lx max_address=0x%lx trace_address_threshold=0x%lx chunk_size=%lu\n", realloc_counter, trace_address, trace_size, trace_size, trace_address + trace_size, trace_address_threshold, chunk_size);

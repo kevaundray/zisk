@@ -17,6 +17,22 @@
 #include "emu.hpp"
 #include "log.hpp"
 
+/**************/
+/* TRACE SIZE */
+/**************/
+
+void set_trace_size (uint64_t new_trace_size)
+{
+    // Update trace global variables
+    // asm_printf("%s trace resize (trace_resize_request: %ld):  %ld MB => %ld MB\n", log_name, trace_resize_request, trace_size >> 20, new_trace_size >> 20);
+    
+    // trace_resize_request = 0;
+
+    trace_size = new_trace_size;
+    trace_address_threshold = TRACE_ADDR + trace_size - MAX_CHUNK_TRACE_SIZE;
+    pOutputTrace[2] = trace_size;    
+}
+
 uint64_t next_chunk_id = 0; // Next trace chunk id to be mapped, starting from 0
 int trace_chunk_fd[TRACE_NUMBER_OF_CHUNKS]; // File descriptors for each chunk
 uint64_t trace_total_mapped_size = 0; // Total mapped trace size
@@ -117,6 +133,54 @@ void trace_preventive_cleanup (void)
     }
 }
 
+bool shm_exists (char * name)
+{
+    int fd = shm_open(name, O_RDWR, 0666);
+    if (fd < 0)
+    {
+        if (errno == ENOENT)
+        {
+            return false;
+        }
+        else
+        {
+            asm_printf("ERROR: Failed calling shm_open(%s) errno=%d=%s\n", name, errno, strerror(errno));
+            exit(-1);
+        }
+    }
+    else
+    {
+        close(fd);
+        return true;
+    }
+}
+
+void trace_map_all_existing_chunks (void)
+{
+    // Check we are not creating the shared memories, just mapping them
+    if (create_output_shm)
+    {
+        asm_printf("trace_map_all_existing_chunks() called but create_output_shm is true, so not mapping all chunks to avoid creating them all at once\n");
+        exit(-1);
+    }
+    // List all possible chunks
+    for (uint64_t chunk_id = 0; chunk_id < TRACE_NUMBER_OF_CHUNKS; chunk_id++)
+    {
+        // Build the chunk shared memory name
+        char shmem_chunk_name[128];
+        trace_generate_shmem_chunk_name(shmem_chunk_name, sizeof(shmem_chunk_name), chunk_id);
+
+        if (!shm_exists(shmem_chunk_name))
+        {
+            break;
+        }
+
+        // Map the chunk shared memory to the trace address space
+        trace_map_next_chunk();
+        if (verbose) asm_printf("trace_map_all_existing_chunks() mapped chunk shared memory %s\n", shmem_chunk_name);
+    }
+}
+
 void trace_map_next_chunk (void)
 {
     // Get the next chunk id, size and address
@@ -204,17 +268,28 @@ void trace_map_next_chunk (void)
     // Update total mapped size
     trace_total_mapped_size += chunk_size;
 
+    // Update trace global variables
+    set_trace_size(trace_total_mapped_size);
+
     // Increment next chunk id
     next_chunk_id++;
 }
 
 void trace_map_initialize (void)
 {
-    // Perform preventive cleanup of any leftover shared memory chunks
-    trace_preventive_cleanup();
+    if (create_output_shm)
+    {
+        // Perform preventive cleanup of any leftover shared memory chunks
+        trace_preventive_cleanup();
 
-    // Map the first chunk, i.e. chunk 0
-    trace_map_next_chunk();
+        // Map the first chunk, i.e. chunk 0
+        trace_map_next_chunk();
+    }
+    else
+    {
+        // Map all existing chunks
+        trace_map_all_existing_chunks();
+    }
 
     trace_address = TRACE_ADDR;
     pOutputTrace = (uint64_t *)TRACE_ADDR;
