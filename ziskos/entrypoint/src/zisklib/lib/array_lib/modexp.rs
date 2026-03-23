@@ -252,6 +252,7 @@ fn modexp_long(
 /// - `result_ptr` points to an array of at least `modulus_len` bytes
 ///
 /// Returns the number of bytes written to `result_ptr` (always equals `modulus_len`, zero-padded)
+#[allow(clippy::too_many_arguments)]
 #[inline]
 pub(crate) unsafe fn modexp_bytes_c(
     base_ptr: *const u8,
