@@ -9,6 +9,9 @@ void asm_printf(const char *format, ...)
     // Flush any previous error message
     fflush(stderr);
 
+    // Determine the stream to use
+    FILE *stream = stdio ? stderr : stdout;
+
     // Get current date and time
     struct timeval tv;
     gettimeofday(&tv, NULL);
@@ -33,15 +36,31 @@ void asm_printf(const char *format, ...)
     }
 
     // Print the prefix first
-    printf("[ASM %s %s.%06ld] ", log_name, date_and_time, tv.tv_usec);
+    fprintf(stream, "[ASM %s %s.%06ld] ", log_name, date_and_time, tv.tv_usec);
     
     // Handle the variable arguments
     va_list args;
     va_start(args, format);
-    vprintf(format, args);
+    vfprintf(stream, format, args);
     va_end(args);
 
     // Flush the output to ensure this message is printed immediately, in case we are exiting right
     // after this call
-    fflush(stdout);
+    fflush(stream);
+}
+
+void asm_raw_printf(const char *format, ...)
+{
+    // Determine the stream to use
+    FILE *stream = stdio ? stderr : stdout;
+
+    // Handle the variable arguments
+    va_list args;
+    va_start(args, format);
+    vfprintf(stream, format, args);
+    va_end(args);
+
+    // Flush the output to ensure this message is printed immediately, in case we are exiting right
+    // after this call
+    fflush(stream);
 }

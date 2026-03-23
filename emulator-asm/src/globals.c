@@ -33,6 +33,7 @@ uint64_t number_of_mt_requests = 1;
 uint16_t port = 0;
 uint64_t chunk_player_address = 0;
 bool wait_flag = true;
+bool stdio = false;
 
 // Shared memory names
 char shmem_control_input_name[128] = {0};

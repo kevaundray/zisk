@@ -59,6 +59,7 @@ void print_usage (void)
         asm_printf("\t-r <precompile_results_file>\n");
     }
     asm_printf("\t--redirect-output-to-file redirect output to file\n");
+    asm_printf("\t--stdio use standard input and output for communication instead of TCP\n");
     asm_printf("\t-h/--help print this\n");
 }
 
@@ -444,6 +445,11 @@ void parse_arguments(int argc, char *argv[])
             if (strcmp(argv[i], "--redirect-output-to-file") == 0)
             {
                 redirect_output_to_file = true;
+                continue;
+            }
+            if (strcmp(argv[i], "--stdio") == 0)
+            {
+                stdio = true;
                 continue;
             }
 #ifdef ASM_PRECOMPILE_CACHE
@@ -1091,5 +1097,6 @@ void configure (void)
         asm_printf("\tcreate_input_shm=%u\n", create_input_shm);
         asm_printf("\tcreate_internal_shm=%u\n", create_internal_shm);
         asm_printf("\tcreate_output_shm=%u\n", create_output_shm);
+        asm_printf("\tstdio=%u\n", stdio);
     }
 }

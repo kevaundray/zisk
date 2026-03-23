@@ -38,6 +38,7 @@ extern uint64_t number_of_mt_requests; // Loop to send this number of minimal tr
 extern uint16_t port; // Service TCP port
 extern uint64_t chunk_player_address; // Chunk player address, used for generation methods that use the chunk player, i.e. gen_method=8 or gen_method=10
 extern bool wait_flag; // If true, the shmem will get a flag set to 1 if we are waiting for a semaphore, and set it back to 0 when we are not waiting anymore. This can be used for debugging purposes to know if the assembly code is waiting for a semaphore or not.
+extern bool stdio; // If true, the assembly code will use standard input and output for communication instead of TCP
 
 // Shared memory names
 extern char shmem_control_input_name[128];

@@ -889,7 +889,7 @@ void server_run (void)
 
         for (unsigned int i = 0; i < output_size; i++)
         {
-            printf("%08x\n", *pOutput);
+            asm_raw_printf("%08x\n", *pOutput);
             pOutput++;
         }
         fflush(stdout);
@@ -911,7 +911,7 @@ void server_run (void)
         for (unsigned int i = 0; i < output_size; i++)
         {
             pOutput++;
-            printf("%08x\n", *pOutput);
+            asm_raw_printf("%08x\n", *pOutput);
         }
         fflush(stdout);
         fflush(stderr);
