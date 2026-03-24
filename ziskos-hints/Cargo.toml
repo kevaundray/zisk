@@ -15,6 +15,7 @@ repository = { workspace = true }
 categories = { workspace = true }
 
 [dependencies]
+zkvm-interface = { workspace = true }
 lib-c = { workspace = true }
 
 num-bigint = { workspace = true }
@@ -41,9 +42,6 @@ zisk-verifier = { workspace = true }
 [features]
 default = ["hints"]
 hints = []
-
-[build-dependencies]
-bindgen = "0.72"
 
 [lints.rust]
 unexpected_cfgs = { level = "warn", check-cfg = [

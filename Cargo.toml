@@ -51,6 +51,7 @@ members = [
     "sdk",
     "ziskbuild",
 	"definitions",
+    "zkvm-interface",
 ]
 
 resolver = "2"
@@ -100,6 +101,7 @@ mem-common = { path = "state-machines/mem-common" }
 mem-planner-cpp = { path = "state-machines/mem-cpp" }
 sm-rom = { path = "state-machines/rom" }
 ziskclib = { path = "ziskclib" }
+zkvm-interface = { path = "zkvm-interface" }
 ziskos = { path = "ziskos/entrypoint" }
 ziskos-hints = { path = "ziskos-hints" }
 circuit = { path = "tools/circuit" }

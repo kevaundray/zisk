@@ -6291,7 +6291,6 @@ version = "0.17.0"
 dependencies = [
  "anyhow",
  "bincode",
- "bindgen 0.72.1",
  "bytes",
  "cfg-if",
  "critical-section",
@@ -6318,6 +6317,7 @@ dependencies = [
  "zisk-common",
  "zisk-definitions",
  "zisk-verifier",
+ "zkvm-interface",
 ]
 
 [[package]]
@@ -6326,7 +6326,6 @@ version = "0.17.0"
 dependencies = [
  "anyhow",
  "bincode",
- "bindgen 0.72.1",
  "cfg-if",
  "fields",
  "getrandom 0.2.17",
@@ -6343,6 +6342,7 @@ dependencies = [
  "sha2",
  "tiny-keccak",
  "zisk-verifier",
+ "zkvm-interface",
 ]
 
 [[package]]
@@ -6350,6 +6350,13 @@ name = "ziskos-static-lib"
 version = "0.17.0"
 dependencies = [
  "ziskos",
+]
+
+[[package]]
+name = "zkvm-interface"
+version = "0.17.0"
+dependencies = [
+ "bindgen 0.72.1",
 ]
 
 [[package]]
