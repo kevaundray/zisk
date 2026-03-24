@@ -578,28 +578,37 @@ void stdio_server (void)
     bool bShutdown = false;
     bool bReset;
 
+    if (!silent)
+    {
+        asm_printf("Waiting for incoming data from stdin in pid=%d...\n", process_id);
+    }
+
+    // Disable buffering on stdin and stdout
+    setbuf(stdin, NULL);
+    setbuf(stdout, NULL);
+
     while (true)
     {
         // Read client request
         uint64_t request[5];
-        ssize_t bytes_read = fread(request, 1, sizeof(request), stdin);
+        ssize_t bytes_read = read(STDIN_FILENO, request, sizeof(request));
         if (bytes_read != sizeof(request))
         {
             if ((errno != 0) && (errno != 2))
             {
-                asm_printf("WARNING: Failed calling fread(stdin) invalid bytes_read=%ld errno=%d=%s\n", bytes_read, errno, strerror(errno));
+                asm_printf("WARNING: Failed calling read(stdin) invalid bytes_read=%ld errno=%d=%s\n", bytes_read, errno, strerror(errno));
             }
             break;
         }
 #ifdef DEBUG
         if (verbose)
         {
-            asm_printf("fread(stdin) returned: %ld\n", bytes_read);
+            asm_printf("read(stdin) returned: %ld\n", bytes_read);
         }
 #endif
         if (verbose)
         {
-            asm_printf("fread(stdin)'d request=[%lu, 0x%lx, 0x%lx, 0x%lx, 0x%lx]\n", request[0], request[1], request[2], request[3], request[4]);
+            asm_printf("read(stdin)'d request=[%lu, 0x%lx, 0x%lx, 0x%lx, 0x%lx]\n", request[0], request[1], request[2], request[3], request[4]);
         }
 
         // Process request and get response
@@ -608,14 +617,14 @@ void stdio_server (void)
 
         if (verbose)
         {
-            asm_printf("fwrite(stdout)'ing response=[%lu, 0x%lx, 0x%lx, 0x%lx, 0x%lx]\n", response[0], response[1], response[2], response[3], response[4]);
+            asm_printf("write(stdout)'ing response=[%lu, 0x%lx, 0x%lx, 0x%lx, 0x%lx]\n", response[0], response[1], response[2], response[3], response[4]);
         }
 
         // Write response to client
-        ssize_t bytes_sent = fwrite(response, 1, sizeof(response), stdout);
+        ssize_t bytes_sent = write(STDOUT_FILENO, response, sizeof(response));
         if (bytes_sent != sizeof(response))
         {
-            asm_printf("ERROR: Failed calling fwrite(stdout) invalid bytes_sent=%ld errno=%d=%s\n", bytes_sent, errno, strerror(errno));
+            asm_printf("ERROR: Failed calling write(stdout) invalid bytes_sent=%ld errno=%d=%s\n", bytes_sent, errno, strerror(errno));
             break;
         }
         else if (verbose)

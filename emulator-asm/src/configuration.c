@@ -365,6 +365,38 @@ void parse_arguments(int argc, char *argv[])
                 }
                 continue;
             }
+            if (strcmp(argv[i], "--server_pid") == 0)
+            {
+                i++;
+                if (i >= argc)
+                {
+                    asm_printf("ERROR: Detected argument --server_pid in the last position; please provide server pid after it\n");
+                    print_usage();
+                    exit(-1);
+                }
+                errno = 0;
+                char *endptr;
+                uint64_t arguments_server_pid_u64 = strtoul(argv[i], &endptr, 10);
+                server_pid = arguments_server_pid_u64;
+
+                // Check for errors
+                if (errno == ERANGE) {
+                    asm_printf("ERROR: Server PID is too large\n");
+                    print_usage();
+                    exit(-1);
+                } else if (endptr == argv[i]) {
+                    asm_printf("ERROR: No digits found while parsing server PID\n");
+                    print_usage();
+                    exit(-1);
+                } else if (*endptr != '\0') {
+                    asm_printf("ERROR: Extra characters after server PID: %s\n", endptr);
+                    print_usage();
+                    exit(-1);
+                } else {
+                    asm_printf("Got server PID= %u\n", server_pid);
+                }
+                continue;
+            }
             if (strcmp(argv[i], "-f") == 0)
             {
                 save_to_file = true;

@@ -34,6 +34,7 @@ uint16_t port = 0;
 uint64_t chunk_player_address = 0;
 bool wait_flag = true;
 bool stdio = false;
+int server_pid = 0;
 
 // Shared memory names
 char shmem_control_input_name[128] = {0};
