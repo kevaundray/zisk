@@ -105,12 +105,16 @@ char server_stdout_name[256];
 
 void client_stdio_connect ( void )
 {
-    // Set paths based on server PID
-    assert(server_pid > 0);
+    // Set paths based on server PID or default to fifos if server PID is not provided
     if (server_pid > 0)
     {
         snprintf(server_stdin_name, sizeof(server_stdin_name), "/proc/%d/fd/0", server_pid);
         snprintf(server_stdout_name, sizeof(server_stdout_name), "/proc/%d/fd/1", server_pid);
+    }
+    else
+    {
+        sprintf(server_stdin_name, "/tmp/fifoinput");
+        sprintf(server_stdout_name, "/tmp/fifooutput");
     }
 
     // Construct paths to server's stdin and stdout
@@ -150,6 +154,7 @@ void client_stdio_send ( const uint64_t * request )
         asm_printf("ERROR: Failed calling write() bytes_written=%ld errno=%d=%s\n", bytes_written, errno, strerror(errno));
         exit(-1);
     }
+    if (verbose) asm_printf("Wrote %ld bytes to %s\n", bytes_written, server_stdin_name);
 }
 
 void client_stdio_recv ( uint64_t * response )
@@ -172,7 +177,7 @@ void client_stdio_recv ( uint64_t * response )
             exit(-1);
         }
         total_read += bytes_read;
-        asm_printf("Read %ld bytes, total_read=%ld\n", bytes_read, total_read);
+        if (verbose) asm_printf("Read %ld bytes from %s, total_read=%ld\n", bytes_read, server_stdout_name, total_read);
     }
 }
 
