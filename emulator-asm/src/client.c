@@ -108,18 +108,21 @@ void client_stdio_connect ( void )
     // Set paths based on server PID or default to fifos if server PID is not provided
     if (server_pid > 0)
     {
+        // Construct paths to server's stdin and stdout based on server PID, e.g., /proc/12345/fd/0 and /proc/12345/fd/1
         snprintf(server_stdin_name, sizeof(server_stdin_name), "/proc/%d/fd/0", server_pid);
         snprintf(server_stdout_name, sizeof(server_stdout_name), "/proc/%d/fd/1", server_pid);
     }
     else
     {
+        // Default to fifos with fixed names if server PID is not provided (e.g., for testing with a manually launched server)
+        // Precondition 1: These fifos must be created before launching the client, e.g., with "mkfifo /tmp/fifoinput /tmp/fifooutput"
+        // Precondition 2: The server must be launched with its stdout and stdin redirected to these fifos, e.g.
+        // emulator-asm/build/ziskemuasm -s --gen=1 -v -m --stdio --redirect-output-to-file < /tmp/fifoinput > /tmp/fifooutput &
+        // The server process will not exist until the client opens the fifos, so the client must be launched after the server in this state
+        // The server process will stop existing after the client closes the fifos, i.e. after client completion
         sprintf(server_stdin_name, "/tmp/fifoinput");
         sprintf(server_stdout_name, "/tmp/fifooutput");
     }
-
-    // Construct paths to server's stdin and stdout
-    // These should be set via command line arguments with the server's PID
-    // e.g., --stdin-path=/proc/12345/fd/0 --stdout-path=/proc/12345/fd/1
     
     // Open server's stdin (we write to it)
     server_stdin_fd = open(server_stdin_name, O_WRONLY);
@@ -694,6 +697,53 @@ void client_run (void)
 
     int result;
 
+    /*************************/
+    /* Connect to the server */
+    /*************************/
+    client_io_connect();
+
+    // Request and response, to be used to communicate with the server.
+    // The first 64 bits of the request is the type, and the rest are arguments.
+    // The response format depends on the request type.
+    uint64_t request[5];
+    uint64_t response[5];
+
+    /********/
+    /* Ping */
+    /********/
+
+    gettimeofday(&start_time, NULL);
+
+    // Prepare message to send
+    request[0] = TYPE_PING;
+    request[1] = 0;
+    request[2] = 0;
+    request[3] = 0;
+    request[4] = 0;
+
+    // Send data to server
+    client_io_send(request);
+
+    // Read server response
+    client_io_recv(response);
+    
+    if (response[0] != TYPE_PONG)
+    {
+        asm_printf("ERROR: recv() returned unexpected type=%lu\n", response[0]);
+        exit(-1);
+    }
+    if (response[1] != gen_method)
+    {
+        asm_printf("ERROR: recv() returned unexpected gen_method=%lu\n", response[1]);
+        exit(-1);
+    }
+
+    gettimeofday(&stop_time, NULL);
+    duration = TimeDiff(start_time, stop_time);
+    asm_printf("client (PING): done in %lu us\n", duration);
+
+    client_setup();
+
     /************************/
     /* Read input file data */
     /************************/
@@ -798,49 +848,6 @@ void client_run (void)
 
         //client_write_precompile_results();
     }
-
-    /*************************/
-    /* Connect to the server */
-    /*************************/
-    client_io_connect();
-
-    // Request and response
-    uint64_t request[5];
-    uint64_t response[5];
-
-    /********/
-    /* Ping */
-    /********/
-
-    gettimeofday(&start_time, NULL);
-
-    // Prepare message to send
-    request[0] = TYPE_PING;
-    request[1] = 0;
-    request[2] = 0;
-    request[3] = 0;
-    request[4] = 0;
-
-    // Send data to server
-    client_io_send(request);
-
-    // Read server response
-    client_io_recv(response);
-    
-    if (response[0] != TYPE_PONG)
-    {
-        asm_printf("ERROR: recv() returned unexpected type=%lu\n", response[0]);
-        exit(-1);
-    }
-    if (response[1] != gen_method)
-    {
-        asm_printf("ERROR: recv() returned unexpected gen_method=%lu\n", response[1]);
-        exit(-1);
-    }
-
-    gettimeofday(&stop_time, NULL);
-    duration = TimeDiff(start_time, stop_time);
-    asm_printf("client (PING): done in %lu us\n", duration);
 
     /*****************/
     /* Minimal trace */

@@ -719,7 +719,17 @@ int main(int argc, char *argv[])
     if (client)
     {
         // Setup the client
-        client_setup();
+        //
+        // Client setup is deferred until after the initial ping to the server to map the shared
+        // memories just created by the server in the stdio case; otherwise the client could either
+        // not find any shared memory, or map old shared memories that the server will unlink during
+        // its setup before creating new ones, causing the client to read and write to shared
+        // memories that the server will not use anymore.
+        // In the TCP case this is not an issue because the server creates the shared memories
+        // before it starts listening to clients, so the client can map them during its setup even
+        // before pinging the server, but we keep the procedure common to both cases.
+        //
+        // client_setup();
 
         // Run the client
         client_run();
