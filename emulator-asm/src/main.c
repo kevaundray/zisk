@@ -634,7 +634,7 @@ void stdio_server (void)
                 {
                     continue;
                 }
-                asm_printf("WARNING: Failed calling read(stdin) bytes_read=%ld errno=%d=%s\n", bytes_read, errno, strerror(errno));
+                asm_printf("WARNING: Failed calling read(stdin) bytes_read=%zd errno=%d=%s\n", bytes_read, errno, strerror(errno));
                 read_error = true;
                 break;
             }
@@ -685,7 +685,7 @@ void stdio_server (void)
                     // Interrupted by signal, retry write
                     continue;
                 }
-                asm_printf("ERROR: Failed calling write(stdout) invalid bytes_sent=%ld errno=%d=%s\n", bytes_sent, errno, strerror(errno));
+                asm_printf("ERROR: Failed calling write(stdout) invalid bytes_sent=%zd errno=%d=%s\n", bytes_sent, errno, strerror(errno));
                 write_error = true;
                 break;
             }
@@ -698,7 +698,7 @@ void stdio_server (void)
         }
         if (write_error || (total_sent != sizeof(response)))
         {
-            asm_printf("ERROR: Failed calling write(stdout) invalid total_sent=%zd errno=%d=%s\n", total_sent, errno, strerror(errno));
+            asm_printf("ERROR: Failed calling write(stdout) invalid total_sent=%zu errno=%d=%s\n", total_sent, errno, strerror(errno));
             break;
         }
         else if (verbose)

@@ -98,17 +98,30 @@ void client_tcp_send ( const uint64_t * request )
 
 void client_tcp_recv ( uint64_t * response )
 {
-    // Read server response
-    ssize_t bytes_received = recv(socket_fd, response, 5*sizeof(uint64_t), MSG_WAITALL);
-    if (bytes_received < 0)
+    // Read server response, handling partial reads and EINTR
+    uint8_t *buffer = (uint8_t *)response;
+    size_t bytes_remaining = 5 * sizeof(uint64_t);
+    while (bytes_remaining > 0)
     {
-        asm_printf("ERROR: recv() failed errno=%d=%s\n", errno, strerror(errno));
-        exit(-1);
-    }
-    if (bytes_received != 5*sizeof(uint64_t))
-    {
-        asm_printf("ERROR: recv() returned bytes_received=%ld errno=%d=%s\n", bytes_received, errno, strerror(errno));
-        exit(-1);
+        ssize_t result = recv(socket_fd, buffer, bytes_remaining, 0);
+        if (result < 0)
+        {
+            if (errno == EINTR)
+            {
+                // Interrupted by signal, retry recv
+                continue;
+            }
+            asm_printf("ERROR: recv() failed result=%zd errno=%d=%s\n", result, errno, strerror(errno));
+            exit(-1);
+        }
+        if (result == 0)
+        {
+            // Peer closed connection unexpectedly
+            asm_printf("ERROR: recv() returned 0 bytes (peer closed connection) errno=%d=%s\n", errno, strerror(errno));
+            exit(-1);
+        }
+        buffer += (size_t)result;
+        bytes_remaining -= (size_t)result;
     }
 }
 
