@@ -14,7 +14,7 @@ use std::{
 };
 use zisk_core::{
     zisk_ops::{OpStats, ZiskOp},
-    ZiskInst, ZiskOperationType, ZiskRom, RAM_ADDR, REGS_IN_MAIN_TOTAL_NUMBER, SRC_IMM, SRC_REG,
+    ZiskInst, ZiskOperationType, ZiskRom, REGS_IN_MAIN_TOTAL_NUMBER, SRC_IMM, SRC_REG,
 };
 
 use crate::{
@@ -83,6 +83,8 @@ pub struct Stats {
     top_rois_filter: bool,
     disable_call_stack: bool,
     use_colors: bool,
+    ram_size: u64,
+    ram_used: u64,
     #[cfg(feature = "debug_stats_trace")]
     debug_step_stack: Vec<u64>,
     #[cfg(feature = "debug_stats_trace")]
@@ -127,6 +129,8 @@ impl Default for Stats {
             top_rois_filter: false,
             disable_call_stack: false,
             use_colors: std::io::stdout().is_terminal(),
+            ram_size: 0,
+            ram_used: 0,
             #[cfg(feature = "debug_stats_trace")]
             debug_step_stack: Vec::new(),
             #[cfg(feature = "debug_stats_trace")]
@@ -816,7 +820,9 @@ impl Stats {
         report.add_cost_perc("TOTAL", total_cost);
         report.ln();
         report.add_cost_perc("FROPS", self.frops_cost);
-        report.add_perc("RAM USAGE", self.costs.mops.get_max_ram_address() - RAM_ADDR + 1, 1 << 29);
+        if self.ram_size > 0 {
+            report.add_perc("RAM USAGE", self.ram_used, self.ram_size);
+        }
         report.title_count_cost_perc2("COST BY OPCODE", "COUNT", "COST", " RANK");
         self.report_opcodes(&mut report, &self.costs.ops, "OP", true);
 
@@ -834,7 +840,9 @@ impl Stats {
         }
 
         if !self.rois.is_empty() && !self.disable_call_stack {
-            report.title_autowidth("TOP STEP FUNCTIONS (STEPS, % STEPS, CALLS, FUNCTION)");
+            report.title_autowidth(
+                "TOP STEP FUNCTIONS (STEPS, % STEPS, CALLS, STEPS/CALL, FUNCTION)",
+            );
 
             let top_step_rois = self.get_top_rois(true);
             for (index, _) in top_step_rois.iter() {
@@ -846,7 +854,7 @@ impl Stats {
                 report.add_top_step_calls_perc(&roi.name, steps, roi.calls);
             }
 
-            report.title_autowidth("TOP COST FUNCTIONS (COST, % COST, CALLS, FUNCTION)");
+            report.title_autowidth("TOP COST FUNCTIONS (COST, % COST, CALLS, COST/CALL, FUNCTION)");
 
             // Create a vector with ROI indices and their steps for sorting
             let top_cost_rois = self.get_top_rois(false);
@@ -1072,6 +1080,10 @@ impl Stats {
     }
     pub fn set_top_rois_filter(&mut self, value: bool) {
         self.top_rois_filter = value;
+    }
+    pub fn set_ram_usage(&mut self, ram_size: u64, ram_used: u64) {
+        self.ram_size = ram_size;
+        self.ram_used = ram_used;
     }
 
     /// Write disassembly to file with execution counts
