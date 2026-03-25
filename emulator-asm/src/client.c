@@ -69,12 +69,30 @@ void client_tcp_close ( void )
 
 void client_tcp_send ( const uint64_t * request )
 {
-    // Send data to server
-    int result = send(socket_fd, request, 5*sizeof(uint64_t), 0);
-    if (result < 0)
+    // Send data to server, handling partial writes and EINTR
+    const uint8_t *buffer = (const uint8_t *)request;
+    size_t bytes_to_send = 5 * sizeof(uint64_t);
+    while (bytes_to_send > 0)
     {
-        asm_printf("ERROR: send() failed result=%d errno=%d=%s\n", result, errno, strerror(errno));
-        exit(-1);
+        ssize_t result = send(socket_fd, buffer, bytes_to_send, 0);
+        if (result < 0)
+        {
+            if (errno == EINTR)
+            {
+                // Interrupted by signal, retry send
+                continue;
+            }
+            asm_printf("ERROR: send() failed result=%zd errno=%d=%s\n", result, errno, strerror(errno));
+            exit(-1);
+        }
+        if (result == 0)
+        {
+            // Unexpected: send() returned 0 without sending data
+            asm_printf("ERROR: send() returned 0 bytes errno=%d=%s\n", errno, strerror(errno));
+            exit(-1);
+        }
+        buffer += (size_t)result;
+        bytes_to_send -= (size_t)result;
     }
 }
 
@@ -151,27 +169,48 @@ void client_stdio_close ( void )
 
 void client_stdio_send ( const uint64_t * request )
 {
-    ssize_t bytes_written = write(server_stdin_fd, request, 5 * sizeof(uint64_t));
-    if (bytes_written != 5 * sizeof(uint64_t))
+    size_t bytes_to_write = 5 * sizeof(uint64_t);
+    size_t total_written = 0;
+    while (total_written < bytes_to_write)
     {
-        asm_printf("ERROR: Failed calling write() bytes_written=%ld errno=%d=%s\n", bytes_written, errno, strerror(errno));
-        exit(-1);
+        ssize_t bytes_written = write(server_stdin_fd,
+                                      ((const char *)request) + total_written,
+                                      bytes_to_write - total_written);
+        if (bytes_written < 0)
+        {
+            if (errno == EINTR)
+            {
+                continue;  // Interrupted, retry
+            }
+            asm_printf("ERROR: Failed calling write() bytes_written=%zd errno=%d=%s\n",
+                       bytes_written, errno, strerror(errno));
+            exit(-1);
+        }
+        if (bytes_written == 0)
+        {
+            asm_printf("ERROR: write() returned 0 bytes, unexpected EOF on %s\n", server_stdin_name);
+            exit(-1);
+        }
+        total_written += (size_t)bytes_written;
     }
-    if (verbose) asm_printf("Wrote %ld bytes to %s\n", bytes_written, server_stdin_name);
+    if (verbose) asm_printf("Wrote %zu bytes to %s\n", total_written, server_stdin_name);
 }
 
 void client_stdio_recv ( uint64_t * response )
 {
-    ssize_t total_read = 0;
     size_t bytes_to_read = 5 * sizeof(uint64_t);
+    ssize_t total_read = 0;
     
     while (total_read < bytes_to_read)
     {
         ssize_t bytes_read = read(server_stdout_fd, ((char*)response) + total_read, bytes_to_read - total_read);
         if (bytes_read < 0)
         {
-            if (errno == EINTR) continue;  // Interrupted, retry
-            asm_printf("ERROR: Failed calling read() errno=%d=%s\n", errno, strerror(errno));
+            if (errno == EINTR)
+            {
+                continue;  // Interrupted, retry
+            }
+            asm_printf("ERROR: Failed calling read() bytes_read=%zd errno=%d=%s\n", bytes_read, errno, strerror(errno));
             exit(-1);
         }
         if (bytes_read == 0)
@@ -180,8 +219,8 @@ void client_stdio_recv ( uint64_t * response )
             exit(-1);
         }
         total_read += bytes_read;
-        if (verbose) asm_printf("Read %ld bytes from %s, total_read=%ld\n", bytes_read, server_stdout_name, total_read);
     }
+    if (verbose) asm_printf("Read %zd bytes from %s, total_read=%zd\n", total_read, server_stdout_name, total_read);
 }
 
 /******/

@@ -115,7 +115,11 @@ bool precompile_cache_enabled = false;
 
 void process_request(const uint64_t * request, uint64_t * response, bool * bReset, bool * bShutdown)
 {
+    // Initialize response with default values
     *bReset = false;
+    *bShutdown = false;
+
+    // Switch on request type
     switch (request[0])
     {
         case TYPE_PING:
@@ -544,7 +548,7 @@ void tcp_server (void)
                         // Interrupted by signal, retry send
                         continue;
                     }
-                    asm_printf("ERROR: Failed calling send() invalid bytes_sent=%ld errno=%d=%s\n",
+                    asm_printf("ERROR: Failed calling send() invalid bytes_sent=%zd errno=%d=%s\n",
                                bytes_sent, errno, strerror(errno));
                     break;
                 }
@@ -579,7 +583,7 @@ void tcp_server (void)
             }
         }
 
-        // Chutdown the client socket
+        // Shutdown the client socket
         shutdown(client_fd, SHUT_WR);
 
         // Close client socket
@@ -645,7 +649,7 @@ void stdio_server (void)
 #ifdef DEBUG
         if (verbose)
         {
-            asm_printf("read(stdin) returned total_read: %ld\n", total_read);
+            asm_printf("read(stdin) returned total_read: %zd\n", total_read);
         }
 #endif
         if (read_error || (total_read != sizeof(request)))
@@ -694,7 +698,7 @@ void stdio_server (void)
         }
         if (write_error || (total_sent != sizeof(response)))
         {
-            asm_printf("ERROR: Failed calling write(stdout) invalid total_sent=%ld errno=%d=%s\n", total_sent, errno, strerror(errno));
+            asm_printf("ERROR: Failed calling write(stdout) invalid total_sent=%zd errno=%d=%s\n", total_sent, errno, strerror(errno));
             break;
         }
         else if (verbose)
@@ -726,9 +730,6 @@ int main(int argc, char *argv[])
     // Start counting total execution time
     gettimeofday(&total_start_time, NULL);
 #endif
-
-    // Result, to be used in calls to functions returning int
-    int result;
 
     // Get current process id
     process_id = getpid();
