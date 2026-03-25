@@ -562,7 +562,7 @@ void tcp_server (void)
             }
             if (total_sent != total_size)
             {
-                asm_printf("ERROR: Failed calling send() invalid total_sent=%ld errno=%d=%s\n", total_sent, errno, strerror(errno));
+                asm_printf("ERROR: Failed calling send() invalid total_sent=%zu errno=%d=%s\n", total_sent, errno, strerror(errno));
                 break;
             }
             else if (verbose)
@@ -649,7 +649,7 @@ void stdio_server (void)
 #ifdef DEBUG
         if (verbose)
         {
-            asm_printf("read(stdin) returned total_read: %zd\n", total_read);
+            asm_printf("read(stdin) returned total_read: %zu\n", total_read);
         }
 #endif
         if (read_error || (total_read != sizeof(request)))

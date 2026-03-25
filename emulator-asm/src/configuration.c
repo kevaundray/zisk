@@ -443,6 +443,7 @@ void parse_arguments(int argc, char *argv[])
             if (strcmp(argv[i], "--open_input_shm") == 0)
             {
                 create_input_shm = false;
+                delete_input_shm = false;
                 continue;
             }
             if (strcmp(argv[i], "--open_all_shm") == 0)

@@ -98,14 +98,14 @@ void server_setup (void)
         }
 
 #ifdef USE_HUGE_PAGES
-        void * pRom = mmap((void *)ROM_ADDR, ROM_SIZE, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_FIXED | map_locked_flag | MAP_HUGETLB, shmem_rom_fd, 0);
+        void * pRom = mmap((void *)ROM_ADDR, ROM_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_FIXED | map_locked_flag | MAP_HUGETLB, shmem_rom_fd, 0);
         if (pRom == MAP_FAILED)
         {
             asm_printf("ERROR: Failed calling mmap(rom) with huge pages errno=%d=%s\n", errno, strerror(errno));
-            pRom = mmap((void *)ROM_ADDR, ROM_SIZE, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_FIXED | map_locked_flag, shmem_rom_fd, 0);
+            pRom = mmap((void *)ROM_ADDR, ROM_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_FIXED | map_locked_flag, shmem_rom_fd, 0);
         }
 #else
-        void * pRom = mmap((void *)ROM_ADDR, ROM_SIZE, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_FIXED | map_locked_flag, shmem_rom_fd, 0);
+        void * pRom = mmap((void *)ROM_ADDR, ROM_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_FIXED | map_locked_flag, shmem_rom_fd, 0);
 #endif
         if (pRom == MAP_FAILED)
         {
@@ -517,14 +517,14 @@ void server_setup (void)
 
         // Map it to the ram address
 #ifdef USE_HUGE_PAGES
-        void * pRam = mmap((void *)RAM_ADDR, RAM_SIZE, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_FIXED | map_locked_flag | MAP_HUGETLB, shmem_ram_fd, 0);
+        void * pRam = mmap((void *)RAM_ADDR, RAM_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_FIXED | map_locked_flag | MAP_HUGETLB, shmem_ram_fd, 0);
         if (pRam == MAP_FAILED)
         {
             asm_printf("ERROR: Failed calling mmap(ram) with huge pages errno=%d=%s\n", errno, strerror(errno));
-            pRam = mmap((void *)RAM_ADDR, RAM_SIZE, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_FIXED | map_locked_flag, shmem_ram_fd, 0);
+            pRam = mmap((void *)RAM_ADDR, RAM_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_FIXED | map_locked_flag, shmem_ram_fd, 0);
         }
 #else
-        void * pRam = mmap((void *)RAM_ADDR, RAM_SIZE, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_FIXED | map_locked_flag, shmem_ram_fd, 0);
+        void * pRam = mmap((void *)RAM_ADDR, RAM_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_FIXED | map_locked_flag, shmem_ram_fd, 0);
 #endif
         if (pRam == MAP_FAILED)
         {
