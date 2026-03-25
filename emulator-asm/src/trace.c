@@ -172,6 +172,16 @@ void trace_map_all_existing_chunks (void)
 
         if (!shm_exists(shmem_chunk_name))
         {
+            if (chunk_id == 0)
+            {
+                asm_printf("trace_map_all_existing_chunks() failed because the first chunk shared memory %s does not exist\n", shmem_chunk_name);
+                exit(-1);
+            }
+            else
+            {
+                // No more chunks to map
+                break;
+            }
             break;
         }
 
@@ -290,7 +300,4 @@ void trace_map_initialize (void)
         // Map all existing chunks
         trace_map_all_existing_chunks();
     }
-
-    trace_address = TRACE_ADDR;
-    pOutputTrace = (uint64_t *)TRACE_ADDR;
 }

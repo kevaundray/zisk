@@ -523,22 +523,49 @@ void tcp_server (void)
             uint64_t response[5];
             process_request(request, response, &bReset, &bShutdown);
 
+            // Send response to client
             if (verbose)
             {
                 asm_printf("send()'ing response=[%lu, 0x%lx, 0x%lx, 0x%lx, 0x%lx]\n", response[0], response[1], response[2], response[3], response[4]);
             }
-
-            // Send response to client
-            ssize_t bytes_sent = send(client_fd, response, sizeof(response), MSG_WAITALL);
-            if (bytes_sent != sizeof(response))
+            // Send response to client, handling partial writes
+            size_t total_size = sizeof(response);
+            size_t total_sent = 0;
+            while (total_sent < total_size)
             {
-                asm_printf("ERROR: Failed calling send() invalid bytes_sent=%ld errno=%d=%s\n", bytes_sent, errno, strerror(errno));
+                ssize_t bytes_sent = send(client_fd,
+                                          (const char *)response + total_sent,
+                                          total_size - total_sent,
+                                          0);
+                if (bytes_sent < 0)
+                {
+                    if (errno == EINTR)
+                    {
+                        // Interrupted by signal, retry send
+                        continue;
+                    }
+                    asm_printf("ERROR: Failed calling send() invalid bytes_sent=%ld errno=%d=%s\n",
+                               bytes_sent, errno, strerror(errno));
+                    break;
+                }
+                if (bytes_sent == 0)
+                {
+                    // Peer has performed an orderly shutdown
+                    asm_printf("ERROR: Failed calling send(): connection closed by peer\n");
+                    break;
+                }
+                total_sent += (size_t)bytes_sent;
+            }
+            if (total_sent != total_size)
+            {
+                asm_printf("ERROR: Failed calling send() invalid total_sent=%ld errno=%d=%s\n", total_sent, errno, strerror(errno));
                 break;
             }
             else if (verbose)
             {
                 asm_printf("Response sent to client\n");
             }
+
             // Reset the server if requested by the client
             if (bReset)
             {
@@ -574,7 +601,6 @@ void tcp_server (void)
 
 void stdio_server (void)
 {
-    int result;
     bool bShutdown = false;
     bool bReset;
 
@@ -591,21 +617,41 @@ void stdio_server (void)
     {
         // Read client request
         uint64_t request[5];
-        ssize_t bytes_read = read(STDIN_FILENO, request, sizeof(request));
-        if (bytes_read != sizeof(request))
+        size_t total_read = 0;
+        bool read_error = false;
+        while (total_read < sizeof(request))
         {
-            if ((errno != 0) && (errno != 2))
+            ssize_t bytes_read = read(STDIN_FILENO,
+                                      (char *)request + total_read,
+                                      sizeof(request) - total_read);
+            if (bytes_read < 0)
             {
-                asm_printf("WARNING: Failed calling read(stdin) invalid bytes_read=%ld errno=%d=%s\n", bytes_read, errno, strerror(errno));
+                if (errno == EINTR)
+                {
+                    continue;
+                }
+                asm_printf("WARNING: Failed calling read(stdin) bytes_read=%ld errno=%d=%s\n", bytes_read, errno, strerror(errno));
+                read_error = true;
+                break;
             }
-            break;
+            if (bytes_read == 0)
+            {
+                // EOF before full request received
+                read_error = true;
+                break;
+            }
+            total_read += (size_t)bytes_read;
         }
 #ifdef DEBUG
         if (verbose)
         {
-            asm_printf("read(stdin) returned: %ld\n", bytes_read);
+            asm_printf("read(stdin) returned total_read: %ld\n", total_read);
         }
 #endif
+        if (read_error || (total_read != sizeof(request)))
+        {
+            break;
+        }
         if (verbose)
         {
             asm_printf("read(stdin)'d request=[%lu, 0x%lx, 0x%lx, 0x%lx, 0x%lx]\n", request[0], request[1], request[2], request[3], request[4]);
@@ -621,10 +667,34 @@ void stdio_server (void)
         }
 
         // Write response to client
-        ssize_t bytes_sent = write(STDOUT_FILENO, response, sizeof(response));
-        if (bytes_sent != sizeof(response))
+        size_t total_sent = 0;
+        bool write_error = false;
+        while (total_sent < sizeof(response))
         {
-            asm_printf("ERROR: Failed calling write(stdout) invalid bytes_sent=%ld errno=%d=%s\n", bytes_sent, errno, strerror(errno));
+            ssize_t bytes_sent = write(STDOUT_FILENO,
+                                       (const char *)response + total_sent,
+                                       sizeof(response) - total_sent);
+            if (bytes_sent < 0)
+            {
+                if (errno == EINTR)
+                {
+                    // Interrupted by signal, retry write
+                    continue;
+                }
+                asm_printf("ERROR: Failed calling write(stdout) invalid bytes_sent=%ld errno=%d=%s\n", bytes_sent, errno, strerror(errno));
+                write_error = true;
+                break;
+            }
+            else if (bytes_sent == 0)
+            {
+                asm_printf("ERROR: write(stdout) returned 0, response not fully sent\n");
+                break;
+            }
+            total_sent += (size_t)bytes_sent;
+        }
+        if (write_error || (total_sent != sizeof(response)))
+        {
+            asm_printf("ERROR: Failed calling write(stdout) invalid total_sent=%ld errno=%d=%s\n", total_sent, errno, strerror(errno));
             break;
         }
         else if (verbose)

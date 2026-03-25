@@ -377,7 +377,7 @@ void parse_arguments(int argc, char *argv[])
                 errno = 0;
                 char *endptr;
                 uint64_t arguments_server_pid_u64 = strtoul(argv[i], &endptr, 10);
-                server_pid = arguments_server_pid_u64;
+                server_pid = arguments_server_pid_u64 & 0xFFFFFFFF; // Keep only lower 32 bits, since PIDs are typically 32 bits
 
                 // Check for errors
                 if (errno == ERANGE) {
@@ -393,7 +393,7 @@ void parse_arguments(int argc, char *argv[])
                     print_usage();
                     exit(-1);
                 } else {
-                    asm_printf("Got server PID= %u\n", server_pid);
+                    asm_printf("Got server PID= %d\n", server_pid);
                 }
                 continue;
             }

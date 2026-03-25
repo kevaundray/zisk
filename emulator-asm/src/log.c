@@ -27,7 +27,6 @@ void asm_printf(const char *format, ...)
     }
     else
     {
-        struct tm *tm_info = localtime(&now);
         if (tm_info == NULL || strftime(date_and_time, sizeof(date_and_time), "%Y-%m-%d %H:%M:%S", tm_info) == 0)
         {
             // Fallback if localtime() fails or strftime() cannot format

@@ -16,7 +16,6 @@
 #include "trace.hpp"
 #include "emu.hpp"
 #include "log.hpp"
-#include "trace.hpp"
 
 /**************/
 /* PRINT REGS */
