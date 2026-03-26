@@ -686,6 +686,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "bindgen"
+version = "0.72.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "993776b509cfb49c750f11b8f07a46fa23e0a1386ffc01fb1e7d343efc387895"
+dependencies = [
+ "bitflags",
+ "cexpr",
+ "clang-sys",
+ "itertools 0.13.0",
+ "log",
+ "prettyplease",
+ "proc-macro2",
+ "quote",
+ "regex",
+ "rustc-hash 2.1.1",
+ "shlex",
+ "syn 2.0.117",
+]
+
+[[package]]
 name = "bit-set"
 version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1206,7 +1226,7 @@ dependencies = [
 [[package]]
 name = "curves"
 version = "0.16.1"
-source = "git+https://github.com/0xPolygonHermez/pil2-proofman.git?branch=pre-develop-0.17.0#4530b6f57f12d927e95bf28cd36fd25d0558e097"
+source = "git+https://github.com/0xPolygonHermez/pil2-proofman.git?branch=pre-develop-0.17.0#125295f22f4b5c955abee895e73a374556d182ee"
 dependencies = [
  "fields",
  "num-bigint",
@@ -1610,7 +1630,7 @@ dependencies = [
 [[package]]
 name = "fields"
 version = "0.16.1"
-source = "git+https://github.com/0xPolygonHermez/pil2-proofman.git?branch=pre-develop-0.17.0#4530b6f57f12d927e95bf28cd36fd25d0558e097"
+source = "git+https://github.com/0xPolygonHermez/pil2-proofman.git?branch=pre-develop-0.17.0#125295f22f4b5c955abee895e73a374556d182ee"
 dependencies = [
  "cfg-if",
  "num-bigint",
@@ -2403,7 +2423,7 @@ version = "0.2.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5f655543f54b263cbc3d2456bf714bd807d66a33eff8f70136687f0776d34f76"
 dependencies = [
- "bindgen",
+ "bindgen 0.69.5",
  "build-probe-mpi",
  "cc",
 ]
@@ -2696,7 +2716,7 @@ dependencies = [
 [[package]]
 name = "pil-std-lib"
 version = "0.16.1"
-source = "git+https://github.com/0xPolygonHermez/pil2-proofman.git?branch=pre-develop-0.17.0#4530b6f57f12d927e95bf28cd36fd25d0558e097"
+source = "git+https://github.com/0xPolygonHermez/pil2-proofman.git?branch=pre-develop-0.17.0#125295f22f4b5c955abee895e73a374556d182ee"
 dependencies = [
  "colored",
  "fields",
@@ -3062,7 +3082,7 @@ dependencies = [
 [[package]]
 name = "proofman"
 version = "0.16.1"
-source = "git+https://github.com/0xPolygonHermez/pil2-proofman.git?branch=pre-develop-0.17.0#4530b6f57f12d927e95bf28cd36fd25d0558e097"
+source = "git+https://github.com/0xPolygonHermez/pil2-proofman.git?branch=pre-develop-0.17.0#125295f22f4b5c955abee895e73a374556d182ee"
 dependencies = [
  "bincode",
  "blake3",
@@ -3097,7 +3117,7 @@ dependencies = [
 [[package]]
 name = "proofman-common"
 version = "0.16.1"
-source = "git+https://github.com/0xPolygonHermez/pil2-proofman.git?branch=pre-develop-0.17.0#4530b6f57f12d927e95bf28cd36fd25d0558e097"
+source = "git+https://github.com/0xPolygonHermez/pil2-proofman.git?branch=pre-develop-0.17.0#125295f22f4b5c955abee895e73a374556d182ee"
 dependencies = [
  "bincode",
  "borsh",
@@ -3129,7 +3149,7 @@ dependencies = [
 [[package]]
 name = "proofman-hints"
 version = "0.16.1"
-source = "git+https://github.com/0xPolygonHermez/pil2-proofman.git?branch=pre-develop-0.17.0#4530b6f57f12d927e95bf28cd36fd25d0558e097"
+source = "git+https://github.com/0xPolygonHermez/pil2-proofman.git?branch=pre-develop-0.17.0#125295f22f4b5c955abee895e73a374556d182ee"
 dependencies = [
  "fields",
  "itoa",
@@ -3142,7 +3162,7 @@ dependencies = [
 [[package]]
 name = "proofman-macros"
 version = "0.16.1"
-source = "git+https://github.com/0xPolygonHermez/pil2-proofman.git?branch=pre-develop-0.17.0#4530b6f57f12d927e95bf28cd36fd25d0558e097"
+source = "git+https://github.com/0xPolygonHermez/pil2-proofman.git?branch=pre-develop-0.17.0#125295f22f4b5c955abee895e73a374556d182ee"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -3152,7 +3172,7 @@ dependencies = [
 [[package]]
 name = "proofman-starks-lib-c"
 version = "0.16.1"
-source = "git+https://github.com/0xPolygonHermez/pil2-proofman.git?branch=pre-develop-0.17.0#4530b6f57f12d927e95bf28cd36fd25d0558e097"
+source = "git+https://github.com/0xPolygonHermez/pil2-proofman.git?branch=pre-develop-0.17.0#125295f22f4b5c955abee895e73a374556d182ee"
 dependencies = [
  "crossbeam-channel",
  "tracing",
@@ -3161,7 +3181,7 @@ dependencies = [
 [[package]]
 name = "proofman-util"
 version = "0.16.1"
-source = "git+https://github.com/0xPolygonHermez/pil2-proofman.git?branch=pre-develop-0.17.0#4530b6f57f12d927e95bf28cd36fd25d0558e097"
+source = "git+https://github.com/0xPolygonHermez/pil2-proofman.git?branch=pre-develop-0.17.0#125295f22f4b5c955abee895e73a374556d182ee"
 dependencies = [
  "bincode",
  "bytemuck",
@@ -3173,7 +3193,7 @@ dependencies = [
 [[package]]
 name = "proofman-verifier"
 version = "0.16.1"
-source = "git+https://github.com/0xPolygonHermez/pil2-proofman.git?branch=pre-develop-0.17.0#4530b6f57f12d927e95bf28cd36fd25d0558e097"
+source = "git+https://github.com/0xPolygonHermez/pil2-proofman.git?branch=pre-develop-0.17.0#125295f22f4b5c955abee895e73a374556d182ee"
 dependencies = [
  "bytemuck",
  "fields",
@@ -3464,6 +3484,15 @@ dependencies = [
  "libc",
  "untrusted",
  "windows-sys 0.52.0",
+]
+
+[[package]]
+name = "ripemd"
+version = "0.1.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bd124222d17ad93a644ed9d011a40f4fb64aa54275c08cc216524a9ea82fb09f"
+dependencies = [
+ "digest 0.10.7",
 ]
 
 [[package]]
@@ -5438,7 +5467,7 @@ dependencies = [
 [[package]]
 name = "witness"
 version = "0.16.1"
-source = "git+https://github.com/0xPolygonHermez/pil2-proofman.git?branch=pre-develop-0.17.0#4530b6f57f12d927e95bf28cd36fd25d0558e097"
+source = "git+https://github.com/0xPolygonHermez/pil2-proofman.git?branch=pre-develop-0.17.0#125295f22f4b5c955abee895e73a374556d182ee"
 dependencies = [
  "colored",
  "fields",
@@ -5784,6 +5813,7 @@ dependencies = [
  "paste",
  "precompiles-helpers",
  "rand 0.8.5",
+ "ripemd",
  "serde",
  "sha2",
  "tiny-keccak",
@@ -5791,6 +5821,7 @@ dependencies = [
  "zisk-common",
  "zisk-definitions",
  "zisk-verifier",
+ "zkvm-interface",
 ]
 
 [[package]]
@@ -5810,10 +5841,19 @@ dependencies = [
  "paste",
  "precompiles-helpers",
  "rand 0.8.5",
+ "ripemd",
  "serde",
  "sha2",
  "tiny-keccak",
  "zisk-verifier",
+ "zkvm-interface",
+]
+
+[[package]]
+name = "zkvm-interface"
+version = "0.17.0"
+dependencies = [
+ "bindgen 0.72.1",
 ]
 
 [[package]]
