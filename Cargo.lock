@@ -1154,7 +1154,7 @@ dependencies = [
 [[package]]
 name = "curves"
 version = "0.16.1"
-source = "git+https://github.com/0xPolygonHermez/pil2-proofman.git?branch=pre-develop-0.17.0#125295f22f4b5c955abee895e73a374556d182ee"
+source = "git+https://github.com/0xPolygonHermez/pil2-proofman.git?branch=pre-develop-0.17.0#a0b991094a9c49130d30ea65987d8149d4304ba8"
 dependencies = [
  "fields",
  "num-bigint",
@@ -2853,7 +2853,7 @@ dependencies = [
 [[package]]
 name = "pil-std-lib"
 version = "0.16.1"
-source = "git+https://github.com/0xPolygonHermez/pil2-proofman.git?branch=pre-develop-0.17.0#125295f22f4b5c955abee895e73a374556d182ee"
+source = "git+https://github.com/0xPolygonHermez/pil2-proofman.git?branch=pre-develop-0.17.0#a0b991094a9c49130d30ea65987d8149d4304ba8"
 dependencies = [
  "colored",
  "fields",
@@ -3237,7 +3237,7 @@ dependencies = [
 [[package]]
 name = "proofman"
 version = "0.16.1"
-source = "git+https://github.com/0xPolygonHermez/pil2-proofman.git?branch=pre-develop-0.17.0#125295f22f4b5c955abee895e73a374556d182ee"
+source = "git+https://github.com/0xPolygonHermez/pil2-proofman.git?branch=pre-develop-0.17.0#a0b991094a9c49130d30ea65987d8149d4304ba8"
 dependencies = [
  "bincode",
  "blake3",
@@ -3272,7 +3272,7 @@ dependencies = [
 [[package]]
 name = "proofman-common"
 version = "0.16.1"
-source = "git+https://github.com/0xPolygonHermez/pil2-proofman.git?branch=pre-develop-0.17.0#125295f22f4b5c955abee895e73a374556d182ee"
+source = "git+https://github.com/0xPolygonHermez/pil2-proofman.git?branch=pre-develop-0.17.0#a0b991094a9c49130d30ea65987d8149d4304ba8"
 dependencies = [
  "bincode",
  "borsh",
@@ -3304,7 +3304,7 @@ dependencies = [
 [[package]]
 name = "proofman-hints"
 version = "0.16.1"
-source = "git+https://github.com/0xPolygonHermez/pil2-proofman.git?branch=pre-develop-0.17.0#125295f22f4b5c955abee895e73a374556d182ee"
+source = "git+https://github.com/0xPolygonHermez/pil2-proofman.git?branch=pre-develop-0.17.0#a0b991094a9c49130d30ea65987d8149d4304ba8"
 dependencies = [
  "fields",
  "itoa",
@@ -3317,7 +3317,7 @@ dependencies = [
 [[package]]
 name = "proofman-macros"
 version = "0.16.1"
-source = "git+https://github.com/0xPolygonHermez/pil2-proofman.git?branch=pre-develop-0.17.0#125295f22f4b5c955abee895e73a374556d182ee"
+source = "git+https://github.com/0xPolygonHermez/pil2-proofman.git?branch=pre-develop-0.17.0#a0b991094a9c49130d30ea65987d8149d4304ba8"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -3327,7 +3327,7 @@ dependencies = [
 [[package]]
 name = "proofman-starks-lib-c"
 version = "0.16.1"
-source = "git+https://github.com/0xPolygonHermez/pil2-proofman.git?branch=pre-develop-0.17.0#125295f22f4b5c955abee895e73a374556d182ee"
+source = "git+https://github.com/0xPolygonHermez/pil2-proofman.git?branch=pre-develop-0.17.0#a0b991094a9c49130d30ea65987d8149d4304ba8"
 dependencies = [
  "crossbeam-channel",
  "tracing",
@@ -3336,7 +3336,7 @@ dependencies = [
 [[package]]
 name = "proofman-util"
 version = "0.16.1"
-source = "git+https://github.com/0xPolygonHermez/pil2-proofman.git?branch=pre-develop-0.17.0#125295f22f4b5c955abee895e73a374556d182ee"
+source = "git+https://github.com/0xPolygonHermez/pil2-proofman.git?branch=pre-develop-0.17.0#a0b991094a9c49130d30ea65987d8149d4304ba8"
 dependencies = [
  "bincode",
  "bytemuck",
@@ -3348,7 +3348,7 @@ dependencies = [
 [[package]]
 name = "proofman-verifier"
 version = "0.16.1"
-source = "git+https://github.com/0xPolygonHermez/pil2-proofman.git?branch=pre-develop-0.17.0#125295f22f4b5c955abee895e73a374556d182ee"
+source = "git+https://github.com/0xPolygonHermez/pil2-proofman.git?branch=pre-develop-0.17.0#a0b991094a9c49130d30ea65987d8149d4304ba8"
 dependencies = [
  "bytemuck",
  "fields",
@@ -5883,7 +5883,7 @@ dependencies = [
 [[package]]
 name = "witness"
 version = "0.16.1"
-source = "git+https://github.com/0xPolygonHermez/pil2-proofman.git?branch=pre-develop-0.17.0#125295f22f4b5c955abee895e73a374556d182ee"
+source = "git+https://github.com/0xPolygonHermez/pil2-proofman.git?branch=pre-develop-0.17.0#a0b991094a9c49130d30ea65987d8149d4304ba8"
 dependencies = [
  "colored",
  "fields",
