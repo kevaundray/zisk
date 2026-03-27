@@ -6,7 +6,6 @@ pub(crate) const ROUNDS: usize = 24;
 pub(crate) const CLOCKS: usize = 1 + ROUNDS;
 
 /// The maximum value that any expression during keccakf computation can get
-/// Obtained from `keccakf_expr_generator.rs`
 const MAX_EXPR_VALUE: u32 = 144;
 
 pub(crate) const BASE: u32 = MAX_EXPR_VALUE + 1;

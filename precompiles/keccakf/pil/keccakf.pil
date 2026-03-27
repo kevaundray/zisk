@@ -62,14 +62,14 @@ airtemplate Keccakf(const int N = 2**17) {
     const int CLOCKS = 1 + ROUNDS; // 1 for input state
 
     const int NUM_NON_USABLE_ROWS = N % CLOCKS;
-    const int NUM_KECCAKF;
+    const int NUM_OPS;
     if (NUM_NON_USABLE_ROWS == 0) {
         // N is perfectly divisible by CLOCKS
         if (N < CLOCKS) {
             error(`N must be at least ${CLOCKS} to fit the Keccak-f[${WIDTH}] arithmetization, but received N=${N}`);
         }
 
-        NUM_KECCAKF = N / CLOCKS;
+        NUM_OPS = N / CLOCKS;
     } else {
         // N is not divisible by CLOCKS
         if (N < 2*CLOCKS) {
@@ -77,8 +77,10 @@ airtemplate Keccakf(const int N = 2**17) {
         }
 
         // Subtract 1 because we can't fit a complete cycle in the remaining rows
-        NUM_KECCAKF = (N - NUM_NON_USABLE_ROWS) / CLOCKS - 1;
+        NUM_OPS = (N - NUM_NON_USABLE_ROWS) / CLOCKS - 1;
     }
+
+    const int NUM_KECCAKF = NUM_OPS;
     println(`The total number of Keccak-f's with N = ${N} is ${NUM_KECCAKF}`);
 
     // Round constants
@@ -89,17 +91,12 @@ airtemplate Keccakf(const int N = 2**17) {
         0x000000000000800A, 0x800000008000000A, 0x8000000080008081, 0x8000000000008080, 0x0000000080000001, 0x8000000080008008
     ];
 
-    const int RC_BITS[ROUNDS][64];
-    for (int r = 0; r < ROUNDS; r++) {
-        RC_BITS[r] = unpack(RC[r]);
-    }
-
     // ═══════════════════════════════════════════════════════════════════════════
     // CLOCK SELECTORS
     // ═══════════════════════════════════════════════════════════════════════════
 
     // Base clock: 1 at first cycle row, 0 elsewhere within each cycle
-    col fixed CLK_0 = [[1, 0:(CLOCKS-1)]:NUM_KECCAKF, 0...];
+    col fixed CLK_0 = [[1, 0:(CLOCKS-1)]:NUM_OPS, 0...];
 
     // Clock selectors for each row in the cycle
     const expr CLK[CLOCKS];
@@ -410,7 +407,8 @@ airtemplate Keccakf(const int N = 2**17) {
         for (int z = 0; z < 64; z++) {
             weighted_rc[z] = 0;
             for (int r = 0; r < air.ROUNDS; r++) {
-                weighted_rc[z] += air.CLK[r] * air.RC_BITS[r][z];
+                const int bit = (air.RC[r] >> z) & 1;
+                weighted_rc[z] += air.CLK[r] * bit;
             }
         }
 
@@ -446,15 +444,6 @@ airtemplate Keccakf(const int N = 2**17) {
             packed += a[offset + j] * 2**j;
         }
         return packed;
-    }
-
-    function unpack(int packed, const int num_bits = 64): const int[] {
-        const int unpacked[num_bits];
-        for (int i = 0; i < num_bits; i++) {
-            unpacked[i] = packed & 1;
-            packed = packed >> 1;
-        }
-        return unpacked;
     }
 
     function bit_pos(const int x, const int y, const int z): int {

@@ -1,9 +1,10 @@
 mod constants;
+mod dual;
 mod round;
 mod utils;
 
 use constants::*;
-use round::keccak_f_round;
+use round::{keccak_f_round, reduce_state_mod2};
 pub use utils::*;
 
 /// State representation as 5x5x64 bits
@@ -13,14 +14,7 @@ pub type KeccakStateBits = [[[u64; 64]; 5]; 5];
 pub fn keccak_f(state: &mut KeccakStateBits) {
     for round in 0..24 {
         keccak_f_round(state, round);
-
-        // Reduce the state modulo 2
-        reduce_state_mod2(state);
     }
-}
-
-fn reduce_state_mod2(state: &mut KeccakStateBits) {
-    state.iter_mut().flatten().flatten().for_each(|bit| *bit %= 2);
 }
 
 /// Iterator that yields the state after each round of Keccak-f
