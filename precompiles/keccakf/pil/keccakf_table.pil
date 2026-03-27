@@ -3,7 +3,13 @@ require "std_lookup.pil"
 require "opids.pil"
 
 // The maximum value that any expression during keccakf computation can get
-// Obtained from `keccakf_expr_generator.rs`
+// Operation summary:
+//  - The θ.1 step has 4 add, this gives a number in the range <= 5
+//  - The θ.2 step has 1 add, this gives a number in the range <= 10
+//  - The θ.3 step has 1 add, this gives a number in the range <= 11
+//  - The χ.1 step has 1 add and 1 prod, this gives a number in the range <= 132
+//  - The χ.2 step has 1 add, this gives a number in the range <= 143
+//  - The ι step has 1 add, this gives a number in the range <= 144
 const int KECCAKF_TABLE_MAX_VALUE = 144;
 
 const int KECCAKF_TABLE_BASE = KECCAKF_TABLE_MAX_VALUE + 1;

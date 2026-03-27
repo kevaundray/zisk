@@ -1,6 +1,8 @@
+mod constants;
 mod round;
 mod utils;
 
+use constants::*;
 use round::keccak_f_round;
 pub use utils::*;
 
@@ -128,6 +130,45 @@ mod tests {
                 0x16F53526E70465C2,
                 0x75F644E97F30A13B,
                 0xEAF1FF7B5CECA249,
+            ]
+        );
+    }
+
+    #[test]
+    fn test_keccak_f_full_state() {
+        let state_linear = [0xFFFFFFFFFFFFFFFFu64; 25];
+        let mut state = keccakf_state_from_linear(&state_linear);
+        keccak_f(&mut state);
+        let state_linear = keccakf_state_to_linear(&state);
+
+        assert_eq!(
+            state_linear,
+            [
+                0x9F00F21BBA6817C4,
+                0xCDF5AA0D21AF5E78,
+                0xD6539ABF24095B97,
+                0x8BB6F30A010F8228,
+                0xF0F711BA0547331D,
+                0x4F44330558EB182F,
+                0x2213B79D9055207C,
+                0xEB5E5B55CA4FB490,
+                0xBFAEB81A299B5D4,
+                0x9E5D924F1A65ED48,
+                0x4650C533B7BFB3,
+                0xDDAD454B84D7AB05,
+                0xF03CE56503E82921,
+                0xCE442E92C6728660,
+                0x1A9CE5E4B37DDCD3,
+                0xF63B60E27CEA6F0E,
+                0xCC4CC7FCA665BFAD,
+                0x40CF4EBA54A2285D,
+                0x2725F1F142304213,
+                0x554D327DE6FBAD9B,
+                0x19866A26CBC8BDC2,
+                0xE8C3C28FAF02C7F5,
+                0xC6BC1F3512A665AE,
+                0xCAA831F1A5DC86CE,
+                0x3F82AFE91CA4B9B0,
             ]
         );
     }

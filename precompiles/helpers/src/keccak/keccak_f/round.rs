@@ -1,42 +1,13 @@
-use super::{bits_from_u64, KeccakStateBits};
+use super::{KeccakStateBits, RC_BITS, RHO_OFFSETS};
 
-/// Round constants
-const RC: [[bool; 64]; 24] = [
-    bits_from_u64(0x0000000000000001),
-    bits_from_u64(0x0000000000008082),
-    bits_from_u64(0x800000000000808A),
-    bits_from_u64(0x8000000080008000),
-    bits_from_u64(0x000000000000808B),
-    bits_from_u64(0x0000000080000001),
-    bits_from_u64(0x8000000080008081),
-    bits_from_u64(0x8000000000008009),
-    bits_from_u64(0x000000000000008A),
-    bits_from_u64(0x0000000000000088),
-    bits_from_u64(0x0000000080008009),
-    bits_from_u64(0x000000008000000A),
-    bits_from_u64(0x000000008000808B),
-    bits_from_u64(0x800000000000008B),
-    bits_from_u64(0x8000000000008089),
-    bits_from_u64(0x8000000000008003),
-    bits_from_u64(0x8000000000008002),
-    bits_from_u64(0x8000000000000080),
-    bits_from_u64(0x000000000000800A),
-    bits_from_u64(0x800000008000000A),
-    bits_from_u64(0x8000000080008081),
-    bits_from_u64(0x8000000000008080),
-    bits_from_u64(0x0000000080000001),
-    bits_from_u64(0x8000000080008008),
-];
-
-/// Rho rotation offsets for each position
-const RHO_OFFSETS: [[usize; 5]; 5] = [
-    [0, 36, 3, 41, 18],
-    [1, 44, 10, 45, 2],
-    [62, 6, 43, 15, 61],
-    [28, 55, 25, 21, 56],
-    [27, 20, 39, 8, 14],
-];
-
+// The maximum value that any expression during keccakf computation can get
+// Operation summary:
+//  - The θ.1 step has 4 add, this gives a number in the range <= 5
+//  - The θ.2 step has 1 add, this gives a number in the range <= 10
+//  - The θ.3 step has 1 add, this gives a number in the range <= 11
+//  - The χ.1 step has 1 add and 1 prod, this gives a number in the range <= 132
+//  - The χ.2 step has 1 add, this gives a number in the range <= 143
+//  - The ι step has 1 add, this gives a number in the range <= 144
 pub fn keccak_f_round(state: &mut KeccakStateBits, round: usize) {
     // θ (Theta) step - Column parity computation and mixing
     theta(state);
@@ -150,6 +121,6 @@ fn chi(state: &mut KeccakStateBits) {
 /// A[0, 0, z] = A[0, 0, z] ⊕ RC[round][z]
 fn iota(state: &mut KeccakStateBits, round: usize) {
     for z in 0..64 {
-        state[0][0][z] += RC[round][z] as u64;
+        state[0][0][z] += RC_BITS[round][z] as u64;
     }
 }
