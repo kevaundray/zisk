@@ -59,7 +59,8 @@ airtemplate Keccakf(const int N = 2**17) {
 
     const int WIDTH = 1600;
     const int ROUNDS = 24;
-    const int CLOCKS = 1 + ROUNDS; // 1 for input state
+    const int ROUNDS_BY_CLOCK = 1;
+    const int CLOCKS = 1 + ROUNDS / ROUNDS_BY_CLOCK; // 1 for input state
 
     const int NUM_NON_USABLE_ROWS = N % CLOCKS;
     const int NUM_OPS;
@@ -118,7 +119,7 @@ airtemplate Keccakf(const int N = 2**17) {
     // STATE COLUMNS
     // ═══════════════════════════════════════════════════════════════════════════
 
-    // The state is represented as a 1D array of 1600 bits
+    // The state is represented as a 1D array of WIDTH bits
     col witness bits(1) state[WIDTH];
 
     // Bit constraint the state
@@ -126,7 +127,7 @@ airtemplate Keccakf(const int N = 2**17) {
         state[i] * (1 - state[i]) === 0;
     }
 
-    // We apply the Keccak-f round function the first 24 cycles
+    // We apply the Keccak-f round function all clocks except the last one
     const expr round_f_active = in_use - (CLOCKS - 1)'in_use_clk_0;
 
     // ═══════════════════════════════════════════════════════════════════════════
@@ -134,14 +135,12 @@ airtemplate Keccakf(const int N = 2**17) {
     // ═══════════════════════════════════════════════════════════════════════════
 
     // Compute the expressions for the Keccak-f permutation
-    const expr keccakf[WIDTH] = iota(chi(pi(rho(theta(state)))));
+    const expr keccakf[WIDTH] = keccakf_multiple_rounds(state, ROUNDS_BY_CLOCK);
 
-    // Check that state' == keccakf(state)
-    // We'll use a lookup argument to check it. Instead of performing 1600 lookups,
-    // we pack multiple state bits into each lookup to reduce the number of lookups.
-    // We do so in a way that it fits within the KeccakfTable's constraints.
+    // We check the relationship between state' and keccakf(state) using lookup arguments
     const int num_chunks = (WIDTH + KECCAKF_TABLE_MAX_CHUNKS - 1) / KECCAKF_TABLE_MAX_CHUNKS;
 
+    set_array_size(num_chunks+100);
     col witness bits(22) chunk_acc[num_chunks];
     for (int i = 0; i < num_chunks; i++) {
         const int bit_offset = i * KECCAKF_TABLE_MAX_CHUNKS;
@@ -245,30 +244,28 @@ airtemplate Keccakf(const int N = 2**17) {
     // ═══════════════════════════════════════════════════════════════════════════
     proves_operation(op: OP_KECCAKF, b: [step_addr'(ADDR_STATE), 0], main_step: step_addr'(STEP_MAIN), mul: in_use_clk_0);
 
-    function add(const expr b[]): const expr {
-        const int len = length(b);
-        expr result = 0;
+    function keccakf_multiple_rounds(const expr state[], const int rounds): const expr[] {
+        const int len = length(state);
+        assert(len == air.WIDTH);
+        expr current_state[len];
         for (int i = 0; i < len; i++) {
-            result += b[i];
+            current_state[i] = state[i];
         }
-        return result;
+
+        for (int r = 0; r < rounds; r++) {
+            current_state = keccakf_round(current_state, r);
+        }
+
+        return current_state;
     }
 
-    function xor(const expr b1, const expr b2): const expr {
-        return add([b1, b2]);
-    }
-
-    function xor5(const expr b1, const expr b2, const expr b3, const expr b4, const expr b5): const expr {
-        return add([b1, b2, b3, b4, b5]);
-    }
-
-    function nand(const expr b1, const expr b2): const expr {
-        return (1 + b1) * b2;
+    function keccakf_round(const expr state[], const int round_offset = 0): const expr[] {
+        return iota(chi(pi(rho(theta(state)))), round_offset);
     }
 
     function theta(const expr a[]): const expr[] {
         const int len = length(a);
-        assert(len == 1600);
+        assert(len == air.WIDTH);
         const expr result[len];
 
         // For all pairs (x, z) such that 0 ≤ x < 5 and 0 ≤ z < 64, compute:
@@ -315,7 +312,7 @@ airtemplate Keccakf(const int N = 2**17) {
 
     function rho(const expr a[]): const expr[] {
         const int len = length(a);
-        assert(len == 1600);
+        assert(len == air.WIDTH);
         const expr result[len];
 
         // For all z such that 0 ≤ z < 64, let result[0, 0, z] = a[0, 0, z]
@@ -351,7 +348,7 @@ airtemplate Keccakf(const int N = 2**17) {
 
     function pi(const expr a[]): const expr[] {
         const int len = length(a);
-        assert(len == 1600);
+        assert(len == air.WIDTH);
         const expr result[len];
 
         // For all triples (x, y, z) such that 0 ≤ x,y < 5, and 0 ≤ z < 64, let:  
@@ -373,7 +370,7 @@ airtemplate Keccakf(const int N = 2**17) {
 
     function chi(const expr a[]): const expr[] {
         const int len = length(a);
-        assert(len == 1600);
+        assert(len == air.WIDTH);
         const expr result[len];
 
         // For all triples (x, y, z) such that 0 ≤ x,y < 5 and 0 ≤ z < 64 compute:
@@ -397,18 +394,19 @@ airtemplate Keccakf(const int N = 2**17) {
         return result;
     }
 
-    function iota(const expr a[]): const expr {
+    function iota(const expr a[], const int round_offset = 0): const expr {
         const int len = length(a);
-        assert(len == 1600);
+        assert(len == air.WIDTH);
         const expr result[len];
 
         // Precompute weighted RC for each bit position
         expr weighted_rc[64];
         for (int z = 0; z < 64; z++) {
             weighted_rc[z] = 0;
-            for (int r = 0; r < air.ROUNDS; r++) {
+            for (int clk = 0; clk < air.CLOCKS - 1; clk++) {
+                const int r = air.ROUNDS_BY_CLOCK * clk + round_offset;
                 const int bit = (air.RC[r] >> z) & 1;
-                weighted_rc[z] += air.CLK[r] * bit;
+                weighted_rc[z] += air.CLK[clk] * bit;
             }
         }
 
@@ -434,6 +432,27 @@ airtemplate Keccakf(const int N = 2**17) {
         }
 
         return result;
+    }
+
+    function add(const expr b[]): const expr {
+        const int len = length(b);
+        expr result = 0;
+        for (int i = 0; i < len; i++) {
+            result += b[i];
+        }
+        return result;
+    }
+
+    function xor(const expr b1, const expr b2): const expr {
+        return add([b1, b2]);
+    }
+
+    function xor5(const expr b1, const expr b2, const expr b3, const expr b4, const expr b5): const expr {
+        return add([b1, b2, b3, b4, b5]);
+    }
+
+    function nand(const expr b1, const expr b2): const expr {
+        return (1 + b1) * b2;
     }
 
     function pack(const expr a[], const int offset = 0, const int len = 0): const expr {
