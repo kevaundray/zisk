@@ -6,11 +6,19 @@ use constants::*;
 pub use round::keccak_f_round;
 pub use utils::*;
 
-/// State representation as 5x5x64 bits
-pub type KeccakStateBits = [[[u64; 64]; 5]; 5];
+/// State representation as 5x5x64 bits.
+/// The maximum value that any expression during keccakf computation can get is 144, which fits in a u8.
+// Operation summary:
+//  - The θ.1 step has 4 add, this gives a number in the range <= 5
+//  - The θ.2 step has 1 add, this gives a number in the range <= 10
+//  - The θ.3 step has 1 add, this gives a number in the range <= 11
+//  - The χ.1 step has 1 add and 1 prod, this gives a number in the range <= 132
+//  - The χ.2 step has 1 add, this gives a number in the range <= 143
+//  - The ι step has 1 add, this gives a number in the range <= 144
+pub type KeccakState = [[[u8; 64]; 5]; 5];
 
 /// Full Keccak-f[1600] permutation
-pub fn keccak_f(state: &mut KeccakStateBits) {
+pub fn keccak_f(state: &mut KeccakState) {
     for round in 0..24 {
         keccak_f_round(state, round);
 
@@ -20,17 +28,17 @@ pub fn keccak_f(state: &mut KeccakStateBits) {
 }
 
 /// Reduce the state modulo 2 by applying modulo 2 to each bit in the state
-fn reduce_state_mod2(state: &mut KeccakStateBits) {
+fn reduce_state_mod2(state: &mut KeccakState) {
     state.iter_mut().flatten().flatten().for_each(|bit| *bit %= 2);
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{keccak_f, utils::keccakf_state_from_linear, KeccakStateBits};
+    use super::{keccak_f, utils::keccakf_state_from_linear, KeccakState};
 
     /// Convert from 5x5x64 bit array to linear [u64; 25]
     #[allow(clippy::needless_range_loop)]
-    pub fn keccakf_state_to_linear(state: &KeccakStateBits) -> [u64; 25] {
+    pub fn keccakf_state_to_linear(state: &KeccakState) -> [u64; 25] {
         let mut linear = [0u64; 25];
         for x in 0..5 {
             for y in 0..5 {

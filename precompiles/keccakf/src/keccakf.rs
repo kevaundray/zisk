@@ -107,7 +107,7 @@ impl<F: PrimeField64> KeccakfSM<F> {
             // Apply round function to the state
             keccak_f_round(&mut state, r);
 
-            // Convert to 1D
+            // Fill the state for this round
             let state_1d = keccakf_state_to_linear_1d(&state);
             for i in 0..WIDTH {
                 trace[r + 1].set_state(i, (state_1d[i] % 2) == 1);
@@ -125,7 +125,7 @@ impl<F: PrimeField64> KeccakfSM<F> {
                 }
                 accs[i] = acc;
 
-                // Set the accumulator
+                // Set the accumulator for the previous round
                 trace[r].set_chunk_acc(i, acc);
             }
             chunk_accs.push(accs);

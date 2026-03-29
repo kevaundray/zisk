@@ -1,4 +1,4 @@
-use super::{KeccakStateBits, RC_BITS, RHO_OFFSETS};
+use super::{KeccakState, RC_BITS, RHO_OFFSETS};
 
 // The maximum value that any expression during keccakf computation can get
 // Operation summary:
@@ -8,7 +8,7 @@ use super::{KeccakStateBits, RC_BITS, RHO_OFFSETS};
 //  - The χ.1 step has 1 add and 1 prod, this gives a number in the range <= 132
 //  - The χ.2 step has 1 add, this gives a number in the range <= 143
 //  - The ι step has 1 add, this gives a number in the range <= 144
-pub fn keccak_f_round(state: &mut KeccakStateBits, round: usize) {
+pub fn keccak_f_round(state: &mut KeccakState, round: usize) {
     // θ (Theta) step - Column parity computation and mixing
     theta(state);
 
@@ -30,8 +30,8 @@ pub fn keccak_f_round(state: &mut KeccakStateBits, round: usize) {
 /// 2. D[x, z] = C[(x-1) mod 5, z] ⊕ C[(x+1) mod 5, (z-1) mod 64]
 /// 3. A[x, y, z] = A[x, y, z] ⊕ D[x, z]
 #[allow(clippy::needless_range_loop)]
-fn theta(state: &mut KeccakStateBits) {
-    let mut c = [[0u64; 64]; 5];
+fn theta(state: &mut KeccakState) {
+    let mut c = [[0u8; 64]; 5];
 
     // Step 1: Compute column parities
     for x in 0..5 {
@@ -42,7 +42,7 @@ fn theta(state: &mut KeccakStateBits) {
     }
 
     // Step 2: Compute D[x, z]
-    let mut d = [[0u64; 64]; 5];
+    let mut d = [[0u8; 64]; 5];
     for x in 0..5 {
         for z in 0..64 {
             d[x][z] = c[(x + 4) % 5][z] + c[(x + 1) % 5][(z + 63) % 64];
@@ -62,8 +62,8 @@ fn theta(state: &mut KeccakStateBits) {
 /// ρ (Rho) step: For all z such that 0 ≤ z < 64:
 /// 1. R[0, 0, z] = A[0, 0, z] (no rotation for [0,0])
 /// 2. For other positions, rotate according to RHO_OFFSETS
-fn rho(state: &mut KeccakStateBits) {
-    let mut temp_state = [[[0u64; 64]; 5]; 5];
+fn rho(state: &mut KeccakState) {
+    let mut temp_state = [[[0u8; 64]; 5]; 5];
 
     for x in 0..5 {
         for y in 0..5 {
@@ -85,8 +85,8 @@ fn rho(state: &mut KeccakStateBits) {
 
 /// π (Pi) step: For all triples (x, y, z) such that 0 ≤ x,y < 5, and 0 ≤ z < 64:
 /// B[x, y, z] = R[(x + 3y) mod 5, x, z]
-fn pi(state: &mut KeccakStateBits) {
-    let mut temp_state = [[[0u64; 64]; 5]; 5];
+fn pi(state: &mut KeccakState) {
+    let mut temp_state = [[[0u8; 64]; 5]; 5];
 
     for x in 0..5 {
         for y in 0..5 {
@@ -101,8 +101,8 @@ fn pi(state: &mut KeccakStateBits) {
 
 /// χ (Chi) step: For all triples (x, y, z) such that 0 ≤ x,y < 5 and 0 ≤ z < 64:
 /// A[x, y, z] = B[x, y, z] ⊕ ((¬B[(x + 1) mod 5, y, z]) ∧ B[(x + 2) mod 5, y, z])
-fn chi(state: &mut KeccakStateBits) {
-    let mut temp_state = [[[0u64; 64]; 5]; 5];
+fn chi(state: &mut KeccakState) {
+    let mut temp_state = [[[0u8; 64]; 5]; 5];
 
     for x in 0..5 {
         for y in 0..5 {
@@ -119,8 +119,12 @@ fn chi(state: &mut KeccakStateBits) {
 
 /// ι (Iota) step: For all z such that 0 ≤ z < 64:
 /// A[0, 0, z] = A[0, 0, z] ⊕ RC[round][z]
-fn iota(state: &mut KeccakStateBits, round: usize) {
+fn iota(state: &mut KeccakState, round: usize) {
     for z in 0..64 {
-        state[0][0][z] += RC_BITS[round][z] as u64;
+        state[0][0][z] += RC_BITS[round][z] as u8;
     }
+}
+
+fn reduce_state_mod2(state: &mut KeccakState) {
+    state.iter_mut().flatten().flatten().for_each(|bit| *bit %= 2);
 }

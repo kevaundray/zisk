@@ -1,5 +1,3 @@
-use super::bits_from_u64;
-
 /// Round constants
 pub(crate) const RC: [u64; 24] = [
     0x0000000000000001,
@@ -63,3 +61,13 @@ pub(crate) const RHO_OFFSETS: [[usize; 5]; 5] = [
     [28, 55, 25, 21, 56],
     [27, 20, 39, 8, 14],
 ];
+
+const fn bits_from_u64(value: u64) -> [bool; 64] {
+    let mut bits = [false; 64];
+    let mut i = 0;
+    while i < 64 {
+        bits[i] = (value >> i) & 1 == 1;
+        i += 1;
+    }
+    bits
+}
