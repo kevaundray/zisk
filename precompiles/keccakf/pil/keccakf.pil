@@ -59,8 +59,7 @@ airtemplate Keccakf(const int N = 2**17) {
 
     const int WIDTH = 1600;
     const int ROUNDS = 24;
-    const int ROUNDS_BY_CLOCK = 1;
-    const int CLOCKS = 1 + ROUNDS / ROUNDS_BY_CLOCK; // 1 for input state
+    const int CLOCKS = 1 + ROUNDS; // 1 for input state
 
     const int NUM_NON_USABLE_ROWS = N % CLOCKS;
     const int NUM_OPS;
@@ -135,7 +134,7 @@ airtemplate Keccakf(const int N = 2**17) {
     // ═══════════════════════════════════════════════════════════════════════════
 
     // Compute the expressions for the Keccak-f permutation
-    const expr keccakf[WIDTH] = keccakf_multiple_rounds(state, ROUNDS_BY_CLOCK);
+    const expr keccakf[WIDTH] = keccakf_round(state);
 
     // We check the relationship between state' and keccakf(state) using lookup arguments
     const int num_chunks = (WIDTH + KECCAKF_TABLE_MAX_CHUNKS - 1) / KECCAKF_TABLE_MAX_CHUNKS;
@@ -152,7 +151,7 @@ airtemplate Keccakf(const int N = 2**17) {
         for (int j = 0; j < num_bits; j++) {
             acc_val += keccakf[bit_offset + j] * (KECCAKF_TABLE_BASE ** j);
         }
-        chunk_acc[i] <== acc_val;
+        round_f_active * (chunk_acc[i] - acc_val) === 0;
 
         const expr lookup_cols[KECCAKF_TABLE_MAX_CHUNKS + 1];
 
@@ -244,23 +243,8 @@ airtemplate Keccakf(const int N = 2**17) {
     // ═══════════════════════════════════════════════════════════════════════════
     proves_operation(op: OP_KECCAKF, b: [step_addr'(ADDR_STATE), 0], main_step: step_addr'(STEP_MAIN), mul: in_use_clk_0);
 
-    function keccakf_multiple_rounds(const expr state[], const int rounds): const expr[] {
-        const int len = length(state);
-        assert(len == air.WIDTH);
-        expr current_state[len];
-        for (int i = 0; i < len; i++) {
-            current_state[i] = state[i];
-        }
-
-        for (int r = 0; r < rounds; r++) {
-            current_state = keccakf_round(current_state, r);
-        }
-
-        return current_state;
-    }
-
-    function keccakf_round(const expr state[], const int round_offset = 0): const expr[] {
-        return iota(chi(pi(rho(theta(state)))), round_offset);
+    function keccakf_round(const expr state[]): const expr[] {
+        return iota(chi(pi(rho(theta(state)))));
     }
 
     function theta(const expr a[]): const expr[] {
@@ -403,10 +387,9 @@ airtemplate Keccakf(const int N = 2**17) {
         expr weighted_rc[64];
         for (int z = 0; z < 64; z++) {
             weighted_rc[z] = 0;
-            for (int clk = 0; clk < air.CLOCKS - 1; clk++) {
-                const int r = air.ROUNDS_BY_CLOCK * clk + round_offset;
-                const int bit = (air.RC[r] >> z) & 1;
-                weighted_rc[z] += air.CLK[clk] * bit;
+            for (int i = 0; i < air.ROUNDS; i++) {
+                const int bit = (air.RC[i] >> z) & 1;
+                weighted_rc[z] += air.CLK[i] * bit;
             }
         }
 

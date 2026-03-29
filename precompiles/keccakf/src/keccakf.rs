@@ -78,12 +78,19 @@ impl<F: PrimeField64> KeccakfSM<F> {
         &self,
         trace: &mut [KeccakfTraceRowType<F>],
         initial_state: &[u64; 25],
-        addr: Option<u32>,
-        step: Option<u64>,
+        addr: u32,
+        step: u64,
     ) -> Vec<[u32; NUM_CHUNKS]> {
-        let lookup_active = addr.is_some() && step.is_some();
+        // Fill step and addr
+        trace[0].set_step_addr(step);
+        trace[1].set_step_addr(addr as u64);
 
-        // Collect accumulators for lookup table
+        // Fill in_use
+        for i in 0..CLOCKS {
+            trace[i].set_in_use(true);
+        }
+
+        // Collect accumulators to avoid recomputation
         let mut chunk_accs = Vec::with_capacity(ROUNDS);
 
         // Convert input state to 5x5x64 representation
@@ -111,19 +118,11 @@ impl<F: PrimeField64> KeccakfSM<F> {
                         acc += (state_1d[offset + j] as u32) * BASE.pow(j as u32);
                     }
                     accs[i] = acc;
+
+                    // Set the accumulator
+                    trace[r - 1].set_chunk_acc(i, acc);
                 }
                 chunk_accs.push(accs);
-            }
-        }
-
-        if lookup_active {
-            // Fill step and addr
-            trace[0].set_step_addr(step.unwrap_or(0));
-            trace[1].set_step_addr(addr.unwrap_or(0) as u64);
-
-            // Fill in_use
-            for i in 0..CLOCKS {
-                trace[i].set_in_use(true);
             }
         }
 
@@ -187,12 +186,7 @@ impl<F: PrimeField64> KeccakfSM<F> {
             .map(|(index, trace)| {
                 let input_index = inputs_indexes[index];
                 let input = &inputs[input_index.0][input_index.1];
-                self.process_trace(
-                    trace,
-                    &input.state,
-                    Some(input.addr_main),
-                    Some(input.step_main),
-                )
+                self.process_trace(trace, &input.state, input.addr_main, input.step_main)
             })
             .collect();
 
