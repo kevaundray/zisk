@@ -124,7 +124,3 @@ fn iota(state: &mut KeccakState, round: usize) {
         state[0][0][z] += RC_BITS[round][z] as u8;
     }
 }
-
-fn reduce_state_mod2(state: &mut KeccakState) {
-    state.iter_mut().flatten().flatten().for_each(|bit| *bit %= 2);
-}
