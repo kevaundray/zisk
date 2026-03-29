@@ -58,9 +58,6 @@ resolver = "2"
 [profile.release]
 opt-level = 3
 
-[profile.release.package."proofman-verifier"]
-opt-level = 0
-
 [profile.bench]
 opt-level = 3
 
