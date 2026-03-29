@@ -16,7 +16,7 @@ pub fn keccakf_state_from_linear(linear: &[u64; 25]) -> KeccakState {
 }
 
 #[allow(clippy::needless_range_loop)]
-pub fn keccakf_state_to_linear_1d(state: &KeccakState) -> [u8; 1600] {
+pub fn keccakf_state_flatten(state: &KeccakState) -> [u8; 1600] {
     let mut linear_1d = [0u8; 1600];
     for x in 0..5 {
         for y in 0..5 {

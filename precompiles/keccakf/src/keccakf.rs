@@ -21,7 +21,9 @@ type KeccakfTraceType<F> = KeccakfTrace<F>;
 #[cfg(not(feature = "packed"))]
 type KeccakfTraceRowType<F> = KeccakfTraceRow<F>;
 
-use precompiles_helpers::{keccak_f_round, keccakf_state_from_linear, keccakf_state_to_linear_1d};
+use precompiles_helpers::{
+    keccak_f_round, keccakf_bit_pos, keccakf_state_flatten, keccakf_state_from_linear,
+};
 
 use crate::KeccakfInput;
 
@@ -97,9 +99,9 @@ impl<F: PrimeField64> KeccakfSM<F> {
         let mut state = keccakf_state_from_linear(input);
 
         // Row 0: fill the input state
-        let state_1d = keccakf_state_to_linear_1d(&state);
+        let state_flat = keccakf_state_flatten(&state);
         for i in 0..WIDTH {
-            trace[0].set_state(i, state_1d[i] == 1);
+            trace[0].set_state(i, state_flat[i] == 1);
         }
 
         // Rows 1..CLOCKS: apply each round
@@ -107,13 +109,10 @@ impl<F: PrimeField64> KeccakfSM<F> {
             // Apply round function to the state
             keccak_f_round(&mut state, r);
 
-            // Fill the state for this round
-            let state_1d = keccakf_state_to_linear_1d(&state);
-            for i in 0..WIDTH {
-                trace[r + 1].set_state(i, (state_1d[i] % 2) == 1);
-            }
+            // Flatten unreduced state for accumulator computation
+            let state_flat = keccakf_state_flatten(&state);
 
-            // Compute accumulators for lookup
+            // Compute accumulators
             let mut accs = [0u32; NUM_CHUNKS];
             for i in 0..NUM_CHUNKS {
                 let offset = i * TABLE_MAX_CHUNKS;
@@ -121,17 +120,26 @@ impl<F: PrimeField64> KeccakfSM<F> {
 
                 let mut acc = 0u32;
                 for j in 0..num_bits {
-                    acc += (state_1d[offset + j] as u32) * BASE.pow(j as u32);
+                    acc += (state_flat[offset + j] as u32) * BASE.pow(j as u32);
                 }
                 accs[i] = acc;
-
-                // Set the accumulator for the previous round
                 trace[r].set_chunk_acc(i, acc);
             }
             chunk_accs.push(accs);
 
-            // Reduce state for next round
-            state.iter_mut().flatten().flatten().for_each(|bit| *bit %= 2);
+            // Fill the trace for the next round
+            for x in 0..5 {
+                for y in 0..5 {
+                    for z in 0..64 {
+                        // Reduce the state modulo 2
+                        state[x][y][z] %= 2;
+
+                        // Fill the trace
+                        let bit_pos = keccakf_bit_pos(x, y, z);
+                        trace[r + 1].set_state(bit_pos, state[x][y][z] == 1);
+                    }
+                }
+            }
         }
 
         chunk_accs
