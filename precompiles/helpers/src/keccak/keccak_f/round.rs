@@ -23,9 +23,6 @@ pub fn keccak_f_round(state: &mut KeccakStateBits, round: usize) {
 
     // ι (Iota) step - Add round constant
     iota(state, round);
-
-    // Reduce the state modulo 2
-    reduce_state_mod2(state);
 }
 
 /// θ (Theta) step: For all pairs (x, z) such that 0 ≤ x < 5 and 0 ≤ z < 64:
@@ -126,9 +123,4 @@ fn iota(state: &mut KeccakStateBits, round: usize) {
     for z in 0..64 {
         state[0][0][z] += RC_BITS[round][z] as u64;
     }
-}
-
-/// Reduce the state modulo 2 by applying modulo 2 to each bit in the state
-pub(crate) fn reduce_state_mod2(state: &mut KeccakStateBits) {
-    state.iter_mut().flatten().flatten().for_each(|bit| *bit %= 2);
 }
