@@ -21,7 +21,7 @@ type KeccakfTraceType<F> = KeccakfTrace<F>;
 #[cfg(not(feature = "packed"))]
 type KeccakfTraceRowType<F> = KeccakfTraceRow<F>;
 
-use precompiles_helpers::{keccak_f_rounds, keccakf_state_from_linear, keccakf_state_to_linear_1d};
+use precompiles_helpers::{keccak_f_round, keccakf_state_from_linear, keccakf_state_to_linear_1d};
 
 use crate::KeccakfInput;
 
@@ -77,7 +77,7 @@ impl<F: PrimeField64> KeccakfSM<F> {
     fn process_trace(
         &self,
         trace: &mut [KeccakfTraceRowType<F>],
-        initial_state: &[u64; 25],
+        input: &[u64; 25],
         addr: u32,
         step: u64,
     ) -> Vec<[u32; NUM_CHUNKS]> {
@@ -94,36 +94,44 @@ impl<F: PrimeField64> KeccakfSM<F> {
         let mut chunk_accs = Vec::with_capacity(ROUNDS);
 
         // Convert input state to 5x5x64 representation
-        let initial_state = keccakf_state_from_linear(initial_state);
-        let round_states = keccak_f_rounds(initial_state);
+        let mut state = keccakf_state_from_linear(input);
 
-        // Fill the states
-        for (state_3d, r) in round_states {
-            let state_1d = keccakf_state_to_linear_1d(&state_3d);
+        // Row 0: fill the input state
+        let state_1d = keccakf_state_to_linear_1d(&state);
+        for i in 0..WIDTH {
+            trace[0].set_state(i, state_1d[i] == 1);
+        }
 
-            // Fill state
+        // Rows 1..CLOCKS: apply each round
+        for r in 0..ROUNDS {
+            // Apply round function to the state
+            keccak_f_round(&mut state, r);
+
+            // Convert to 1D
+            let state_1d = keccakf_state_to_linear_1d(&state);
             for i in 0..WIDTH {
-                trace[r].set_state(i, (state_1d[i] % 2) == 1);
+                trace[r + 1].set_state(i, (state_1d[i] % 2) == 1);
             }
 
             // Compute accumulators for lookup
-            if r > 0 {
-                let mut accs = [0u32; NUM_CHUNKS];
-                for i in 0..NUM_CHUNKS {
-                    let offset = i * TABLE_MAX_CHUNKS;
-                    let num_bits = std::cmp::min(TABLE_MAX_CHUNKS, WIDTH - offset);
+            let mut accs = [0u32; NUM_CHUNKS];
+            for i in 0..NUM_CHUNKS {
+                let offset = i * TABLE_MAX_CHUNKS;
+                let num_bits = std::cmp::min(TABLE_MAX_CHUNKS, WIDTH - offset);
 
-                    let mut acc = 0u32;
-                    for j in 0..num_bits {
-                        acc += (state_1d[offset + j] as u32) * BASE.pow(j as u32);
-                    }
-                    accs[i] = acc;
-
-                    // Set the accumulator
-                    trace[r - 1].set_chunk_acc(i, acc);
+                let mut acc = 0u32;
+                for j in 0..num_bits {
+                    acc += (state_1d[offset + j] as u32) * BASE.pow(j as u32);
                 }
-                chunk_accs.push(accs);
+                accs[i] = acc;
+
+                // Set the accumulator
+                trace[r].set_chunk_acc(i, acc);
             }
+            chunk_accs.push(accs);
+
+            // Reduce state for next round
+            state.iter_mut().flatten().flatten().for_each(|bit| *bit %= 2);
         }
 
         chunk_accs
