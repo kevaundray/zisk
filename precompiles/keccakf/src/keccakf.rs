@@ -120,7 +120,7 @@ impl<F: PrimeField64> KeccakfSM<F> {
 
                 let mut acc = 0u32;
                 for j in 0..num_bits {
-                    acc += (state_flat[offset + j] as u32) * BASE.pow(j as u32);
+                    acc += (state_flat[offset + j] as u32) * POWS_BASE[j];
                 }
                 accs[i] = acc;
                 trace[r].set_chunk_acc(i, acc);
