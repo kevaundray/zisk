@@ -4,7 +4,7 @@ use std::cell::{Cell, RefCell};
 #[cfg(feature = "hints")]
 thread_local! {
     static BUFFER: RefCell<Vec<u64>> = RefCell::new(Vec::with_capacity(64));
-    static DEPTH: Cell<u32> = Cell::new(0);
+    static DEPTH: Cell<u32> = const { Cell::new(0) };
 }
 
 /// Append a single u64 to the hints buffer.
