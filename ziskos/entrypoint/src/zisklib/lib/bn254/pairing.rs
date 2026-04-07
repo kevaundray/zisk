@@ -26,11 +26,7 @@ const PAIRING_CHECK_ERR_G2_NOT_IN_SUBGROUP: u8 = 6;
 ///          input: P ∈ G1 and Q ∈ G2
 ///          output: e(P,Q) ∈ GT
 ///
-pub fn pairing_bn254(
-    p: &[u64; 8],
-    q: &[u64; 16],
-    #[cfg(feature = "hints")] hints: &mut Vec<u64>,
-) -> [u64; 48] {
+pub fn pairing_bn254(p: &[u64; 8], q: &[u64; 16]) -> [u64; 48] {
     // Is p = 𝒪?
     if *p == G1_IDENTITY || *q == G2_IDENTITY {
         // e(P, 𝒪) = e(𝒪, Q) = 1;
@@ -40,29 +36,16 @@ pub fn pairing_bn254(
     }
 
     // Miller loop
-    let miller_loop = miller_loop_bn254(
-        p,
-        q,
-        #[cfg(feature = "hints")]
-        hints,
-    );
+    let miller_loop = miller_loop_bn254(p, q);
 
     // Final exponentiation
-    final_exp_bn254(
-        &miller_loop,
-        #[cfg(feature = "hints")]
-        hints,
-    )
+    final_exp_bn254(&miller_loop)
 }
 
 /// Computes the optimal Ate pairing for a batch of G1 and G2 points over the BN254 curve
 /// and multiplies the results together, i.e.:
 ///     e(P₁, Q₁) · e(P₂, Q₂) · ... · e(Pₙ, Qₙ) ∈ GT
-pub fn pairing_batch_bn254(
-    g1_points: &[[u64; 8]],
-    g2_points: &[[u64; 16]],
-    #[cfg(feature = "hints")] hints: &mut Vec<u64>,
-) -> [u64; 48] {
+pub fn pairing_batch_bn254(g1_points: &[[u64; 8]], g2_points: &[[u64; 16]]) -> [u64; 48] {
     // Since each e(Pi, Qi) := FinalExp(MillerLoop(Pi, Qi))
     // We have:
     //  e(P₁, Q₁) · e(P₂, Q₂) · ... · e(Pₙ, Qₙ) = FinalExp(MillerLoop(P₁, Q₁) · MillerLoop(P₂, Q₂) · ... · MillerLoop(Pₙ, Qₙ))
@@ -94,19 +77,10 @@ pub fn pairing_batch_bn254(
     }
 
     // Compute the Miller loop for the batch
-    let miller_loop = miller_loop_batch_bn254(
-        &g1_points_ml,
-        &g2_points_ml,
-        #[cfg(feature = "hints")]
-        hints,
-    );
+    let miller_loop = miller_loop_batch_bn254(&g1_points_ml, &g2_points_ml);
 
     // Final exponentiation
-    final_exp_bn254(
-        &miller_loop,
-        #[cfg(feature = "hints")]
-        hints,
-    )
+    final_exp_bn254(&miller_loop)
 }
 
 /// BN254 pairing check with validation.
@@ -125,11 +99,7 @@ pub fn pairing_batch_bn254(
 /// * `Err(PAIRING_CHECK_ERR_G2_NOT_IN_FIELD)` - G2 field element not canonical (>= P)
 /// * `Err(PAIRING_CHECK_ERR_G2_NOT_ON_CURVE)` - G2 point not on twist curve
 /// * `Err(PAIRING_CHECK_ERR_G2_NOT_IN_SUBGROUP)` - G2 point not in subgroup
-pub fn pairing_check_bn254(
-    g1_points: &[[u64; 8]],
-    g2_points: &[[u64; 16]],
-    #[cfg(feature = "hints")] hints: &mut Vec<u64>,
-) -> Result<bool, u8> {
+pub fn pairing_check_bn254(g1_points: &[[u64; 8]], g2_points: &[[u64; 16]]) -> Result<bool, u8> {
     assert_eq!(g1_points.len(), g2_points.len(), "Number of G1 and G2 points must be equal");
 
     // Collect valid pairs
@@ -141,31 +111,17 @@ pub fn pairing_check_bn254(
 
         // If p = 𝒪 or q = 𝒪 => MillerLoop(P, 𝒪) = MillerLoop(𝒪, Q) = 1; we can skip
         if g2_is_inf {
-            if !g1_is_inf
-                && !is_on_curve_bn254(
-                    g1,
-                    #[cfg(feature = "hints")]
-                    hints,
-                )
-            {
+            if !g1_is_inf && !is_on_curve_bn254(g1) {
                 return Err(PAIRING_CHECK_ERR_G1_NOT_ON_CURVE);
             }
             continue;
         }
 
         if g1_is_inf {
-            if !is_on_curve_twist_bn254(
-                g2,
-                #[cfg(feature = "hints")]
-                hints,
-            ) {
+            if !is_on_curve_twist_bn254(g2) {
                 return Err(PAIRING_CHECK_ERR_G2_NOT_ON_CURVE);
             }
-            if !is_on_subgroup_twist_bn254(
-                g2,
-                #[cfg(feature = "hints")]
-                hints,
-            ) {
+            if !is_on_subgroup_twist_bn254(g2) {
                 return Err(PAIRING_CHECK_ERR_G2_NOT_IN_SUBGROUP);
             }
             continue;
@@ -179,11 +135,7 @@ pub fn pairing_check_bn254(
         }
 
         // Verify G1 point is on curve
-        if !is_on_curve_bn254(
-            g1,
-            #[cfg(feature = "hints")]
-            hints,
-        ) {
+        if !is_on_curve_bn254(g1) {
             return Err(PAIRING_CHECK_ERR_G1_NOT_ON_CURVE);
         }
 
@@ -197,20 +149,12 @@ pub fn pairing_check_bn254(
         }
 
         // Verify G2 point is on twist curve
-        if !is_on_curve_twist_bn254(
-            g2,
-            #[cfg(feature = "hints")]
-            hints,
-        ) {
+        if !is_on_curve_twist_bn254(g2) {
             return Err(PAIRING_CHECK_ERR_G2_NOT_ON_CURVE);
         }
 
         // Verify G2 point is in subgroup
-        if !is_on_subgroup_twist_bn254(
-            g2,
-            #[cfg(feature = "hints")]
-            hints,
-        ) {
+        if !is_on_subgroup_twist_bn254(g2) {
             return Err(PAIRING_CHECK_ERR_G2_NOT_IN_SUBGROUP);
         }
 
@@ -224,12 +168,7 @@ pub fn pairing_check_bn254(
     }
 
     // Compute batch pairing and check if result is 1
-    Ok(is_one(&pairing_batch_bn254(
-        &g1_valid,
-        &g2_valid,
-        #[cfg(feature = "hints")]
-        hints,
-    )))
+    Ok(is_one(&pairing_batch_bn254(&g1_valid, &g2_valid)))
 }
 
 /// BN254 pairing check with big-endian byte format
@@ -247,11 +186,7 @@ pub fn pairing_check_bn254(
 /// - 5 = G2 point not on curve
 /// - 6 = G2 point not in subgroup
 #[inline]
-pub(crate) unsafe fn bn254_pairing_check_c(
-    pairs: *const u8,
-    num_pairs: usize,
-    #[cfg(feature = "hints")] hints: &mut Vec<u64>,
-) -> u8 {
+pub(crate) unsafe fn bn254_pairing_check_c(pairs: *const u8, num_pairs: usize) -> u8 {
     // Parse all pairs
     let mut g1_points: Vec<[u64; 8]> = Vec::with_capacity(num_pairs);
     let mut g2_points: Vec<[u64; 16]> = Vec::with_capacity(num_pairs);
@@ -267,12 +202,7 @@ pub(crate) unsafe fn bn254_pairing_check_c(
     }
 
     // Perform pairing check with validation
-    match pairing_check_bn254(
-        &g1_points,
-        &g2_points,
-        #[cfg(feature = "hints")]
-        hints,
-    ) {
+    match pairing_check_bn254(&g1_points, &g2_points) {
         Ok(true) => PAIRING_CHECK_SUCCESS,
         Ok(false) => PAIRING_CHECK_FAILED,
         Err(code) => code,

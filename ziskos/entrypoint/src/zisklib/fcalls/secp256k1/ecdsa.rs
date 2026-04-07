@@ -46,7 +46,6 @@ pub fn fcall_secp256k1_ecdsa_verify(
     z_value: &[u64; 4],
     r_value: &[u64; 4],
     s_value: &[u64; 4],
-    #[cfg(feature = "hints")] hints: &mut Vec<u64>,
 ) -> [u64; 8] {
     #[cfg(not(all(target_os = "zkvm", target_vendor = "zisk")))]
     {
@@ -66,8 +65,8 @@ pub fn fcall_secp256k1_ecdsa_verify(
         // Hint the result
         #[cfg(feature = "hints")]
         {
-            hints.push(results.len() as u64);
-            hints.extend_from_slice(&results);
+            crate::hints_collect::hints_push(results.len() as u64);
+            crate::hints_collect::hints_extend(&results);
         }
 
         results

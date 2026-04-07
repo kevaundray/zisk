@@ -14,10 +14,7 @@ cfg_if! {
 
 /// Computes the binary decomposition of a NON-ZERO unsigned integer `x` into its bits.
 #[allow(unused_variables)]
-pub fn fcall_bin_decomp(
-    x_val: &[u64],
-    #[cfg(feature = "hints")] hints: &mut Vec<u64>,
-) -> (usize, Vec<u64>) {
+pub fn fcall_bin_decomp(x_val: &[u64]) -> (usize, Vec<u64>) {
     #[cfg(not(all(target_os = "zkvm", target_vendor = "zisk")))]
     {
         let len_x = x_val.len();
@@ -26,9 +23,9 @@ pub fn fcall_bin_decomp(
         let bits_u64: Vec<u64> = bits.into_iter().map(|b| b as u64).collect();
         #[cfg(feature = "hints")]
         {
-            hints.push(len_bits as u64 + 1);
-            hints.push(len_bits as u64);
-            hints.extend_from_slice(&bits_u64);
+            crate::hints_collect::hints_push(len_bits as u64 + 1);
+            crate::hints_collect::hints_push(len_bits as u64);
+            crate::hints_collect::hints_extend(&bits_u64);
         }
 
         (len_bits, bits_u64)

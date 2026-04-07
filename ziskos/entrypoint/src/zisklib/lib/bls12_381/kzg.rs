@@ -19,43 +19,22 @@ pub fn verify_kzg_proof(
     y_bytes: &[u8; 32],
     commitment_bytes: &[u8; 48],
     proof_bytes: &[u8; 48],
-    #[cfg(feature = "hints")] hints: &mut Vec<u64>,
 ) -> bool {
     // Parse the commitment
-    let commitment = match decompress_bls12_381(
-        commitment_bytes,
-        #[cfg(feature = "hints")]
-        hints,
-    ) {
+    let commitment = match decompress_bls12_381(commitment_bytes) {
         Ok(result) => result,
         Err(_) => return false,
     };
-    if !eq(&commitment, &G1_IDENTITY)
-        && !is_on_subgroup_bls12_381(
-            &commitment,
-            #[cfg(feature = "hints")]
-            hints,
-        )
-    {
+    if !eq(&commitment, &G1_IDENTITY) && !is_on_subgroup_bls12_381(&commitment) {
         return false;
     }
 
     // Parse the proof
-    let proof = match decompress_bls12_381(
-        proof_bytes,
-        #[cfg(feature = "hints")]
-        hints,
-    ) {
+    let proof = match decompress_bls12_381(proof_bytes) {
         Ok(result) => result,
         Err(_) => return false,
     };
-    if !eq(&proof, &G1_IDENTITY)
-        && !is_on_subgroup_bls12_381(
-            &proof,
-            #[cfg(feature = "hints")]
-            hints,
-        )
-    {
+    if !eq(&proof, &G1_IDENTITY) && !is_on_subgroup_bls12_381(&proof) {
         return false;
     }
 
@@ -81,32 +60,12 @@ pub fn verify_kzg_proof(
     let g2 = G2_GENERATOR;
 
     // Compute c_minus_y = C - [y]G₁
-    let y_g1 = scalar_mul_bls12_381(
-        &g1,
-        &y,
-        #[cfg(feature = "hints")]
-        hints,
-    );
-    let c_minus_y = sub_complete_bls12_381(
-        &commitment,
-        &y_g1,
-        #[cfg(feature = "hints")]
-        hints,
-    );
+    let y_g1 = scalar_mul_bls12_381(&g1, &y);
+    let c_minus_y = sub_complete_bls12_381(&commitment, &y_g1);
 
     // Compute t_minus_z = [τ]₂ - [z]G₂
-    let z_g2 = scalar_mul_twist_bls12_381(
-        &g2,
-        &z,
-        #[cfg(feature = "hints")]
-        hints,
-    );
-    let t_minus_z = sub_complete_twist_bls12_381(
-        &tau_g2,
-        &z_g2,
-        #[cfg(feature = "hints")]
-        hints,
-    );
+    let z_g2 = scalar_mul_twist_bls12_381(&g2, &z);
+    let t_minus_z = sub_complete_twist_bls12_381(&tau_g2, &z_g2);
 
     // LHS: e(C - [y]G₁, G₂) - G₂ is never infinity
     // RHS: e(π, [τ]₂ - [z]G₂)
@@ -132,23 +91,14 @@ pub fn verify_kzg_proof(
     // General case: no infinities, proceed with pairing check
     // The check is equivalent to:
     // e(C - [y]G₁, -G₂) · e(π, [τ]₂ - [z]G₂) = 1
-    let neg_g2 = neg_twist_bls12_381(
-        &g2,
-        #[cfg(feature = "hints")]
-        hints,
-    );
+    let neg_g2 = neg_twist_bls12_381(&g2);
 
     // Batch pairing check
     let g1_points = [c_minus_y, proof];
     let g2_points = [neg_g2, t_minus_z];
 
     // Check if the pairing result equals 1
-    is_one(&pairing_batch_bls12_381(
-        &g1_points,
-        &g2_points,
-        #[cfg(feature = "hints")]
-        hints,
-    ))
+    is_one(&pairing_batch_bls12_381(&g1_points, &g2_points))
 }
 
 /// Verify KZG proof using BLS12-381 implementation.
@@ -172,21 +122,13 @@ pub(crate) unsafe fn verify_kzg_proof_c(
     y: *const u8,
     commitment: *const u8,
     proof: *const u8,
-    #[cfg(feature = "hints")] hints: &mut Vec<u64>,
 ) -> bool {
     let z_bytes: &[u8; 32] = &*(z as *const [u8; 32]);
     let y_bytes: &[u8; 32] = &*(y as *const [u8; 32]);
     let commitment_bytes: &[u8; 48] = &*(commitment as *const [u8; 48]);
     let proof_bytes: &[u8; 48] = &*(proof as *const [u8; 48]);
 
-    verify_kzg_proof(
-        z_bytes,
-        y_bytes,
-        commitment_bytes,
-        proof_bytes,
-        #[cfg(feature = "hints")]
-        hints,
-    )
+    verify_kzg_proof(z_bytes, y_bytes, commitment_bytes, proof_bytes)
 }
 
 /// Convert 32-byte big-endian scalar to [u64; 4] little-endian, checking canonicity

@@ -4,7 +4,7 @@ use anyhow::Result;
 
 /// Processes an `HINT_VERIFY_KZG_PROOF` hint.
 #[inline]
-pub fn verify_kzg_proof_hint(data: &[u64]) -> Result<Vec<u64>> {
+pub fn verify_kzg_proof_hint(data: &[u64]) -> Result<()> {
     hint_fields![Z: 32, Y: 32, COMMITMENT: 48, PROOF: 48];
 
     let bytes = unsafe { std::slice::from_raw_parts(data.as_ptr() as *const u8, data.len() * 8) };
@@ -18,16 +18,9 @@ pub fn verify_kzg_proof_hint(data: &[u64]) -> Result<Vec<u64>> {
     let proof: &[u8; PROOF_SIZE] =
         bytes[PROOF_OFFSET..PROOF_OFFSET + PROOF_SIZE].try_into().unwrap();
 
-    let mut hints = Vec::new();
     unsafe {
-        zisklib::verify_kzg_proof_c(
-            z.as_ptr(),
-            y.as_ptr(),
-            commitment.as_ptr(),
-            proof.as_ptr(),
-            &mut hints,
-        )
+        zisklib::verify_kzg_proof_c(z.as_ptr(), y.as_ptr(), commitment.as_ptr(), proof.as_ptr())
     };
 
-    Ok(hints)
+    Ok(())
 }

@@ -4,7 +4,7 @@ use anyhow::Result;
 
 // Processes a `MODEXP` hint.
 #[inline]
-pub fn modexp_hint(data: &[u64]) -> Result<Vec<u64>> {
+pub fn modexp_hint(data: &[u64]) -> Result<()> {
     let mut pos = 0;
     let (base, base_len) = read_field_bytes(data, &mut pos)?;
     let (exp, exp_len) = read_field_bytes(data, &mut pos)?;
@@ -21,7 +21,6 @@ pub fn modexp_hint(data: &[u64]) -> Result<Vec<u64>> {
         );
     }
 
-    let mut hints = Vec::new();
     let mut result = vec![0u8; modulus_len];
     unsafe {
         zisklib::modexp_bytes_c(
@@ -32,9 +31,8 @@ pub fn modexp_hint(data: &[u64]) -> Result<Vec<u64>> {
             modulus.as_ptr(),
             modulus_len,
             result.as_mut_ptr(),
-            &mut hints,
         );
     }
 
-    Ok(hints)
+    Ok(())
 }

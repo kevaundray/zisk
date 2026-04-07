@@ -12,14 +12,7 @@ const IV: [u64; 8] = [
     0x5BE0CD19137E2179,
 ];
 
-pub fn blake2b_compress(
-    rounds: u32,
-    h: &mut [u64; 8],
-    m: &[u64; 16],
-    t: &[u64; 2],
-    f: bool,
-    #[cfg(feature = "hints")] hints: &mut Vec<u64>,
-) {
+pub fn blake2b_compress(rounds: u32, h: &mut [u64; 8], m: &[u64; 16], t: &[u64; 2], f: bool) {
     let mut v = [0u64; 16];
 
     v[..8].copy_from_slice(h);
@@ -33,13 +26,7 @@ pub fn blake2b_compress(
     }
 
     for r in 0..rounds {
-        blake2b_round(
-            &mut v,
-            m,
-            r,
-            #[cfg(feature = "hints")]
-            hints,
-        );
+        blake2b_round(&mut v, m, r);
     }
 
     for i in 0..8 {
@@ -47,18 +34,9 @@ pub fn blake2b_compress(
     }
 }
 
-fn blake2b_round(
-    v: &mut [u64; 16],
-    m: &[u64; 16],
-    round: u32,
-    #[cfg(feature = "hints")] hints: &mut Vec<u64>,
-) {
+fn blake2b_round(v: &mut [u64; 16], m: &[u64; 16], round: u32) {
     let mut params = SyscallBlake2bRoundParams { index: (round % 10) as u64, state: v, input: m };
-    syscall_blake2b_round(
-        &mut params,
-        #[cfg(feature = "hints")]
-        hints,
-    );
+    syscall_blake2b_round(&mut params);
 }
 
 /// C-compatible wrapper for full Blake2b compression function
@@ -74,7 +52,6 @@ pub(crate) unsafe fn blake2b_compress_c(
     message: *const u64,
     offset: *const u64,
     final_block: u8,
-    #[cfg(feature = "hints")] hints: &mut Vec<u64>,
 ) {
     // Parse state
     let state_slice = core::slice::from_raw_parts_mut(state, 8);
@@ -88,13 +65,5 @@ pub(crate) unsafe fn blake2b_compress_c(
     let offset_slice = core::slice::from_raw_parts(offset, 2);
     let offset_array: &[u64; 2] = &*(offset_slice.as_ptr() as *const [u64; 2]);
 
-    blake2b_compress(
-        rounds,
-        state_array,
-        message_array,
-        offset_array,
-        final_block != 0,
-        #[cfg(feature = "hints")]
-        hints,
-    );
+    blake2b_compress(rounds, state_array, message_array, offset_array, final_block != 0);
 }

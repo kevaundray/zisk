@@ -11,20 +11,16 @@ cfg_if! {
 }
 
 #[allow(unused_variables)]
-pub fn fcall_msb_pos_256(
-    x: &[u64; 4],
-    y: &[u64; 4],
-    #[cfg(feature = "hints")] hints: &mut Vec<u64>,
-) -> (u64, u64) {
+pub fn fcall_msb_pos_256(x: &[u64; 4], y: &[u64; 4]) -> (u64, u64) {
     #[cfg(not(all(target_os = "zkvm", target_vendor = "zisk")))]
     {
         let tmp: [u64; 8] = [x[0], x[1], x[2], x[3], y[0], y[1], y[2], y[3]];
         let (i, pos) = msb_pos_256(&tmp, 2);
         #[cfg(feature = "hints")]
         {
-            hints.push(2);
-            hints.push(i as u64);
-            hints.push(pos as u64);
+            crate::hints_collect::hints_push(2);
+            crate::hints_collect::hints_push(i as u64);
+            crate::hints_collect::hints_push(pos as u64);
         }
         (i as u64, pos as u64)
     }
@@ -39,12 +35,7 @@ pub fn fcall_msb_pos_256(
 }
 
 #[allow(unused_variables)]
-pub fn fcall_msb_pos_256_3(
-    x: &[u64; 4],
-    y: &[u64; 4],
-    z: &[u64; 4],
-    #[cfg(feature = "hints")] hints: &mut Vec<u64>,
-) -> (u64, u64) {
+pub fn fcall_msb_pos_256_3(x: &[u64; 4], y: &[u64; 4], z: &[u64; 4]) -> (u64, u64) {
     #[cfg(not(all(target_os = "zkvm", target_vendor = "zisk")))]
     {
         let tmp: [u64; 12] =
@@ -52,9 +43,9 @@ pub fn fcall_msb_pos_256_3(
         let (i, pos) = msb_pos_256(&tmp, 3);
         #[cfg(feature = "hints")]
         {
-            hints.push(2);
-            hints.push(i as u64);
-            hints.push(pos as u64);
+            crate::hints_collect::hints_push(2);
+            crate::hints_collect::hints_push(i as u64);
+            crate::hints_collect::hints_push(pos as u64);
         }
         (i as u64, pos as u64)
     }

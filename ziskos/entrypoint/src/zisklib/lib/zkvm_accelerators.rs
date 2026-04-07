@@ -24,15 +24,8 @@ pub unsafe extern "C" fn zkvm_keccak256(
     data: *const u8,
     len: usize,
     output: *mut zkvm_keccak256_hash,
-    #[cfg(feature = "hints")] hints: &mut Vec<u64>,
 ) -> zkvm_status {
-    super::keccak256_c(
-        data,
-        len,
-        (*output).data.as_mut_ptr(),
-        #[cfg(feature = "hints")]
-        hints,
-    );
+    super::keccak256_c(data, len, (*output).data.as_mut_ptr());
     ZKVM_EOK
 }
 
@@ -42,15 +35,8 @@ pub unsafe extern "C" fn zkvm_sha256(
     data: *const u8,
     len: usize,
     output: *mut zkvm_sha256_hash,
-    #[cfg(feature = "hints")] hints: &mut Vec<u64>,
 ) -> zkvm_status {
-    super::sha256_c(
-        data,
-        len,
-        (*output).data.as_mut_ptr(),
-        #[cfg(feature = "hints")]
-        hints,
-    );
+    super::sha256_c(data, len, (*output).data.as_mut_ptr());
     ZKVM_EOK
 }
 
@@ -60,15 +46,8 @@ pub unsafe extern "C" fn zkvm_ripemd160(
     data: *const u8,
     len: usize,
     output: *mut zkvm_ripemd160_hash,
-    #[cfg(feature = "hints")] hints: &mut Vec<u64>,
 ) -> zkvm_status {
-    super::ripemd160_c(
-        data,
-        len,
-        (*output).data.as_mut_ptr(),
-        #[cfg(feature = "hints")]
-        hints,
-    );
+    super::ripemd160_c(data, len, (*output).data.as_mut_ptr());
     ZKVM_EOK
 }
 
@@ -82,19 +61,8 @@ pub unsafe extern "C" fn zkvm_modexp(
     modulus: *const u8,
     mod_len: usize,
     output: *mut u8,
-    #[cfg(feature = "hints")] hints: &mut Vec<u64>,
 ) -> zkvm_status {
-    super::modexp_bytes_c(
-        base,
-        base_len,
-        exp,
-        exp_len,
-        modulus,
-        mod_len,
-        output,
-        #[cfg(feature = "hints")]
-        hints,
-    );
+    super::modexp_bytes_c(base, base_len, exp, exp_len, modulus, mod_len, output);
     ZKVM_EOK
 }
 
@@ -104,14 +72,11 @@ pub unsafe extern "C" fn zkvm_bn254_g1_add(
     p1: *const zkvm_bn254_g1_point,
     p2: *const zkvm_bn254_g1_point,
     result: *mut zkvm_bn254_g1_point,
-    #[cfg(feature = "hints")] hints: &mut Vec<u64>,
 ) -> zkvm_status {
     let ret = super::bn254_g1_add_c(
         (*p1).data.as_ptr(),
         (*p2).data.as_ptr(),
         (*result).data.as_mut_ptr(),
-        #[cfg(feature = "hints")]
-        hints,
     );
     if matches!(ret, bn254::G1_ADD_SUCCESS | bn254::G1_ADD_SUCCESS_INFINITY) {
         ZKVM_EOK
@@ -126,14 +91,11 @@ pub unsafe extern "C" fn zkvm_bn254_g1_mul(
     point: *const zkvm_bn254_g1_point,
     scalar: *const zkvm_bn254_scalar,
     result: *mut zkvm_bn254_g1_point,
-    #[cfg(feature = "hints")] hints: &mut Vec<u64>,
 ) -> zkvm_status {
     let ret = super::bn254_g1_mul_c(
         (*point).data.as_ptr(),
         (*scalar).data.as_ptr(),
         (*result).data.as_mut_ptr(),
-        #[cfg(feature = "hints")]
-        hints,
     );
     if matches!(ret, bn254::G1_MUL_SUCCESS | bn254::G1_MUL_SUCCESS_INFINITY) {
         ZKVM_EOK
@@ -148,14 +110,8 @@ pub unsafe extern "C" fn zkvm_bn254_pairing(
     pairs: *const zkvm_bn254_pairing_pair,
     num_pairs: usize,
     verified: *mut bool,
-    #[cfg(feature = "hints")] hints: &mut Vec<u64>,
 ) -> zkvm_status {
-    let ret = super::bn254_pairing_check_c(
-        pairs as *const u8,
-        num_pairs,
-        #[cfg(feature = "hints")]
-        hints,
-    );
+    let ret = super::bn254_pairing_check_c(pairs as *const u8, num_pairs);
     match ret {
         bn254::PAIRING_CHECK_SUCCESS => {
             *verified = true;
@@ -177,7 +133,6 @@ pub unsafe extern "C" fn zkvm_blake2f(
     m: *const zkvm_blake2f_message,
     t: *const zkvm_blake2f_offset,
     f: u8,
-    #[cfg(feature = "hints")] hints: &mut Vec<u64>,
 ) -> zkvm_status {
     super::blake2b_compress_c(
         rounds,
@@ -185,8 +140,6 @@ pub unsafe extern "C" fn zkvm_blake2f(
         (*m).data.as_ptr() as *const u64,
         (*t).data.as_ptr() as *const u64,
         f,
-        #[cfg(feature = "hints")]
-        hints,
     );
     ZKVM_EOK
 }
@@ -199,7 +152,6 @@ pub unsafe extern "C" fn zkvm_kzg_point_eval(
     y: *const zkvm_kzg_field_element,
     proof: *const zkvm_kzg_proof,
     verified: *mut bool,
-    #[cfg(feature = "hints")] hints: &mut Vec<u64>,
 ) -> zkvm_status {
     // verify_kzg_proof_c takes (z, y, commitment, proof)
     *verified = super::verify_kzg_proof_c(
@@ -207,8 +159,6 @@ pub unsafe extern "C" fn zkvm_kzg_point_eval(
         (*y).data.as_ptr(),
         (*commitment).data.as_ptr(),
         (*proof).data.as_ptr(),
-        #[cfg(feature = "hints")]
-        hints,
     );
     ZKVM_EOK
 }
@@ -219,14 +169,11 @@ pub unsafe extern "C" fn zkvm_bls12_g1_add(
     p1: *const zkvm_bls12_381_g1_point,
     p2: *const zkvm_bls12_381_g1_point,
     result: *mut zkvm_bls12_381_g1_point,
-    #[cfg(feature = "hints")] hints: &mut Vec<u64>,
 ) -> zkvm_status {
     let ret = super::bls12_381_g1_add_c(
         (*result).data.as_mut_ptr(),
         (*p1).data.as_ptr(),
         (*p2).data.as_ptr(),
-        #[cfg(feature = "hints")]
-        hints,
     );
     if matches!(ret, bls12_381::G1_ADD_SUCCESS | bls12_381::G1_ADD_SUCCESS_INFINITY) {
         ZKVM_EOK
@@ -241,15 +188,8 @@ pub unsafe extern "C" fn zkvm_bls12_g1_msm(
     pairs: *const zkvm_bls12_381_g1_msm_pair,
     num_pairs: usize,
     result: *mut zkvm_bls12_381_g1_point,
-    #[cfg(feature = "hints")] hints: &mut Vec<u64>,
 ) -> zkvm_status {
-    let ret = super::bls12_381_g1_msm_c(
-        (*result).data.as_mut_ptr(),
-        pairs as *const u8,
-        num_pairs,
-        #[cfg(feature = "hints")]
-        hints,
-    );
+    let ret = super::bls12_381_g1_msm_c((*result).data.as_mut_ptr(), pairs as *const u8, num_pairs);
     if matches!(ret, bls12_381::G1_MSM_SUCCESS | bls12_381::G1_MSM_SUCCESS_INFINITY) {
         ZKVM_EOK
     } else {
@@ -263,14 +203,11 @@ pub unsafe extern "C" fn zkvm_bls12_g2_add(
     p1: *const zkvm_bls12_381_g2_point,
     p2: *const zkvm_bls12_381_g2_point,
     result: *mut zkvm_bls12_381_g2_point,
-    #[cfg(feature = "hints")] hints: &mut Vec<u64>,
 ) -> zkvm_status {
     let ret = super::bls12_381_g2_add_c(
         (*result).data.as_mut_ptr(),
         (*p1).data.as_ptr(),
         (*p2).data.as_ptr(),
-        #[cfg(feature = "hints")]
-        hints,
     );
     if matches!(ret, bls12_381::G2_ADD_SUCCESS | bls12_381::G2_ADD_SUCCESS_INFINITY) {
         ZKVM_EOK
@@ -285,15 +222,8 @@ pub unsafe extern "C" fn zkvm_bls12_g2_msm(
     pairs: *const zkvm_bls12_381_g2_msm_pair,
     num_pairs: usize,
     result: *mut zkvm_bls12_381_g2_point,
-    #[cfg(feature = "hints")] hints: &mut Vec<u64>,
 ) -> zkvm_status {
-    let ret = super::bls12_381_g2_msm_c(
-        (*result).data.as_mut_ptr(),
-        pairs as *const u8,
-        num_pairs,
-        #[cfg(feature = "hints")]
-        hints,
-    );
+    let ret = super::bls12_381_g2_msm_c((*result).data.as_mut_ptr(), pairs as *const u8, num_pairs);
     if matches!(ret, bls12_381::G2_MSM_SUCCESS | bls12_381::G2_MSM_SUCCESS_INFINITY) {
         ZKVM_EOK
     } else {
@@ -307,14 +237,8 @@ pub unsafe extern "C" fn zkvm_bls12_pairing(
     pairs: *const zkvm_bls12_381_pairing_pair,
     num_pairs: usize,
     verified: *mut bool,
-    #[cfg(feature = "hints")] hints: &mut Vec<u64>,
 ) -> zkvm_status {
-    let ret = super::bls12_381_pairing_check_c(
-        pairs as *const u8,
-        num_pairs,
-        #[cfg(feature = "hints")]
-        hints,
-    );
+    let ret = super::bls12_381_pairing_check_c(pairs as *const u8, num_pairs);
     match ret {
         bls12_381::PAIRING_CHECK_SUCCESS => {
             *verified = true;
@@ -333,14 +257,9 @@ pub unsafe extern "C" fn zkvm_bls12_pairing(
 pub unsafe extern "C" fn zkvm_bls12_map_fp_to_g1(
     field_element: *const zkvm_bls12_381_fp,
     result: *mut zkvm_bls12_381_g1_point,
-    #[cfg(feature = "hints")] hints: &mut Vec<u64>,
 ) -> zkvm_status {
-    let ret = super::bls12_381_fp_to_g1_c(
-        (*result).data.as_mut_ptr(),
-        (*field_element).data.as_ptr(),
-        #[cfg(feature = "hints")]
-        hints,
-    );
+    let ret =
+        super::bls12_381_fp_to_g1_c((*result).data.as_mut_ptr(), (*field_element).data.as_ptr());
     if ret == bls12_381::FP_TO_G1_SUCCESS {
         ZKVM_EOK
     } else {
@@ -353,14 +272,9 @@ pub unsafe extern "C" fn zkvm_bls12_map_fp_to_g1(
 pub unsafe extern "C" fn zkvm_bls12_map_fp2_to_g2(
     field_element: *const zkvm_bls12_381_fp2,
     result: *mut zkvm_bls12_381_g2_point,
-    #[cfg(feature = "hints")] hints: &mut Vec<u64>,
 ) -> zkvm_status {
-    let ret = super::bls12_381_fp2_to_g2_c(
-        (*result).data.as_mut_ptr(),
-        (*field_element).data.as_ptr(),
-        #[cfg(feature = "hints")]
-        hints,
-    );
+    let ret =
+        super::bls12_381_fp2_to_g2_c((*result).data.as_mut_ptr(), (*field_element).data.as_ptr());
     if ret == bls12_381::FP2_TO_G2_SUCCESS {
         ZKVM_EOK
     } else {
@@ -375,14 +289,11 @@ pub unsafe extern "C" fn zkvm_secp256r1_verify(
     sig: *const zkvm_secp256r1_signature,
     pubkey: *const zkvm_secp256r1_pubkey,
     verified: *mut bool,
-    #[cfg(feature = "hints")] hints: &mut Vec<u64>,
 ) -> zkvm_status {
     *verified = super::secp256r1_ecdsa_verify_c(
         (*msg).data.as_ptr(),
         (*sig).data.as_ptr(),
         (*pubkey).data.as_ptr(),
-        #[cfg(feature = "hints")]
-        hints,
     );
     ZKVM_EOK
 }
@@ -394,15 +305,9 @@ pub unsafe extern "C" fn zkvm_secp256k1_verify(
     sig: *const zkvm_secp256k1_signature,
     pubkey: *const zkvm_secp256k1_pubkey,
     verified: *mut bool,
-    #[cfg(feature = "hints")] hints: &mut Vec<u64>,
 ) -> zkvm_status {
-    *verified = super::secp256k1_ecdsa_verify_c(
-        sig as *const u8,
-        msg as *const u8,
-        pubkey as *const u8,
-        #[cfg(feature = "hints")]
-        hints,
-    );
+    *verified =
+        super::secp256k1_ecdsa_verify_c(sig as *const u8, msg as *const u8, pubkey as *const u8);
 
     ZKVM_EOK
 }
@@ -414,15 +319,12 @@ pub unsafe extern "C" fn zkvm_secp256k1_ecrecover(
     sig: *const zkvm_secp256k1_signature,
     recid: u8,
     output: *mut zkvm_secp256k1_pubkey,
-    #[cfg(feature = "hints")] hints: &mut Vec<u64>,
 ) -> zkvm_status {
     let ret = super::secp256k1_ecdsa_recover_c(
         sig as *const u8,
         recid,
         msg as *const u8,
         output as *mut u8,
-        #[cfg(feature = "hints")]
-        hints,
     );
 
     if ret == super::ECDSA_RECOVER_SUCCESS {
@@ -442,9 +344,7 @@ pub unsafe extern "C" fn zkvm_secp256k1_ecrecover(
 // doesn't exist) and signature mismatches (if the parameter or return types differ).
 // No types are written manually here — they are all derived from the generated source.
 //
-// Only applicable in the non-hints build (hints adds an extra parameter).
 // ---------------------------------------------------------------------------
-#[cfg(not(feature = "hints"))]
 #[allow(dead_code)]
 mod _interface_type_checks {
     use super::*;

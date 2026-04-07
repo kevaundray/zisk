@@ -5,7 +5,7 @@ use crate::{
 
 use super::constants::R;
 
-pub fn reduce_fr_bn254(x: &[u64; 4], #[cfg(feature = "hints")] hints: &mut Vec<u64>) -> [u64; 4] {
+pub fn reduce_fr_bn254(x: &[u64; 4]) -> [u64; 4] {
     if lt(x, &R) {
         return *x;
     }
@@ -18,11 +18,7 @@ pub fn reduce_fr_bn254(x: &[u64; 4], #[cfg(feature = "hints")] hints: &mut Vec<u
         module: &R,
         d: &mut [0, 0, 0, 0],
     };
-    syscall_arith256_mod(
-        &mut params,
-        #[cfg(feature = "hints")]
-        hints,
-    );
+    syscall_arith256_mod(&mut params);
 
     *params.d
 }

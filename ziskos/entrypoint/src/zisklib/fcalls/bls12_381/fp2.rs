@@ -31,17 +31,14 @@ cfg_if! {
 /// Note that this is a *free-input call*, meaning the Zisk VM does not automatically verify the correctness
 /// of the result. It is the caller's responsibility to ensure it.
 #[allow(unused_variables)]
-pub fn fcall_bls12_381_fp2_inv(
-    p_value: &[u64; 12],
-    #[cfg(feature = "hints")] hints: &mut Vec<u64>,
-) -> [u64; 12] {
+pub fn fcall_bls12_381_fp2_inv(p_value: &[u64; 12]) -> [u64; 12] {
     #[cfg(not(all(target_os = "zkvm", target_vendor = "zisk")))]
     {
         let result: [u64; 12] = bls12_381_fp2_inv(p_value);
         #[cfg(feature = "hints")]
         {
-            hints.push(result.len() as u64);
-            hints.extend_from_slice(&result);
+            crate::hints_collect::hints_push(result.len() as u64);
+            crate::hints_collect::hints_extend(&result);
         }
         result
     }
@@ -90,17 +87,14 @@ pub fn fcall_bls12_381_fp2_inv(
 /// Note that this is a *free-input call*, meaning the Zisk VM does not automatically verify the correctness
 /// of the result. It is the caller's responsibility to ensure it.
 #[allow(unused_variables)]
-pub fn fcall_bls12_381_fp2_sqrt(
-    p_value: &[u64; 12],
-    #[cfg(feature = "hints")] hints: &mut Vec<u64>,
-) -> [u64; 13] {
+pub fn fcall_bls12_381_fp2_sqrt(p_value: &[u64; 12]) -> [u64; 13] {
     #[cfg(not(all(target_os = "zkvm", target_vendor = "zisk")))]
     {
         let result: [u64; 13] = bls12_381_fp2_sqrt_13(p_value);
         #[cfg(feature = "hints")]
         {
-            hints.push(result.len() as u64);
-            hints.extend_from_slice(&result);
+            crate::hints_collect::hints_push(result.len() as u64);
+            crate::hints_collect::hints_extend(&result);
         }
         result
     }

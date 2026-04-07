@@ -8,13 +8,7 @@ use super::{
 
 /// Verifies the signature (r, s) over the message hash z using the public key pk
 /// Returns true if the signature is valid, false otherwise
-pub fn secp256r1_ecdsa_verify(
-    pk: &[u64; 8],
-    z: &[u64; 4],
-    r: &[u64; 4],
-    s: &[u64; 4],
-    #[cfg(feature = "hints")] hints: &mut Vec<u64>,
-) -> bool {
+pub fn secp256r1_ecdsa_verify(pk: &[u64; 8], z: &[u64; 4], r: &[u64; 4], s: &[u64; 4]) -> bool {
     // r and s must be in the range [1, n-1]
     if is_zero(r) || gt(r, &N_MINUS_ONE) {
         return false;
@@ -34,11 +28,7 @@ pub fn secp256r1_ecdsa_verify(
     if gt(&pk_x, &P_MINUS_ONE) || gt(&pk_y, &P_MINUS_ONE) {
         return false;
     }
-    if !secp256r1_is_on_curve(
-        pk,
-        #[cfg(feature = "hints")]
-        hints,
-    ) {
+    if !secp256r1_is_on_curve(pk) {
         return false;
     }
 
@@ -49,55 +39,23 @@ pub fn secp256r1_ecdsa_verify(
     // and ensure that x ≡ r (mod n), saving us from expensive fn arithmetic
 
     // Hint the result
-    let point = fcall_secp256r1_ecdsa_verify(
-        pk,
-        z,
-        r,
-        s,
-        #[cfg(feature = "hints")]
-        hints,
-    );
+    let point = fcall_secp256r1_ecdsa_verify(pk, z, r, s);
 
     // Check the recovered point is valid
     // Note: Identity point would be raised here
-    if !secp256r1_is_on_curve(
-        &point,
-        #[cfg(feature = "hints")]
-        hints,
-    ) {
+    if !secp256r1_is_on_curve(&point) {
         return false;
     }
 
     // Check that [z]G + [r]PK + [-s](x,y) == 𝒪
-    let neg_s = secp256r1_fn_neg(
-        s,
-        #[cfg(feature = "hints")]
-        hints,
-    );
-    if secp256r1_triple_scalar_mul_with_g(
-        z,
-        r,
-        &neg_s,
-        pk,
-        &point,
-        #[cfg(feature = "hints")]
-        hints,
-    )
-    .is_some()
-    {
+    let neg_s = secp256r1_fn_neg(s);
+    if secp256r1_triple_scalar_mul_with_g(z, r, &neg_s, pk, &point).is_some() {
         return false;
     }
 
     // Check that x ≡ r (mod n)
     let point_x: [u64; 4] = [point[0], point[1], point[2], point[3]];
-    eq(
-        &secp256r1_fn_reduce(
-            &point_x,
-            #[cfg(feature = "hints")]
-            hints,
-        ),
-        r,
-    )
+    eq(&secp256r1_fn_reduce(&point_x), r)
 }
 
 // ==================== C FFI Functions ====================
@@ -113,7 +71,6 @@ pub(crate) unsafe fn secp256r1_ecdsa_verify_c(
     msg: *const u8,
     sig: *const u8,
     pk: *const u8,
-    #[cfg(feature = "hints")] hints: &mut Vec<u64>,
 ) -> bool {
     let msg_bytes: &[u8; 32] = &*(msg as *const [u8; 32]);
     let sig_bytes: &[u8; 64] = &*(sig as *const [u8; 64]);
@@ -135,14 +92,7 @@ pub(crate) unsafe fn secp256r1_ecdsa_verify_c(
     let pk_y = bytes_be_to_u64_le(&pk_y_bytes);
 
     let pk: [u64; 8] = [pk_x[0], pk_x[1], pk_x[2], pk_x[3], pk_y[0], pk_y[1], pk_y[2], pk_y[3]];
-    secp256r1_ecdsa_verify(
-        &pk,
-        &z,
-        &r,
-        &s,
-        #[cfg(feature = "hints")]
-        hints,
-    )
+    secp256r1_ecdsa_verify(&pk, &z, &r, &s)
 }
 
 /// Convert big-endian bytes to little-endian u64 limbs (32 bytes -> [u64; 4])

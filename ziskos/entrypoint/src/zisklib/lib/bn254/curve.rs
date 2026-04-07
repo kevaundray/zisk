@@ -29,42 +29,20 @@ const G1_MUL_ERR_NOT_IN_FIELD: u8 = 2;
 const G1_MUL_ERR_NOT_ON_CURVE: u8 = 3;
 
 /// Check if a non-zero point `p` is on the BN254 curve
-pub fn is_on_curve_bn254(p: &[u64; 8], #[cfg(feature = "hints")] hints: &mut Vec<u64>) -> bool {
+pub fn is_on_curve_bn254(p: &[u64; 8]) -> bool {
     let x: [u64; 4] = p[0..4].try_into().unwrap();
     let y: [u64; 4] = p[4..8].try_into().unwrap();
 
     // p in E iff y² == x³ + 3
-    let lhs = square_fp_bn254(
-        &y,
-        #[cfg(feature = "hints")]
-        hints,
-    );
-    let mut rhs = square_fp_bn254(
-        &x,
-        #[cfg(feature = "hints")]
-        hints,
-    );
-    rhs = mul_fp_bn254(
-        &rhs,
-        &x,
-        #[cfg(feature = "hints")]
-        hints,
-    );
-    rhs = add_fp_bn254(
-        &rhs,
-        &E_B,
-        #[cfg(feature = "hints")]
-        hints,
-    );
+    let lhs = square_fp_bn254(&y);
+    let mut rhs = square_fp_bn254(&x);
+    rhs = mul_fp_bn254(&rhs, &x);
+    rhs = add_fp_bn254(&rhs, &E_B);
     eq(&lhs, &rhs)
 }
 
 /// Adds two non-zero points `p1` and `p2` on the BN254 curve
-pub fn add_bn254(
-    p1: &[u64; 8],
-    p2: &[u64; 8],
-    #[cfg(feature = "hints")] hints: &mut Vec<u64>,
-) -> [u64; 8] {
+pub fn add_bn254(p1: &[u64; 8], p2: &[u64; 8]) -> [u64; 8] {
     let x1: [u64; 4] = p1[0..4].try_into().unwrap();
     let y1: [u64; 4] = p1[4..8].try_into().unwrap();
     let x2: [u64; 4] = p2[0..4].try_into().unwrap();
@@ -75,11 +53,7 @@ pub fn add_bn254(
         // Is y1 == y2?
         if eq(&y1, &y2) {
             // Compute the doubling
-            return dbl_bn254(
-                p1,
-                #[cfg(feature = "hints")]
-                hints,
-            );
+            return dbl_bn254(p1);
         } else {
             // Return 𝒪
             return G1_IDENTITY;
@@ -94,11 +68,7 @@ pub fn add_bn254(
 
     // Call the syscall to add the two points
     let mut params = SyscallBn254CurveAddParams { p1: &mut p1, p2: &p2 };
-    syscall_bn254_curve_add(
-        &mut params,
-        #[cfg(feature = "hints")]
-        hints,
-    );
+    syscall_bn254_curve_add(&mut params);
 
     // Convert the result back to a single array
     let x3 = params.p1.x;
@@ -107,11 +77,7 @@ pub fn add_bn254(
 }
 
 /// Addition of two points with validation and identity handling
-pub fn add_complete_bn254(
-    p1: &[u64; 8],
-    p2: &[u64; 8],
-    #[cfg(feature = "hints")] hints: &mut Vec<u64>,
-) -> Result<[u64; 8], u8> {
+pub fn add_complete_bn254(p1: &[u64; 8], p2: &[u64; 8]) -> Result<[u64; 8], u8> {
     let p1_is_inf = eq(p1, &G1_IDENTITY);
     let p2_is_inf = eq(p2, &G1_IDENTITY);
 
@@ -127,11 +93,7 @@ pub fn add_complete_bn254(
         if !lt(&x2, &P) || !lt(&y2, &P) {
             return Err(G1_ADD_ERR_NOT_IN_FIELD);
         }
-        if !is_on_curve_bn254(
-            p2,
-            #[cfg(feature = "hints")]
-            hints,
-        ) {
+        if !is_on_curve_bn254(p2) {
             return Err(G1_ADD_ERR_NOT_ON_CURVE);
         }
         return Ok(*p2);
@@ -144,11 +106,7 @@ pub fn add_complete_bn254(
         if !lt(&x1, &P) || !lt(&y1, &P) {
             return Err(G1_ADD_ERR_NOT_IN_FIELD);
         }
-        if !is_on_curve_bn254(
-            p1,
-            #[cfg(feature = "hints")]
-            hints,
-        ) {
+        if !is_on_curve_bn254(p1) {
             return Err(G1_ADD_ERR_NOT_ON_CURVE);
         }
         return Ok(*p1);
@@ -160,11 +118,7 @@ pub fn add_complete_bn254(
     if !lt(&x1, &P) || !lt(&y1, &P) {
         return Err(G1_ADD_ERR_NOT_IN_FIELD);
     }
-    if !is_on_curve_bn254(
-        p1,
-        #[cfg(feature = "hints")]
-        hints,
-    ) {
+    if !is_on_curve_bn254(p1) {
         return Err(G1_ADD_ERR_NOT_ON_CURVE);
     }
 
@@ -173,54 +127,33 @@ pub fn add_complete_bn254(
     if !lt(&x2, &P) || !lt(&y2, &P) {
         return Err(G1_ADD_ERR_NOT_IN_FIELD);
     }
-    if !is_on_curve_bn254(
-        p2,
-        #[cfg(feature = "hints")]
-        hints,
-    ) {
+    if !is_on_curve_bn254(p2) {
         return Err(G1_ADD_ERR_NOT_ON_CURVE);
     }
 
     // Perform addition
-    Ok(add_bn254(
-        p1,
-        p2,
-        #[cfg(feature = "hints")]
-        hints,
-    ))
+    Ok(add_bn254(p1, p2))
 }
 
 /// Doubles a non-zero point `p` on the BN254 curve
-pub fn dbl_bn254(p: &[u64; 8], #[cfg(feature = "hints")] hints: &mut Vec<u64>) -> [u64; 8] {
+pub fn dbl_bn254(p: &[u64; 8]) -> [u64; 8] {
     let mut p1 = SyscallPoint256 { x: p[0..4].try_into().unwrap(), y: p[4..8].try_into().unwrap() };
-    syscall_bn254_curve_dbl(
-        &mut p1,
-        #[cfg(feature = "hints")]
-        hints,
-    );
+    syscall_bn254_curve_dbl(&mut p1);
     [p1.x[0], p1.x[1], p1.x[2], p1.x[3], p1.y[0], p1.y[1], p1.y[2], p1.y[3]]
 }
 
 /// Negation of a point
-pub fn neg_bn254(p: &[u64; 8], #[cfg(feature = "hints")] hints: &mut Vec<u64>) -> [u64; 8] {
+pub fn neg_bn254(p: &[u64; 8]) -> [u64; 8] {
     let x: [u64; 4] = p[0..4].try_into().unwrap();
     let y: [u64; 4] = p[4..8].try_into().unwrap();
 
     // Compute the negation
-    let y_neg = neg_fp_bn254(
-        &y,
-        #[cfg(feature = "hints")]
-        hints,
-    );
+    let y_neg = neg_fp_bn254(&y);
     [x[0], x[1], x[2], x[3], y_neg[0], y_neg[1], y_neg[2], y_neg[3]]
 }
 
 /// Multiplies a non-zero point `p` on the BN254 curve by a scalar `k` on the BN254 scalar field
-pub fn scalar_mul_bn254(
-    p: &[u64; 8],
-    k: &[u64; 4],
-    #[cfg(feature = "hints")] hints: &mut Vec<u64>,
-) -> [u64; 8] {
+pub fn scalar_mul_bn254(p: &[u64; 8], k: &[u64; 4]) -> [u64; 8] {
     // Direct cases: k = 0, k = 1, k = 2
     match k {
         [0, 0, 0, 0] => {
@@ -233,11 +166,7 @@ pub fn scalar_mul_bn254(
         }
         [2, 0, 0, 0] => {
             // Return 2p
-            return dbl_bn254(
-                p,
-                #[cfg(feature = "hints")]
-                hints,
-            );
+            return dbl_bn254(p);
         }
         _ => {}
     }
@@ -246,12 +175,7 @@ pub fn scalar_mul_bn254(
     // Hint the length the binary representations of k
     // We will verify the output by recomposing k
     // Moreover, we should check that the first received bit is 1
-    let (max_limb, max_bit) = fcall_msb_pos_256(
-        k,
-        &[0, 0, 0, 0],
-        #[cfg(feature = "hints")]
-        hints,
-    );
+    let (max_limb, max_bit) = fcall_msb_pos_256(k, &[0, 0, 0, 0]);
 
     // Perform the loop, based on the binary representation of k
 
@@ -284,21 +208,13 @@ pub fn scalar_mul_bn254(
     for i in (0..=limb).rev() {
         for j in (0..=bit).rev() {
             // Always double
-            syscall_bn254_curve_dbl(
-                &mut q,
-                #[cfg(feature = "hints")]
-                hints,
-            );
+            syscall_bn254_curve_dbl(&mut q);
 
             // Get the next bit b of k.
             // If b == 1, we should add P to Q, otherwise start the next iteration
             if ((k[i] >> j) & 1) == 1 {
                 let mut params = SyscallBn254CurveAddParams { p1: &mut q, p2: &p };
-                syscall_bn254_curve_add(
-                    &mut params,
-                    #[cfg(feature = "hints")]
-                    hints,
-                );
+                syscall_bn254_curve_add(&mut params);
 
                 // Reconstruct k
                 k_rec[i] |= 1 << j;
@@ -317,11 +233,7 @@ pub fn scalar_mul_bn254(
 }
 
 /// Scalar multiplication with validation and identity handling
-pub fn mul_complete_bn254(
-    p: &[u64; 8],
-    k: &[u64; 4],
-    #[cfg(feature = "hints")] hints: &mut Vec<u64>,
-) -> Result<[u64; 8], u8> {
+pub fn mul_complete_bn254(p: &[u64; 8], k: &[u64; 4]) -> Result<[u64; 8], u8> {
     // If point is infinity, result is infinity
     if eq(p, &G1_IDENTITY) {
         return Ok(G1_IDENTITY);
@@ -335,28 +247,15 @@ pub fn mul_complete_bn254(
         return Err(G1_MUL_ERR_NOT_IN_FIELD);
     }
 
-    if !is_on_curve_bn254(
-        p,
-        #[cfg(feature = "hints")]
-        hints,
-    ) {
+    if !is_on_curve_bn254(p) {
         return Err(G1_MUL_ERR_NOT_ON_CURVE);
     }
 
     // Reduce the scalar
-    let k = reduce_fr_bn254(
-        k,
-        #[cfg(feature = "hints")]
-        hints,
-    );
+    let k = reduce_fr_bn254(k);
 
     // Perform scalar multiplication
-    Ok(scalar_mul_bn254(
-        p,
-        &k,
-        #[cfg(feature = "hints")]
-        hints,
-    ))
+    Ok(scalar_mul_bn254(p, &k))
 }
 
 /// BN254 G1 point addition with big-endian byte format
@@ -371,12 +270,7 @@ pub fn mul_complete_bn254(
 /// - 1 if p1 is invalid (not on curve or invalid field element)
 /// - 2 if p2 is invalid (not on curve or invalid field element)
 #[inline]
-pub(crate) unsafe fn bn254_g1_add_c(
-    p1: *const u8,
-    p2: *const u8,
-    ret: *mut u8,
-    #[cfg(feature = "hints")] hints: &mut Vec<u64>,
-) -> u8 {
+pub(crate) unsafe fn bn254_g1_add_c(p1: *const u8, p2: *const u8, ret: *mut u8) -> u8 {
     let p1_bytes: &[u8; 64] = &*(p1 as *const [u8; 64]);
     let p2_bytes: &[u8; 64] = &*(p2 as *const [u8; 64]);
     let ret_bytes: &mut [u8; 64] = &mut *(ret as *mut [u8; 64]);
@@ -386,12 +280,7 @@ pub(crate) unsafe fn bn254_g1_add_c(
     let p2_u64 = g1_bytes_be_to_u64_le_bn254(p2_bytes);
 
     // Perform addition with validation
-    let result = match add_complete_bn254(
-        &p1_u64,
-        &p2_u64,
-        #[cfg(feature = "hints")]
-        hints,
-    ) {
+    let result = match add_complete_bn254(&p1_u64, &p2_u64) {
         Ok(r) => r,
         Err(code) => return code,
     };
@@ -416,12 +305,7 @@ pub(crate) unsafe fn bn254_g1_add_c(
 /// - 0 if the operation succeeded
 /// - 1 if point is invalid (not on curve or invalid field element)
 #[inline]
-pub(crate) unsafe fn bn254_g1_mul_c(
-    point: *const u8,
-    scalar: *const u8,
-    ret: *mut u8,
-    #[cfg(feature = "hints")] hints: &mut Vec<u64>,
-) -> u8 {
+pub(crate) unsafe fn bn254_g1_mul_c(point: *const u8, scalar: *const u8, ret: *mut u8) -> u8 {
     let point_bytes: &[u8; 64] = &*(point as *const [u8; 64]);
     let scalar_bytes: &[u8; 32] = &*(scalar as *const [u8; 32]);
     let ret_bytes: &mut [u8; 64] = &mut *(ret as *mut [u8; 64]);
@@ -431,12 +315,7 @@ pub(crate) unsafe fn bn254_g1_mul_c(
     let scalar_u64 = scalar_bytes_be_to_u64_le_bn254(scalar_bytes);
 
     // Perform scalar multiplication with validation
-    let product = match mul_complete_bn254(
-        &point_u64,
-        &scalar_u64,
-        #[cfg(feature = "hints")]
-        hints,
-    ) {
+    let product = match mul_complete_bn254(&point_u64, &scalar_u64) {
         Ok(r) => r,
         Err(code) => return code,
     };

@@ -20,10 +20,7 @@ pub struct SyscallBlake2bRoundParams<'a> {
 #[allow(unused_variables)]
 #[cfg_attr(not(feature = "hints"), no_mangle)]
 #[cfg_attr(feature = "hints", export_name = "hints_syscall_blake2b_round")]
-pub extern "C" fn syscall_blake2b_round(
-    params: &mut SyscallBlake2bRoundParams,
-    #[cfg(feature = "hints")] hints: &mut Vec<u64>,
-) {
+pub extern "C" fn syscall_blake2b_round(params: &mut SyscallBlake2bRoundParams) {
     #[cfg(all(target_os = "zkvm", target_vendor = "zisk"))]
     ziskos_syscall!(zisk_definitions::SYSCALL_BLAKE2B_ROUND_ID, params);
 
@@ -33,7 +30,7 @@ pub extern "C" fn syscall_blake2b_round(
 
         #[cfg(feature = "hints")]
         {
-            hints.extend_from_slice(params.state);
+            crate::hints_collect::hints_extend(params.state);
         }
     }
 }

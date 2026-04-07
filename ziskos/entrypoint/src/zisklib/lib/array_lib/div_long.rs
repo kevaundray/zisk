@@ -16,11 +16,7 @@ use super::{add_agtb, mul_long, U256};
 ///
 /// # Note
 /// Not optimal for `len(b) == 1`, use `div_short` instead
-pub fn div_long(
-    a: &[U256],
-    b: &[U256],
-    #[cfg(feature = "hints")] hints: &mut Vec<u64>,
-) -> (Vec<U256>, Vec<U256>) {
+pub fn div_long(a: &[U256], b: &[U256]) -> (Vec<U256>, Vec<U256>) {
     let len_a = a.len();
     let len_b = b.len();
     #[cfg(debug_assertions)]
@@ -49,14 +45,7 @@ pub fn div_long(
     // Hint the quotient and remainder
     let mut quo_flat = vec![0u64; len_a * 4];
     let mut rem_flat = vec![0u64; len_b * 4];
-    let (limbs_quo, limbs_rem) = fcall_division(
-        a_flat,
-        b_flat,
-        &mut quo_flat,
-        &mut rem_flat,
-        #[cfg(feature = "hints")]
-        hints,
-    );
+    let (limbs_quo, limbs_rem) = fcall_division(a_flat, b_flat, &mut quo_flat, &mut rem_flat);
     let quo = U256::flat_to_slice(&quo_flat[..limbs_quo]);
     let rem = U256::flat_to_slice(&rem_flat[..limbs_rem]);
 
@@ -78,13 +67,7 @@ pub fn div_long(
 
     // Multiply the quotient by b
     let mut q_b = vec![U256::ZERO; len_a + 1]; // The +1 is because mul_long is a general purpose function
-    let q_b_len = mul_long(
-        quo,
-        b,
-        &mut q_b,
-        #[cfg(feature = "hints")]
-        hints,
-    );
+    let q_b_len = mul_long(quo, b, &mut q_b);
 
     // Check 1 <= len(r)
     let len_rem = rem.len();
@@ -99,13 +82,7 @@ pub fn div_long(
         assert!(U256::lt_slices(rem, b), "Remainder must be less than divisor");
 
         let mut q_b_r = vec![U256::ZERO; len_a + 1]; // The +1 is because add_agtb is a general purpose function
-        let q_b_r_len = add_agtb(
-            &q_b[..q_b_len],
-            rem,
-            &mut q_b_r,
-            #[cfg(feature = "hints")]
-            hints,
-        );
+        let q_b_r_len = add_agtb(&q_b[..q_b_len], rem, &mut q_b_r);
         assert!(U256::eq_slices(a, &q_b_r[..q_b_r_len]), "a != q·b + r");
     }
 

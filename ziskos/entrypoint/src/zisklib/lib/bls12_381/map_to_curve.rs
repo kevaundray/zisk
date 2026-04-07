@@ -29,43 +29,24 @@ const G2_MAP_TO_CURVE_SUCCESS: u8 = 0;
 const G2_MAP_TO_CURVE_ERR_NOT_IN_FIELD: u8 = 1;
 
 /// Maps a field element to a point on the BLS12-381 G1 curve
-pub fn map_to_curve_g1_bls12_381(
-    u: &[u64; 6],
-    #[cfg(feature = "hints")] hints: &mut Vec<u64>,
-) -> Result<[u64; 12], u8> {
+pub fn map_to_curve_g1_bls12_381(u: &[u64; 6]) -> Result<[u64; 12], u8> {
     // Verify input is in field
     if !lt(u, &P) {
         return Err(G1_MAP_TO_CURVE_ERR_NOT_IN_FIELD);
     }
 
     // Step 1: Map to isogenous curve E' using simplified SWU
-    let p_prime = map_to_curve_simple_swu_g1_bls12_381(
-        u,
-        #[cfg(feature = "hints")]
-        hints,
-    );
+    let p_prime = map_to_curve_simple_swu_g1_bls12_381(u);
 
     // Step 2: Apply isogeny map from E' to E
-    let p = isogeny_map_g1_bls12_381(
-        &p_prime,
-        #[cfg(feature = "hints")]
-        hints,
-    );
+    let p = isogeny_map_g1_bls12_381(&p_prime);
 
     // Step 3: Clear cofactor
-    Ok(scalar_mul_bls12_381(
-        &p,
-        &COFACTOR_G1,
-        #[cfg(feature = "hints")]
-        hints,
-    ))
+    Ok(scalar_mul_bls12_381(&p, &COFACTOR_G1))
 }
 
 /// Maps a field element in Fp2 to a point on the BLS12-381 G2 curve
-pub fn map_to_curve_g2_bls12_381(
-    u: &[u64; 12],
-    #[cfg(feature = "hints")] hints: &mut Vec<u64>,
-) -> Result<[u64; 24], u8> {
+pub fn map_to_curve_g2_bls12_381(u: &[u64; 12]) -> Result<[u64; 24], u8> {
     // Verify input is in field
     let u_0: [u64; 6] = u[0..6].try_into().unwrap();
     let u_1: [u64; 6] = u[6..12].try_into().unwrap();
@@ -74,166 +55,62 @@ pub fn map_to_curve_g2_bls12_381(
     }
 
     // Step 1: Map to isogenous curve E' using simplified SWU
-    let p_prime = map_to_curve_simple_swu_g2_bls12_381(
-        u,
-        #[cfg(feature = "hints")]
-        hints,
-    );
+    let p_prime = map_to_curve_simple_swu_g2_bls12_381(u);
 
     // Step 2: Apply isogeny map from E' to E
-    let p = isogeny_map_g2_bls12_381(
-        &p_prime,
-        #[cfg(feature = "hints")]
-        hints,
-    );
+    let p = isogeny_map_g2_bls12_381(&p_prime);
 
     // Step 3: Clear cofactor
-    Ok(clear_cofactor_twist_bls12_381(
-        &p,
-        #[cfg(feature = "hints")]
-        hints,
-    ))
+    Ok(clear_cofactor_twist_bls12_381(&p))
 }
 
 /// Maps a field element u ∈ Fp to a point on the isogenous curve E'
 /// using the simplified Shallue-van de Woestijne-Ulas (SWU) method for AB != 0
-fn map_to_curve_simple_swu_g1_bls12_381(
-    u: &[u64; 6],
-    #[cfg(feature = "hints")] hints: &mut Vec<u64>,
-) -> [u64; 12] {
+fn map_to_curve_simple_swu_g1_bls12_381(u: &[u64; 6]) -> [u64; 12] {
     // 1. tv1 = inv0(Z^2 * u^4 + Z * u^2)
-    let u2 = square_fp_bls12_381(
-        u,
-        #[cfg(feature = "hints")]
-        hints,
-    );
-    let u4 = square_fp_bls12_381(
-        &u2,
-        #[cfg(feature = "hints")]
-        hints,
-    );
-    let z_u2 = mul_fp_bls12_381(
-        &SWU_Z_G1,
-        &u2,
-        #[cfg(feature = "hints")]
-        hints,
-    );
-    let z2_u4 = mul_fp_bls12_381(
-        &SWU_Z2_G1,
-        &u4,
-        #[cfg(feature = "hints")]
-        hints,
-    );
-    let tv1_denom = add_fp_bls12_381(
-        &z2_u4,
-        &z_u2,
-        #[cfg(feature = "hints")]
-        hints,
-    );
-    let tv1 = inv_fp_bls12_381(
-        &tv1_denom,
-        #[cfg(feature = "hints")]
-        hints,
-    );
+    let u2 = square_fp_bls12_381(u);
+    let u4 = square_fp_bls12_381(&u2);
+    let z_u2 = mul_fp_bls12_381(&SWU_Z_G1, &u2);
+    let z2_u4 = mul_fp_bls12_381(&SWU_Z2_G1, &u4);
+    let tv1_denom = add_fp_bls12_381(&z2_u4, &z_u2);
+    let tv1 = inv_fp_bls12_381(&tv1_denom);
 
     // 2. x1 = (-B / A) * (1 + tv1)
-    let neg_b = neg_fp_bls12_381(
-        &ISO_B_G1,
-        #[cfg(feature = "hints")]
-        hints,
-    );
-    let a_inv = inv_fp_bls12_381(
-        &ISO_A_G1,
-        #[cfg(feature = "hints")]
-        hints,
-    );
-    let neg_b_over_a = mul_fp_bls12_381(
-        &neg_b,
-        &a_inv,
-        #[cfg(feature = "hints")]
-        hints,
-    );
+    let neg_b = neg_fp_bls12_381(&ISO_B_G1);
+    let a_inv = inv_fp_bls12_381(&ISO_A_G1);
+    let neg_b_over_a = mul_fp_bls12_381(&neg_b, &a_inv);
     let one = [1u64, 0, 0, 0, 0, 0];
-    let one_plus_tv1 = add_fp_bls12_381(
-        &one,
-        &tv1,
-        #[cfg(feature = "hints")]
-        hints,
-    );
-    let mut x1 = mul_fp_bls12_381(
-        &neg_b_over_a,
-        &one_plus_tv1,
-        #[cfg(feature = "hints")]
-        hints,
-    );
+    let one_plus_tv1 = add_fp_bls12_381(&one, &tv1);
+    let mut x1 = mul_fp_bls12_381(&neg_b_over_a, &one_plus_tv1);
 
     // 3. If tv1 == 0, set x1 = B / (Z * A)
     if is_zero(&tv1) {
-        let z_a = mul_fp_bls12_381(
-            &SWU_Z_G1,
-            &ISO_A_G1,
-            #[cfg(feature = "hints")]
-            hints,
-        );
-        let z_a_inv = inv_fp_bls12_381(
-            &z_a,
-            #[cfg(feature = "hints")]
-            hints,
-        );
-        x1 = mul_fp_bls12_381(
-            &ISO_B_G1,
-            &z_a_inv,
-            #[cfg(feature = "hints")]
-            hints,
-        );
+        let z_a = mul_fp_bls12_381(&SWU_Z_G1, &ISO_A_G1);
+        let z_a_inv = inv_fp_bls12_381(&z_a);
+        x1 = mul_fp_bls12_381(&ISO_B_G1, &z_a_inv);
     }
 
     // 4. gx1 = x1^3 + A * x1 + B
-    let gx1 = compute_y2_iso_g1_bls12_381(
-        &x1,
-        #[cfg(feature = "hints")]
-        hints,
-    );
+    let gx1 = compute_y2_iso_g1_bls12_381(&x1);
 
     // 5. x2 = Z * u^2 * x1 (computed lazily below if needed)
 
     // 6. gx2 = x2^3 + A * x2 + B  (computed lazily below if needed)
 
     // 7-8. Select x and y based on whether gx1 is square
-    let (y1, gx1_is_qr) = sqrt_fp_bls12_381(
-        &gx1,
-        #[cfg(feature = "hints")]
-        hints,
-    );
+    let (y1, gx1_is_qr) = sqrt_fp_bls12_381(&gx1);
     let (x, mut y) = if gx1_is_qr {
         (x1, y1)
     } else {
-        let x2 = mul_fp_bls12_381(
-            &z_u2,
-            &x1,
-            #[cfg(feature = "hints")]
-            hints,
-        );
-        let gx2 = compute_y2_iso_g1_bls12_381(
-            &x2,
-            #[cfg(feature = "hints")]
-            hints,
-        );
-        let (y2, _) = sqrt_fp_bls12_381(
-            &gx2,
-            #[cfg(feature = "hints")]
-            hints,
-        );
+        let x2 = mul_fp_bls12_381(&z_u2, &x1);
+        let gx2 = compute_y2_iso_g1_bls12_381(&x2);
+        let (y2, _) = sqrt_fp_bls12_381(&gx2);
         (x2, y2)
     };
 
     // 9. If sgn0(u) != sgn0(y), set y = -y
     if sgn0_fp_bls12_381(u) != sgn0_fp_bls12_381(&y) {
-        y = neg_fp_bls12_381(
-            &y,
-            #[cfg(feature = "hints")]
-            hints,
-        );
+        y = neg_fp_bls12_381(&y);
     }
 
     // Return point (x, y) on E'
@@ -245,146 +122,50 @@ fn map_to_curve_simple_swu_g1_bls12_381(
 
 /// Maps a field element u ∈ Fp2 to a point on the isogenous curve E'
 /// using the simplified Shallue-van de Woestijne-Ulas (SWU) method for AB != 0
-fn map_to_curve_simple_swu_g2_bls12_381(
-    u: &[u64; 12],
-    #[cfg(feature = "hints")] hints: &mut Vec<u64>,
-) -> [u64; 24] {
+fn map_to_curve_simple_swu_g2_bls12_381(u: &[u64; 12]) -> [u64; 24] {
     // 1. tv1 = inv0(Z^2 * u^4 + Z * u^2)
-    let u2 = square_fp2_bls12_381(
-        u,
-        #[cfg(feature = "hints")]
-        hints,
-    );
-    let u4 = square_fp2_bls12_381(
-        &u2,
-        #[cfg(feature = "hints")]
-        hints,
-    );
-    let z_u2 = mul_fp2_bls12_381(
-        &SWU_Z_G2,
-        &u2,
-        #[cfg(feature = "hints")]
-        hints,
-    );
-    let z2 = square_fp2_bls12_381(
-        &SWU_Z_G2,
-        #[cfg(feature = "hints")]
-        hints,
-    );
-    let z2_u4 = mul_fp2_bls12_381(
-        &z2,
-        &u4,
-        #[cfg(feature = "hints")]
-        hints,
-    );
-    let tv1_denom = add_fp2_bls12_381(
-        &z2_u4,
-        &z_u2,
-        #[cfg(feature = "hints")]
-        hints,
-    );
-    let tv1 = inv_fp2_bls12_381(
-        &tv1_denom,
-        #[cfg(feature = "hints")]
-        hints,
-    );
+    let u2 = square_fp2_bls12_381(u);
+    let u4 = square_fp2_bls12_381(&u2);
+    let z_u2 = mul_fp2_bls12_381(&SWU_Z_G2, &u2);
+    let z2 = square_fp2_bls12_381(&SWU_Z_G2);
+    let z2_u4 = mul_fp2_bls12_381(&z2, &u4);
+    let tv1_denom = add_fp2_bls12_381(&z2_u4, &z_u2);
+    let tv1 = inv_fp2_bls12_381(&tv1_denom);
 
     // 2. x1 = (-B / A) * (1 + tv1)
-    let neg_b = neg_fp2_bls12_381(
-        &ISO_B_G2,
-        #[cfg(feature = "hints")]
-        hints,
-    );
-    let a_inv = inv_fp2_bls12_381(
-        &ISO_A_G2,
-        #[cfg(feature = "hints")]
-        hints,
-    );
-    let neg_b_over_a = mul_fp2_bls12_381(
-        &neg_b,
-        &a_inv,
-        #[cfg(feature = "hints")]
-        hints,
-    );
+    let neg_b = neg_fp2_bls12_381(&ISO_B_G2);
+    let a_inv = inv_fp2_bls12_381(&ISO_A_G2);
+    let neg_b_over_a = mul_fp2_bls12_381(&neg_b, &a_inv);
     let one: [u64; 12] = [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
-    let one_plus_tv1 = add_fp2_bls12_381(
-        &one,
-        &tv1,
-        #[cfg(feature = "hints")]
-        hints,
-    );
-    let mut x1 = mul_fp2_bls12_381(
-        &neg_b_over_a,
-        &one_plus_tv1,
-        #[cfg(feature = "hints")]
-        hints,
-    );
+    let one_plus_tv1 = add_fp2_bls12_381(&one, &tv1);
+    let mut x1 = mul_fp2_bls12_381(&neg_b_over_a, &one_plus_tv1);
 
     // 3. If tv1 == 0, set x1 = B / (Z * A)
     if is_zero(&tv1) {
-        let z_a = mul_fp2_bls12_381(
-            &SWU_Z_G2,
-            &ISO_A_G2,
-            #[cfg(feature = "hints")]
-            hints,
-        );
-        let z_a_inv = inv_fp2_bls12_381(
-            &z_a,
-            #[cfg(feature = "hints")]
-            hints,
-        );
-        x1 = mul_fp2_bls12_381(
-            &ISO_B_G2,
-            &z_a_inv,
-            #[cfg(feature = "hints")]
-            hints,
-        );
+        let z_a = mul_fp2_bls12_381(&SWU_Z_G2, &ISO_A_G2);
+        let z_a_inv = inv_fp2_bls12_381(&z_a);
+        x1 = mul_fp2_bls12_381(&ISO_B_G2, &z_a_inv);
     }
 
     // 4. gx1 = x1^3 + A * x1 + B
-    let gx1 = compute_y2_iso_g2_bls12_381(
-        &x1,
-        #[cfg(feature = "hints")]
-        hints,
-    );
+    let gx1 = compute_y2_iso_g2_bls12_381(&x1);
 
     // 7-8. Select x and y based on whether gx1 is square
-    let (y1, gx1_is_qr) = sqrt_fp2_bls12_381(
-        &gx1,
-        #[cfg(feature = "hints")]
-        hints,
-    );
+    let (y1, gx1_is_qr) = sqrt_fp2_bls12_381(&gx1);
     let (x, mut y) = if gx1_is_qr {
         (x1, y1)
     } else {
         // 5. x2 = Z * u^2 * x1
-        let x2 = mul_fp2_bls12_381(
-            &z_u2,
-            &x1,
-            #[cfg(feature = "hints")]
-            hints,
-        );
+        let x2 = mul_fp2_bls12_381(&z_u2, &x1);
         // 6. gx2 = x2^3 + A * x2 + B
-        let gx2 = compute_y2_iso_g2_bls12_381(
-            &x2,
-            #[cfg(feature = "hints")]
-            hints,
-        );
-        let (y2, _) = sqrt_fp2_bls12_381(
-            &gx2,
-            #[cfg(feature = "hints")]
-            hints,
-        );
+        let gx2 = compute_y2_iso_g2_bls12_381(&x2);
+        let (y2, _) = sqrt_fp2_bls12_381(&gx2);
         (x2, y2)
     };
 
     // 9. If sgn0(u) != sgn0(y), set y = -y
     if sgn0_fp2_bls12_381(u) != sgn0_fp2_bls12_381(&y) {
-        y = neg_fp2_bls12_381(
-            &y,
-            #[cfg(feature = "hints")]
-            hints,
-        );
+        y = neg_fp2_bls12_381(&y);
     }
 
     // Return point (x, y) on E'
@@ -395,140 +176,40 @@ fn map_to_curve_simple_swu_g2_bls12_381(
 }
 
 /// Compute y² = x³ + A'x + B' for the isogenous curve E' (G1)
-fn compute_y2_iso_g1_bls12_381(
-    x: &[u64; 6],
-    #[cfg(feature = "hints")] hints: &mut Vec<u64>,
-) -> [u64; 6] {
-    let x2 = square_fp_bls12_381(
-        x,
-        #[cfg(feature = "hints")]
-        hints,
-    );
-    let x3 = mul_fp_bls12_381(
-        &x2,
-        x,
-        #[cfg(feature = "hints")]
-        hints,
-    );
-    let ax = mul_fp_bls12_381(
-        &ISO_A_G1,
-        x,
-        #[cfg(feature = "hints")]
-        hints,
-    );
-    let x3_ax = add_fp_bls12_381(
-        &x3,
-        &ax,
-        #[cfg(feature = "hints")]
-        hints,
-    );
-    add_fp_bls12_381(
-        &x3_ax,
-        &ISO_B_G1,
-        #[cfg(feature = "hints")]
-        hints,
-    )
+fn compute_y2_iso_g1_bls12_381(x: &[u64; 6]) -> [u64; 6] {
+    let x2 = square_fp_bls12_381(x);
+    let x3 = mul_fp_bls12_381(&x2, x);
+    let ax = mul_fp_bls12_381(&ISO_A_G1, x);
+    let x3_ax = add_fp_bls12_381(&x3, &ax);
+    add_fp_bls12_381(&x3_ax, &ISO_B_G1)
 }
 
 /// Compute y² = x³ + A'x + B' for the isogenous curve E' (G2)
-fn compute_y2_iso_g2_bls12_381(
-    x: &[u64; 12],
-    #[cfg(feature = "hints")] hints: &mut Vec<u64>,
-) -> [u64; 12] {
-    let x2 = square_fp2_bls12_381(
-        x,
-        #[cfg(feature = "hints")]
-        hints,
-    );
-    let x3 = mul_fp2_bls12_381(
-        &x2,
-        x,
-        #[cfg(feature = "hints")]
-        hints,
-    );
-    let ax = mul_fp2_bls12_381(
-        &ISO_A_G2,
-        x,
-        #[cfg(feature = "hints")]
-        hints,
-    );
-    let x3_ax = add_fp2_bls12_381(
-        &x3,
-        &ax,
-        #[cfg(feature = "hints")]
-        hints,
-    );
-    add_fp2_bls12_381(
-        &x3_ax,
-        &ISO_B_G2,
-        #[cfg(feature = "hints")]
-        hints,
-    )
+fn compute_y2_iso_g2_bls12_381(x: &[u64; 12]) -> [u64; 12] {
+    let x2 = square_fp2_bls12_381(x);
+    let x3 = mul_fp2_bls12_381(&x2, x);
+    let ax = mul_fp2_bls12_381(&ISO_A_G2, x);
+    let x3_ax = add_fp2_bls12_381(&x3, &ax);
+    add_fp2_bls12_381(&x3_ax, &ISO_B_G2)
 }
 
 /// Apply the 11-isogeny map from E' to E for G1
-fn isogeny_map_g1_bls12_381(
-    p: &[u64; 12],
-    #[cfg(feature = "hints")] hints: &mut Vec<u64>,
-) -> [u64; 12] {
+fn isogeny_map_g1_bls12_381(p: &[u64; 12]) -> [u64; 12] {
     let x: [u64; 6] = p[0..6].try_into().unwrap();
     let y: [u64; 6] = p[6..12].try_into().unwrap();
 
     // Compute x-coordinate: x_num / x_den
-    let x_num = eval_poly_fp(
-        &ISO_X_NUM_G1,
-        &x,
-        #[cfg(feature = "hints")]
-        hints,
-    );
-    let x_den = eval_poly_fp(
-        &ISO_X_DEN_G1,
-        &x,
-        #[cfg(feature = "hints")]
-        hints,
-    );
-    let x_den_inv = inv_fp_bls12_381(
-        &x_den,
-        #[cfg(feature = "hints")]
-        hints,
-    );
-    let x_out = mul_fp_bls12_381(
-        &x_num,
-        &x_den_inv,
-        #[cfg(feature = "hints")]
-        hints,
-    );
+    let x_num = eval_poly_fp(&ISO_X_NUM_G1, &x);
+    let x_den = eval_poly_fp(&ISO_X_DEN_G1, &x);
+    let x_den_inv = inv_fp_bls12_381(&x_den);
+    let x_out = mul_fp_bls12_381(&x_num, &x_den_inv);
 
     // Compute y-coordinate: y' * y_num / y_den
-    let y_num = eval_poly_fp(
-        &ISO_Y_NUM_G1,
-        &x,
-        #[cfg(feature = "hints")]
-        hints,
-    );
-    let y_den = eval_poly_fp(
-        &ISO_Y_DEN_G1,
-        &x,
-        #[cfg(feature = "hints")]
-        hints,
-    );
-    let y_den_inv = inv_fp_bls12_381(
-        &y_den,
-        #[cfg(feature = "hints")]
-        hints,
-    );
-    let y_frac = mul_fp_bls12_381(
-        &y_num,
-        &y_den_inv,
-        #[cfg(feature = "hints")]
-        hints,
-    );
-    let y_out = mul_fp_bls12_381(
-        &y,
-        &y_frac,
-        #[cfg(feature = "hints")]
-        hints,
-    );
+    let y_num = eval_poly_fp(&ISO_Y_NUM_G1, &x);
+    let y_den = eval_poly_fp(&ISO_Y_DEN_G1, &x);
+    let y_den_inv = inv_fp_bls12_381(&y_den);
+    let y_frac = mul_fp_bls12_381(&y_num, &y_den_inv);
+    let y_out = mul_fp_bls12_381(&y, &y_frac);
 
     let mut result = [0u64; 12];
     result[0..6].copy_from_slice(&x_out);
@@ -537,68 +218,22 @@ fn isogeny_map_g1_bls12_381(
 }
 
 /// Apply the 3-isogeny map from E' to E for G2
-fn isogeny_map_g2_bls12_381(
-    p: &[u64; 24],
-    #[cfg(feature = "hints")] hints: &mut Vec<u64>,
-) -> [u64; 24] {
+fn isogeny_map_g2_bls12_381(p: &[u64; 24]) -> [u64; 24] {
     let x: [u64; 12] = p[0..12].try_into().unwrap();
     let y: [u64; 12] = p[12..24].try_into().unwrap();
 
     // Compute x-coordinate: x_num / x_den
-    let x_num = eval_poly_fp2(
-        &ISO_X_NUM_G2,
-        &x,
-        #[cfg(feature = "hints")]
-        hints,
-    );
-    let x_den = eval_poly_fp2(
-        &ISO_X_DEN_G2,
-        &x,
-        #[cfg(feature = "hints")]
-        hints,
-    );
-    let x_den_inv = inv_fp2_bls12_381(
-        &x_den,
-        #[cfg(feature = "hints")]
-        hints,
-    );
-    let x_out = mul_fp2_bls12_381(
-        &x_num,
-        &x_den_inv,
-        #[cfg(feature = "hints")]
-        hints,
-    );
+    let x_num = eval_poly_fp2(&ISO_X_NUM_G2, &x);
+    let x_den = eval_poly_fp2(&ISO_X_DEN_G2, &x);
+    let x_den_inv = inv_fp2_bls12_381(&x_den);
+    let x_out = mul_fp2_bls12_381(&x_num, &x_den_inv);
 
     // Compute y-coordinate: y' * y_num / y_den
-    let y_num = eval_poly_fp2(
-        &ISO_Y_NUM_G2,
-        &x,
-        #[cfg(feature = "hints")]
-        hints,
-    );
-    let y_den = eval_poly_fp2(
-        &ISO_Y_DEN_G2,
-        &x,
-        #[cfg(feature = "hints")]
-        hints,
-    );
-    let y_den_inv = inv_fp2_bls12_381(
-        &y_den,
-        #[cfg(feature = "hints")]
-        hints,
-    );
-    let y_frac = mul_fp2_bls12_381(
-        &y_num,
-        &y_den_inv,
-        #[cfg(feature = "hints")]
-        hints,
-    );
-    let y_out = mul_fp2_bls12_381(
-        &y,
-        &y_frac,
-        #[cfg(feature = "hints")]
-        hints,
-    );
+    let y_num = eval_poly_fp2(&ISO_Y_NUM_G2, &x);
+    let y_den = eval_poly_fp2(&ISO_Y_DEN_G2, &x);
+    let y_den_inv = inv_fp2_bls12_381(&y_den);
+    let y_frac = mul_fp2_bls12_381(&y_num, &y_den_inv);
+    let y_out = mul_fp2_bls12_381(&y, &y_frac);
 
     let mut result = [0u64; 24];
     result[0..12].copy_from_slice(&x_out);
@@ -607,51 +242,23 @@ fn isogeny_map_g2_bls12_381(
 }
 
 /// Evaluate a polynomial at x
-fn eval_poly_fp<const N: usize>(
-    coeffs: &[[u64; 6]; N],
-    x: &[u64; 6],
-    #[cfg(feature = "hints")] hints: &mut Vec<u64>,
-) -> [u64; 6] {
+fn eval_poly_fp<const N: usize>(coeffs: &[[u64; 6]; N], x: &[u64; 6]) -> [u64; 6] {
     // Use Horner's method
     let mut result = coeffs[N - 1];
     for i in (0..N - 1).rev() {
-        result = mul_fp_bls12_381(
-            &result,
-            x,
-            #[cfg(feature = "hints")]
-            hints,
-        );
-        result = add_fp_bls12_381(
-            &result,
-            &coeffs[i],
-            #[cfg(feature = "hints")]
-            hints,
-        );
+        result = mul_fp_bls12_381(&result, x);
+        result = add_fp_bls12_381(&result, &coeffs[i]);
     }
     result
 }
 
 /// Evaluate a polynomial at x over Fp2
-fn eval_poly_fp2<const N: usize>(
-    coeffs: &[[u64; 12]; N],
-    x: &[u64; 12],
-    #[cfg(feature = "hints")] hints: &mut Vec<u64>,
-) -> [u64; 12] {
+fn eval_poly_fp2<const N: usize>(coeffs: &[[u64; 12]; N], x: &[u64; 12]) -> [u64; 12] {
     // Use Horner's method
     let mut result = coeffs[N - 1];
     for i in (0..N - 1).rev() {
-        result = mul_fp2_bls12_381(
-            &result,
-            x,
-            #[cfg(feature = "hints")]
-            hints,
-        );
-        result = add_fp2_bls12_381(
-            &result,
-            &coeffs[i],
-            #[cfg(feature = "hints")]
-            hints,
-        );
+        result = mul_fp2_bls12_381(&result, x);
+        result = add_fp2_bls12_381(&result, &coeffs[i]);
     }
     result
 }
@@ -673,11 +280,7 @@ pub(crate) const FP2_TO_G2_SUCCESS: u8 = 0;
 /// - 0 = success
 /// - 1 = error (input not in field)
 #[inline]
-pub(crate) unsafe fn bls12_381_fp_to_g1_c(
-    ret: *mut u8,
-    fp: *const u8,
-    #[cfg(feature = "hints")] hints: &mut Vec<u64>,
-) -> u8 {
+pub(crate) unsafe fn bls12_381_fp_to_g1_c(ret: *mut u8, fp: *const u8) -> u8 {
     let fp_bytes: &[u8; 48] = &*(fp as *const [u8; 48]);
     let ret_bytes: &mut [u8; 96] = &mut *(ret as *mut [u8; 96]);
 
@@ -685,11 +288,7 @@ pub(crate) unsafe fn bls12_381_fp_to_g1_c(
     let u = bytes_be_to_u64_le_fp_bls12_381(fp_bytes);
 
     // Map to curve
-    let result = match map_to_curve_g1_bls12_381(
-        &u,
-        #[cfg(feature = "hints")]
-        hints,
-    ) {
+    let result = match map_to_curve_g1_bls12_381(&u) {
         Ok(p) => p,
         Err(code) => return code,
     };
@@ -712,11 +311,7 @@ pub(crate) unsafe fn bls12_381_fp_to_g1_c(
 /// - 0 = success
 /// - 1 = error (input not in field)
 #[inline]
-pub(crate) unsafe fn bls12_381_fp2_to_g2_c(
-    ret: *mut u8,
-    fp2: *const u8,
-    #[cfg(feature = "hints")] hints: &mut Vec<u64>,
-) -> u8 {
+pub(crate) unsafe fn bls12_381_fp2_to_g2_c(ret: *mut u8, fp2: *const u8) -> u8 {
     let fp2_bytes: &[u8; 96] = &*(fp2 as *const [u8; 96]);
     let ret_bytes: &mut [u8; 192] = &mut *(ret as *mut [u8; 192]);
 
@@ -724,11 +319,7 @@ pub(crate) unsafe fn bls12_381_fp2_to_g2_c(
     let u = bytes_be_to_u64_le_fp2_bls12_381(fp2_bytes);
 
     // Map to curve
-    let result = match map_to_curve_g2_bls12_381(
-        &u,
-        #[cfg(feature = "hints")]
-        hints,
-    ) {
+    let result = match map_to_curve_g2_bls12_381(&u) {
         Ok(p) => p,
         Err(code) => return code,
     };

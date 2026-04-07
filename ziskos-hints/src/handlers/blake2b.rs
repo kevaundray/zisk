@@ -4,7 +4,7 @@ use anyhow::Result;
 
 /// Processes an `HINT_BLAKE2B_COMPRESS` hint.
 #[inline]
-pub fn blake2b_compress_hint(data: &[u64]) -> Result<Vec<u64>> {
+pub fn blake2b_compress_hint(data: &[u64]) -> Result<()> {
     hint_fields![ROUNDS: 1, STATE: 8, MESSAGE: 16, OFFSET: 2, FINAL_BLOCK: 1];
 
     validate_hint_length(data, EXPECTED_LEN, "HINT_BLAKE2B_COMPRESS")?;
@@ -15,8 +15,7 @@ pub fn blake2b_compress_hint(data: &[u64]) -> Result<Vec<u64>> {
     let offset = data[OFFSET_OFFSET..OFFSET_OFFSET + OFFSET_SIZE].try_into().unwrap();
     let final_block = data[FINAL_BLOCK_OFFSET] != 0;
 
-    let mut hints = Vec::new();
-    zisklib::blake2b_compress(rounds, &mut state, message, offset, final_block, &mut hints);
+    zisklib::blake2b_compress(rounds, &mut state, message, offset, final_block);
 
-    Ok(hints)
+    Ok(())
 }

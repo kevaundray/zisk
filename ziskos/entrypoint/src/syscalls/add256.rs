@@ -30,17 +30,14 @@ pub struct SyscallAdd256Params<'a> {
 #[allow(unused_variables)]
 #[cfg_attr(not(feature = "hints"), no_mangle)]
 #[cfg_attr(feature = "hints", export_name = "hints_syscall_add256")]
-pub extern "C" fn syscall_add256(
-    params: &mut SyscallAdd256Params,
-    #[cfg(feature = "hints")] hints: &mut Vec<u64>,
-) -> u64 {
+pub extern "C" fn syscall_add256(params: &mut SyscallAdd256Params) -> u64 {
     #[cfg(not(all(target_os = "zkvm", target_vendor = "zisk")))]
     {
         let cout = precompiles_helpers::add256(params.a, params.b, params.cin, params.c);
         #[cfg(feature = "hints")]
         {
-            hints.extend_from_slice(params.c);
-            hints.push(cout);
+            crate::hints_collect::hints_extend(params.c);
+            crate::hints_collect::hints_push(cout);
         }
         cout
     }

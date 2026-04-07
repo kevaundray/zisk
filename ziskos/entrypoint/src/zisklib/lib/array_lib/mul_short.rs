@@ -11,12 +11,7 @@ use super::{rem_short, ShortScratch, U256};
 ///
 /// # Returns
 /// The number of limbs in the result
-pub fn mul_short(
-    a: &[U256],
-    b: &U256,
-    out: &mut [U256],
-    #[cfg(feature = "hints")] hints: &mut Vec<u64>,
-) -> usize {
+pub fn mul_short(a: &[U256], b: &U256, out: &mut [U256]) -> usize {
     let len_a = a.len();
     #[cfg(debug_assertions)]
     {
@@ -37,11 +32,7 @@ pub fn mul_short(
             dl: out[i].as_limbs_mut(),
             dh: carry.as_limbs_mut(),
         };
-        syscall_arith256(
-            &mut params,
-            #[cfg(feature = "hints")]
-            hints,
-        );
+        syscall_arith256(&mut params);
     }
 
     if carry.is_zero() {
@@ -56,11 +47,7 @@ pub fn mul_short(
 ///
 /// # Returns
 /// A tuple of (result array, number of limbs used)
-pub fn mul_short_one_limb(
-    a: &U256,
-    b: &U256,
-    #[cfg(feature = "hints")] hints: &mut Vec<u64>,
-) -> ([U256; 2], usize) {
+pub fn mul_short_one_limb(a: &U256, b: &U256) -> ([U256; 2], usize) {
     let mut out = [U256::ZERO; 2];
 
     // Compute a * b
@@ -72,11 +59,7 @@ pub fn mul_short_one_limb(
         dl: out[0].as_limbs_mut(),
         dh: &mut dh,
     };
-    syscall_arith256(
-        &mut mul_params,
-        #[cfg(feature = "hints")]
-        hints,
-    );
+    syscall_arith256(&mut mul_params);
 
     let len = if dh == [0u64; 4] {
         1
@@ -100,25 +83,13 @@ pub fn mul_and_reduce_short(
     b: &U256,
     modulus: &U256,
     scratch: &mut ShortScratch,
-    #[cfg(feature = "hints")] hints: &mut Vec<u64>,
 ) -> U256 {
     #[cfg(debug_assertions)]
     {
         assert!(!modulus.is_zero(), "Input 'modulus' must not be zero");
     }
 
-    let (mul, len) = mul_short_one_limb(
-        a,
-        b,
-        #[cfg(feature = "hints")]
-        hints,
-    );
+    let (mul, len) = mul_short_one_limb(a, b);
 
-    rem_short(
-        &mul[..len],
-        modulus,
-        scratch,
-        #[cfg(feature = "hints")]
-        hints,
-    )
+    rem_short(&mul[..len], modulus, scratch)
 }

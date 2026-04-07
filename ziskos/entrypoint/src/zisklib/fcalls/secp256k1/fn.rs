@@ -29,18 +29,15 @@ cfg_if! {
 /// Note that this is a *free-input call*, meaning the Zisk VM does not automatically verify the correctness
 /// of the result. It is the caller's responsibility to ensure it.
 #[allow(unused_variables)]
-pub fn fcall_secp256k1_fn_inv(
-    p_value: &[u64; 4],
-    #[cfg(feature = "hints")] hints: &mut Vec<u64>,
-) -> [u64; 4] {
+pub fn fcall_secp256k1_fn_inv(p_value: &[u64; 4]) -> [u64; 4] {
     #[cfg(not(all(target_os = "zkvm", target_vendor = "zisk")))]
     {
         let mut result: [u64; 4] = [0; 4];
         secp256k1_fn_inv_c(p_value, &mut result);
         #[cfg(feature = "hints")]
         {
-            hints.push(result.len() as u64);
-            hints.extend_from_slice(&result);
+            crate::hints_collect::hints_push(result.len() as u64);
+            crate::hints_collect::hints_extend(&result);
         }
         result
     }
@@ -62,18 +59,15 @@ pub fn fcall_secp256k1_fn_inv(
 }
 
 #[allow(unused_variables)]
-pub fn fcall_secp256k1_fn_inv_in_place(
-    p_value: &[u64; 4],
-    #[cfg(feature = "hints")] hints: &mut Vec<u64>,
-) {
+pub fn fcall_secp256k1_fn_inv_in_place(p_value: &[u64; 4]) {
     #[cfg(not(all(target_os = "zkvm", target_vendor = "zisk")))]
     {
         let mut result: [u64; 4] = [0; 4];
         secp256k1_fn_inv_c(p_value, &mut result);
         #[cfg(feature = "hints")]
         {
-            hints.push(result.len() as u64);
-            hints.extend_from_slice(&result);
+            crate::hints_collect::hints_push(result.len() as u64);
+            crate::hints_collect::hints_extend(&result);
         }
     }
     #[cfg(all(target_os = "zkvm", target_vendor = "zisk"))]

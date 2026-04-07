@@ -20,19 +20,9 @@ pub const ECDSA_RECOVER_ERR_RECOVERY_FAILED: u8 = 5;
 /// - 0 = valid signature
 /// - 1 = public key not on curve
 /// - 2 = invalid signature
-pub fn secp256k1_ecdsa_verify(
-    pk: &[u64; 8],
-    z: &[u64; 4],
-    r: &[u64; 4],
-    s: &[u64; 4],
-    #[cfg(feature = "hints")] hints: &mut Vec<u64>,
-) -> bool {
+pub fn secp256k1_ecdsa_verify(pk: &[u64; 8], z: &[u64; 4], r: &[u64; 4], s: &[u64; 4]) -> bool {
     // pk must be on the curve
-    if !secp256k1_is_on_curve(
-        pk,
-        #[cfg(feature = "hints")]
-        hints,
-    ) {
+    if !secp256k1_is_on_curve(pk) {
         return false;
     }
 
@@ -43,55 +33,23 @@ pub fn secp256k1_ecdsa_verify(
     // and ensure that x ≡ r (mod n), saving us from expensive fn arithmetic
 
     // Hint the result
-    let point = fcall_secp256k1_ecdsa_verify(
-        pk,
-        z,
-        r,
-        s,
-        #[cfg(feature = "hints")]
-        hints,
-    );
+    let point = fcall_secp256k1_ecdsa_verify(pk, z, r, s);
 
     // Check the recovered point is valid
     // Note: Identity point would be raised here
-    if !secp256k1_is_on_curve(
-        &point,
-        #[cfg(feature = "hints")]
-        hints,
-    ) {
+    if !secp256k1_is_on_curve(&point) {
         return false;
     }
 
     // Check that [z]G + [r]PK + [-s](x,y) == 𝒪
-    let neg_s = secp256k1_fn_neg(
-        s,
-        #[cfg(feature = "hints")]
-        hints,
-    );
-    if secp256k1_triple_scalar_mul_with_g(
-        z,
-        r,
-        &neg_s,
-        pk,
-        &point,
-        #[cfg(feature = "hints")]
-        hints,
-    )
-    .is_some()
-    {
+    let neg_s = secp256k1_fn_neg(s);
+    if secp256k1_triple_scalar_mul_with_g(z, r, &neg_s, pk, &point).is_some() {
         return false;
     }
 
     // Check that x ≡ r (mod n)
     let point_x: [u64; 4] = [point[0], point[1], point[2], point[3]];
-    eq(
-        &secp256k1_fn_reduce(
-            &point_x,
-            #[cfg(feature = "hints")]
-            hints,
-        ),
-        r,
-    )
+    eq(&secp256k1_fn_reduce(&point_x), r)
 }
 
 /// Recover the public key point from an ECDSA signature (r, s) over the message hash z and recovery id recid
@@ -108,7 +66,6 @@ pub fn secp256k1_ecdsa_recover(
     s: &[u64; 4],
     z: &[u64; 4],
     recid: u8,
-    #[cfg(feature = "hints")] hints: &mut Vec<u64>,
 ) -> Result<[u64; 8], u8> {
     // Validate r
     if *r == ZERO_256 || gt(r, &N_MINUS_ONE) {
@@ -136,13 +93,8 @@ pub fn secp256k1_ecdsa_recover(
 
     // Compute the y-coordinate from x and the parity bit
     let y_is_odd = (recid & 1) == 1;
-    let r_point = secp256k1_lift_x(
-        &x,
-        y_is_odd,
-        #[cfg(feature = "hints")]
-        hints,
-    )
-    .map_err(|_| ECDSA_RECOVER_ERR_POINT_NOT_ON_CURVE)?;
+    let r_point =
+        secp256k1_lift_x(&x, y_is_odd).map_err(|_| ECDSA_RECOVER_ERR_POINT_NOT_ON_CURVE)?;
 
     // Check that [z]G + [-s]R + [r](xQ,yQ) == 𝒪
 
@@ -150,47 +102,18 @@ pub fn secp256k1_ecdsa_recover(
     // The following functions hints (x,y) satisfying
     //    (x, y) == [s⁻¹·z (mod n)]G + [s⁻¹·r (mod n)]R iff  [z]G + [r]R + [-s](x, y) == 𝒪
     // We can use it by flipping the signs of r and s and its order
-    let neg_s = secp256k1_fn_neg(
-        s,
-        #[cfg(feature = "hints")]
-        hints,
-    );
-    let neg_r = secp256k1_fn_neg(
-        r,
-        #[cfg(feature = "hints")]
-        hints,
-    );
-    let point = fcall_secp256k1_ecdsa_verify(
-        &r_point,
-        z,
-        &neg_s,
-        &neg_r,
-        #[cfg(feature = "hints")]
-        hints,
-    );
+    let neg_s = secp256k1_fn_neg(s);
+    let neg_r = secp256k1_fn_neg(r);
+    let point = fcall_secp256k1_ecdsa_verify(&r_point, z, &neg_s, &neg_r);
 
     // Check the recovered point is valid
     // Note: Identity point would be raised here
-    if !secp256k1_is_on_curve(
-        &point,
-        #[cfg(feature = "hints")]
-        hints,
-    ) {
+    if !secp256k1_is_on_curve(&point) {
         return Err(ECDSA_RECOVER_ERR_RECOVERY_FAILED);
     }
 
     // Check that [z]G + [-s]R + [r](xQ,yQ) == 𝒪
-    if secp256k1_triple_scalar_mul_with_g(
-        z,
-        &neg_s,
-        r,
-        &r_point,
-        &point,
-        #[cfg(feature = "hints")]
-        hints,
-    )
-    .is_some()
-    {
+    if secp256k1_triple_scalar_mul_with_g(z, &neg_s, r, &r_point, &point).is_some() {
         return Err(ECDSA_RECOVER_ERR_RECOVERY_FAILED);
     }
 
@@ -220,7 +143,6 @@ pub(crate) unsafe fn secp256k1_ecdsa_verify_c(
     sig: *const u8,
     msg: *const u8,
     pk: *const u8,
-    #[cfg(feature = "hints")] hints: &mut Vec<u64>,
 ) -> bool {
     let sig_bytes: &[u8; 64] = &*(sig as *const [u8; 64]);
     let msg_bytes: &[u8; 32] = &*(msg as *const [u8; 32]);
@@ -242,14 +164,7 @@ pub(crate) unsafe fn secp256k1_ecdsa_verify_c(
     let pk_y = bytes_be_to_u64_le(&pk_y_bytes);
 
     let pk_arr: [u64; 8] = [pk_x[0], pk_x[1], pk_x[2], pk_x[3], pk_y[0], pk_y[1], pk_y[2], pk_y[3]];
-    secp256k1_ecdsa_verify(
-        &pk_arr,
-        &z,
-        &r,
-        &s,
-        #[cfg(feature = "hints")]
-        hints,
-    )
+    secp256k1_ecdsa_verify(&pk_arr, &z, &r, &s)
 }
 
 /// C-compatible wrapper for secp256k1_ecdsa_recover
@@ -274,7 +189,6 @@ pub(crate) unsafe fn secp256k1_ecdsa_recover_c(
     recid: u8,
     msg: *const u8,
     output: *mut u8,
-    #[cfg(feature = "hints")] hints: &mut Vec<u64>,
 ) -> u8 {
     let sig_bytes: &[u8; 64] = &*(sig as *const [u8; 64]);
     let msg_bytes: &[u8; 32] = &*(msg as *const [u8; 32]);
@@ -289,14 +203,7 @@ pub(crate) unsafe fn secp256k1_ecdsa_recover_c(
     let z = bytes_be_to_u64_le(msg_bytes);
 
     // Perform ecrecover
-    match secp256k1_ecdsa_recover(
-        &r,
-        &s,
-        &z,
-        recid,
-        #[cfg(feature = "hints")]
-        hints,
-    ) {
+    match secp256k1_ecdsa_recover(&r, &s, &z, recid) {
         Ok(pk) => {
             // pk is [u64; 8]: x in limbs [0..4] and y in limbs [4..8], little-endian
             let x = [pk[0], pk[1], pk[2], pk[3]];

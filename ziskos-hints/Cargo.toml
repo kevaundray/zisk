@@ -2,7 +2,7 @@
 #
 # src/core/ is a symlink to ../../ziskos/entrypoint/src/ - same source, different features.
 # src/lib.rs wraps the symlinked source and adds hints-specific modules.
-# Exports C symbols with "hints_" prefix to avoid linker conflicts with ziskos.
+# Enables hints feature so syscalls write to a global thread-local buffer.
 # See README.md for details.
 
 [package]

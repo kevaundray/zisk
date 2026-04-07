@@ -29,7 +29,6 @@ cfg_if! {
 pub fn fcall_bn254_twist_add_line_coeffs(
     p1_value: &[u64; 16],
     p2_value: &[u64; 16],
-    #[cfg(feature = "hints")] hints: &mut Vec<u64>,
 ) -> ([u64; 8], [u64; 8]) {
     #[cfg(not(all(target_os = "zkvm", target_vendor = "zisk")))]
     {
@@ -40,9 +39,9 @@ pub fn fcall_bn254_twist_add_line_coeffs(
         let (lambda, mu): ([u64; 8], [u64; 8]) = bn254_twist_add_line_coeffs(&x1, &y1, &x2, &y2);
         #[cfg(feature = "hints")]
         {
-            hints.push(16);
-            hints.extend_from_slice(&lambda);
-            hints.extend_from_slice(&mu);
+            crate::hints_collect::hints_push(16);
+            crate::hints_collect::hints_extend(&lambda);
+            crate::hints_collect::hints_extend(&mu);
         }
         (lambda, mu)
     }
@@ -97,10 +96,7 @@ pub fn fcall_bn254_twist_add_line_coeffs(
 /// Note that this is a *free-input call*, meaning the Zisk VM does not automatically verify the correctness
 /// of the result. It is the caller's responsibility to ensure it.
 #[allow(unused_variables)]
-pub fn fcall_bn254_twist_dbl_line_coeffs(
-    p_value: &[u64; 16],
-    #[cfg(feature = "hints")] hints: &mut Vec<u64>,
-) -> ([u64; 8], [u64; 8]) {
+pub fn fcall_bn254_twist_dbl_line_coeffs(p_value: &[u64; 16]) -> ([u64; 8], [u64; 8]) {
     #[cfg(not(all(target_os = "zkvm", target_vendor = "zisk")))]
     {
         let x1: [u64; 8] = p_value[0..8].try_into().unwrap();
@@ -108,9 +104,9 @@ pub fn fcall_bn254_twist_dbl_line_coeffs(
         let (lambda, mu): ([u64; 8], [u64; 8]) = bn254_twist_dbl_line_coeffs(&x1, &y1);
         #[cfg(feature = "hints")]
         {
-            hints.push(16);
-            hints.extend_from_slice(&lambda);
-            hints.extend_from_slice(&mu);
+            crate::hints_collect::hints_push(16);
+            crate::hints_collect::hints_extend(&lambda);
+            crate::hints_collect::hints_extend(&mu);
         }
         (lambda, mu)
     }

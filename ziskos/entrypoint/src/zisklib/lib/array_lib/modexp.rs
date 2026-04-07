@@ -13,12 +13,7 @@ use super::{
 /// Modular exponentiation of three large numbers
 ///
 /// It assumes that modulus > 0 and len(base),len(exp),len(modulus) > 0
-pub fn modexp(
-    base: &[U256],
-    exp: &[u64],
-    modulus: &[U256],
-    #[cfg(feature = "hints")] hints: &mut Vec<u64>,
-) -> Vec<U256> {
+pub fn modexp(base: &[U256], exp: &[u64], modulus: &[U256]) -> Vec<U256> {
     let len_b = base.len();
     let len_e = exp.len();
     let len_m = modulus.len();
@@ -70,47 +65,21 @@ pub fn modexp(
 
     // We can assume from now on that base,modulus > 1 and exp > 0
     if len_m == 1 {
-        modexp_short(
-            base,
-            exp,
-            &modulus[0],
-            #[cfg(feature = "hints")]
-            hints,
-        )
+        modexp_short(base, exp, &modulus[0])
     } else {
-        modexp_long(
-            base,
-            exp,
-            modulus,
-            #[cfg(feature = "hints")]
-            hints,
-        )
+        modexp_long(base, exp, modulus)
     }
 }
 
 /// Short modexp when modulus fits in a single U256
-fn modexp_short(
-    base: &[U256],
-    exp: &[u64],
-    modulus: &U256,
-    #[cfg(feature = "hints")] hints: &mut Vec<u64>,
-) -> Vec<U256> {
+fn modexp_short(base: &[U256], exp: &[u64], modulus: &U256) -> Vec<U256> {
     let len_e = exp.len();
 
     // Compute base = base (mod modulus)
-    let base = rem_short_init(
-        base,
-        modulus,
-        #[cfg(feature = "hints")]
-        hints,
-    );
+    let base = rem_short_init(base, modulus);
 
     // Hint exponent bits
-    let (len, bits) = fcall_bin_decomp(
-        exp,
-        #[cfg(feature = "hints")]
-        hints,
-    );
+    let (len, bits) = fcall_bin_decomp(exp);
 
     // We should recompose the exponent from bits to verify correctness
     let mut rec_exp = vec![0u64; len_e];
@@ -132,24 +101,11 @@ fn modexp_short(
         }
 
         // Compute out = out² (mod modulus)
-        out = square_and_reduce_short(
-            &out,
-            modulus,
-            &mut scratch,
-            #[cfg(feature = "hints")]
-            hints,
-        );
+        out = square_and_reduce_short(&out, modulus, &mut scratch);
 
         if bit == 1 {
             // Compute out = (out * base) (mod modulus)
-            out = mul_and_reduce_short(
-                &out,
-                &base,
-                modulus,
-                &mut scratch,
-                #[cfg(feature = "hints")]
-                hints,
-            );
+            out = mul_and_reduce_short(&out, &base, modulus, &mut scratch);
 
             // Recompose the exponent
             let bits_pos = len - 1 - bit_idx;
@@ -165,29 +121,15 @@ fn modexp_short(
 }
 
 /// Long modexp when modulus requires multiple U256 limbs
-fn modexp_long(
-    base: &[U256],
-    exp: &[u64],
-    modulus: &[U256],
-    #[cfg(feature = "hints")] hints: &mut Vec<u64>,
-) -> Vec<U256> {
+fn modexp_long(base: &[U256], exp: &[u64], modulus: &[U256]) -> Vec<U256> {
     let len_e = exp.len();
     let len_m = modulus.len();
 
     // Compute base = base (mod modulus)
-    let base = rem_long_init(
-        base,
-        modulus,
-        #[cfg(feature = "hints")]
-        hints,
-    );
+    let base = rem_long_init(base, modulus);
 
     // Hint exponent bits
-    let (len, bits) = fcall_bin_decomp(
-        exp,
-        #[cfg(feature = "hints")]
-        hints,
-    );
+    let (len, bits) = fcall_bin_decomp(exp);
 
     // We should recompose the exponent from bits to verify correctness
     let mut rec_exp = vec![0u64; len_e];
@@ -209,24 +151,11 @@ fn modexp_long(
         }
 
         // Compute out = out² (mod modulus)
-        out = square_and_reduce_long(
-            &out,
-            modulus,
-            &mut scratch,
-            #[cfg(feature = "hints")]
-            hints,
-        );
+        out = square_and_reduce_long(&out, modulus, &mut scratch);
 
         if bit == 1 {
             // Compute out = (out * base) (mod modulus)
-            out = mul_and_reduce_long(
-                &out,
-                &base,
-                modulus,
-                &mut scratch,
-                #[cfg(feature = "hints")]
-                hints,
-            );
+            out = mul_and_reduce_long(&out, &base, modulus, &mut scratch);
 
             // Recompose the exponent
             let bits_pos = len - 1 - bit_idx;
@@ -262,7 +191,6 @@ pub(crate) unsafe fn modexp_bytes_c(
     modulus_ptr: *const u8,
     modulus_len: usize,
     result_ptr: *mut u8,
-    #[cfg(feature = "hints")] hints: &mut Vec<u64>,
 ) -> usize {
     let base_bytes = std::slice::from_raw_parts(base_ptr, base_len);
     let exp_bytes = std::slice::from_raw_parts(exp_ptr, exp_len);
@@ -273,13 +201,7 @@ pub(crate) unsafe fn modexp_bytes_c(
     let exp_u64 = bytes_be_to_u64_le(exp_bytes);
     let modulus_u256 = bytes_be_to_u256_le(modulus_bytes);
 
-    let result_u256 = modexp(
-        &base_u256,
-        &exp_u64,
-        &modulus_u256,
-        #[cfg(feature = "hints")]
-        hints,
-    );
+    let result_u256 = modexp(&base_u256, &exp_u64, &modulus_u256);
 
     // Convert result back to big-endian bytes with proper length
     let result = std::slice::from_raw_parts_mut(result_ptr, modulus_len);

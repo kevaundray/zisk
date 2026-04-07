@@ -16,6 +16,7 @@ mod profile;
 pub use fcall::*;
 pub mod io;
 pub use profile::*;
+pub mod hints_collect;
 pub mod syscalls;
 pub mod zisklib;
 pub mod ziskos_definitions;

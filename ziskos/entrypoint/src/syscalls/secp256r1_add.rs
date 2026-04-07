@@ -35,10 +35,7 @@ pub struct SyscallSecp256r1AddParams<'a> {
 #[allow(unused_variables)]
 #[cfg_attr(not(feature = "hints"), no_mangle)]
 #[cfg_attr(feature = "hints", export_name = "hints_syscall_secp256r1_add")]
-pub extern "C" fn syscall_secp256r1_add(
-    params: &mut SyscallSecp256r1AddParams,
-    #[cfg(feature = "hints")] hints: &mut Vec<u64>,
-) {
+pub extern "C" fn syscall_secp256r1_add(params: &mut SyscallSecp256r1AddParams) {
     #[cfg(all(target_os = "zkvm", target_vendor = "zisk"))]
     ziskos_syscall!(zisk_definitions::SYSCALL_SECP256R1_ADD_ID, params);
     #[cfg(not(all(target_os = "zkvm", target_vendor = "zisk")))]
@@ -51,7 +48,7 @@ pub extern "C" fn syscall_secp256r1_add(
         params.p1.y.copy_from_slice(&p3[4..8]);
         #[cfg(feature = "hints")]
         {
-            hints.extend_from_slice(&p3);
+            crate::hints_collect::hints_extend(&p3);
         }
     }
 }

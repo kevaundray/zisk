@@ -35,7 +35,7 @@ pub fn hint_log<S: AsRef<str>>(msg: S) {
 const KECCAK256_RATE: usize = 136;
 
 /// Keccak-256 hash function. For reference: https://keccak.team/keccak_specs_summary.html
-pub fn keccak256(input: &[u8], #[cfg(feature = "hints")] hints: &mut Vec<u64>) -> [u8; 32] {
+pub fn keccak256(input: &[u8]) -> [u8; 32] {
     let mut state = [0u64; 25];
     let input_len = input.len();
 
@@ -46,11 +46,7 @@ pub fn keccak256(input: &[u8], #[cfg(feature = "hints")] hints: &mut Vec<u64>) -
         xor_block_into_state(&mut state, &input[offset..offset + KECCAK256_RATE]);
         // Apply Keccak-f permutation
         unsafe {
-            syscall_keccak_f(
-                &mut state,
-                #[cfg(feature = "hints")]
-                hints,
-            );
+            syscall_keccak_f(&mut state);
         }
         offset += KECCAK256_RATE;
     }
@@ -72,11 +68,7 @@ pub fn keccak256(input: &[u8], #[cfg(feature = "hints")] hints: &mut Vec<u64>) -
 
     // Final permutation
     unsafe {
-        syscall_keccak_f(
-            &mut state,
-            #[cfg(feature = "hints")]
-            hints,
-        );
+        syscall_keccak_f(&mut state);
     }
 
     // Squeeze phase: extract first 32 bytes (256 bits) from state
@@ -103,18 +95,9 @@ fn xor_block_into_state(state: &mut [u64; 25], block: &[u8]) {
 /// - `input` must point to at least `input_len` bytes
 /// - `output` must point to a writable buffer of at least 32 bytes
 #[inline]
-pub(crate) unsafe fn keccak256_c(
-    input: *const u8,
-    input_len: usize,
-    output: *mut u8,
-    #[cfg(feature = "hints")] hints: &mut Vec<u64>,
-) {
+pub(crate) unsafe fn keccak256_c(input: *const u8, input_len: usize, output: *mut u8) {
     let input_slice = core::slice::from_raw_parts(input, input_len);
-    let hash = keccak256(
-        input_slice,
-        #[cfg(feature = "hints")]
-        hints,
-    );
+    let hash = keccak256(input_slice);
     let output_slice = core::slice::from_raw_parts_mut(output, 32);
     output_slice.copy_from_slice(&hash);
 }
@@ -138,13 +121,7 @@ pub unsafe extern "C" fn native_keccak256(bytes: *const u8, len: usize, output: 
 
     #[cfg(all(target_os = "zkvm", target_vendor = "zisk"))]
     {
-        keccak256_c(
-            bytes,
-            len,
-            output,
-            #[cfg(feature = "hints")]
-            hints,
-        );
+        keccak256_c(bytes, len, output);
     }
 
     #[cfg(not(all(target_os = "zkvm", target_vendor = "zisk")))]

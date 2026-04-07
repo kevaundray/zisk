@@ -28,7 +28,6 @@ pub fn secp256k1_schnorr_verify(
     pk_x: &[u8; 32],
     sig_r: &[u8; 32],
     sig_s: &[u8; 32],
-    #[cfg(feature = "hints")] hints: &mut Vec<u64>,
 ) -> bool {
     let r = bytes_be_to_u64_le(sig_r);
     let s = bytes_be_to_u64_le(sig_s);
@@ -44,21 +43,12 @@ pub fn secp256k1_schnorr_verify(
         return false;
     }
 
-    let point_p = match secp256k1_lift_x(
-        &pk_x_le,
-        false,
-        #[cfg(feature = "hints")]
-        hints,
-    ) {
+    let point_p = match secp256k1_lift_x(&pk_x_le, false) {
         Ok(pt) => pt,
         Err(_) => return false,
     };
 
-    let tag = sha256(
-        b"BIP0340/challenge",
-        #[cfg(feature = "hints")]
-        hints,
-    );
+    let tag = sha256(b"BIP0340/challenge");
     let mut buf = Vec::with_capacity(64 + 32 + 32 + msg.len());
     buf.extend_from_slice(&tag);
     buf.extend_from_slice(&tag);
@@ -66,29 +56,11 @@ pub fn secp256k1_schnorr_verify(
     buf.extend_from_slice(pk_x);
     buf.extend_from_slice(msg);
 
-    let e_hash = sha256(
-        &buf,
-        #[cfg(feature = "hints")]
-        hints,
-    );
-    let e = secp256k1_fn_reduce(
-        &bytes_be_to_u64_le(&e_hash),
-        #[cfg(feature = "hints")]
-        hints,
-    );
-    let neg_e = secp256k1_fn_neg(
-        &e,
-        #[cfg(feature = "hints")]
-        hints,
-    );
+    let e_hash = sha256(&buf);
+    let e = secp256k1_fn_reduce(&bytes_be_to_u64_le(&e_hash));
+    let neg_e = secp256k1_fn_neg(&e);
 
-    let point_r = match secp256k1_double_scalar_mul_with_g(
-        &s,
-        &neg_e,
-        &point_p,
-        #[cfg(feature = "hints")]
-        hints,
-    ) {
+    let point_r = match secp256k1_double_scalar_mul_with_g(&s, &neg_e, &point_p) {
         Some(pt) => pt,
         None => return false,
     };
@@ -110,7 +82,6 @@ pub(crate) unsafe fn secp256k1_schnorr_verify_c(
     msg_len: usize,
     pk_x: *const u8,
     sig: *const u8,
-    #[cfg(feature = "hints")] hints: &mut Vec<u64>,
 ) -> u8 {
     let msg_bytes: &[u8] =
         if msg_len == 0 { &[] } else { core::slice::from_raw_parts(msg, msg_len) };
@@ -120,14 +91,7 @@ pub(crate) unsafe fn secp256k1_schnorr_verify_c(
     let mut s = [0u8; 32];
     r.copy_from_slice(&sig_bytes[..32]);
     s.copy_from_slice(&sig_bytes[32..]);
-    if secp256k1_schnorr_verify(
-        msg_bytes,
-        &pk_bytes,
-        &r,
-        &s,
-        #[cfg(feature = "hints")]
-        hints,
-    ) {
+    if secp256k1_schnorr_verify(msg_bytes, &pk_bytes, &r, &s) {
         0
     } else {
         1
@@ -144,7 +108,6 @@ pub fn secp256k1_schnorr_batch_verify(
     pk_xs: &[&[u8; 32]],
     sig_rs: &[&[u8; 32]],
     sig_ss: &[&[u8; 32]],
-    #[cfg(feature = "hints")] hints: &mut Vec<u64>,
 ) -> bool {
     let u = msgs.len();
     if u == 0 {
@@ -156,14 +119,7 @@ pub fn secp256k1_schnorr_batch_verify(
 
     // For u=1, delegate to single verification (avoids extra lift_x(r))
     if u == 1 {
-        return secp256k1_schnorr_verify(
-            msgs[0],
-            pk_xs[0],
-            sig_rs[0],
-            sig_ss[0],
-            #[cfg(feature = "hints")]
-            hints,
-        );
+        return secp256k1_schnorr_verify(msgs[0], pk_xs[0], sig_rs[0], sig_ss[0]);
     }
 
     let mut r_vals = Vec::with_capacity(u);
@@ -194,21 +150,11 @@ pub fn secp256k1_schnorr_batch_verify(
     let mut points_r = Vec::with_capacity(u);
 
     for i in 0..u {
-        let point_p = match secp256k1_lift_x(
-            &pk_vals[i],
-            false,
-            #[cfg(feature = "hints")]
-            hints,
-        ) {
+        let point_p = match secp256k1_lift_x(&pk_vals[i], false) {
             Ok(pt) => pt,
             Err(_) => return false,
         };
-        let point_r = match secp256k1_lift_x(
-            &r_vals[i],
-            false,
-            #[cfg(feature = "hints")]
-            hints,
-        ) {
+        let point_r = match secp256k1_lift_x(&r_vals[i], false) {
             Ok(pt) => pt,
             Err(_) => return false,
         };
@@ -216,11 +162,7 @@ pub fn secp256k1_schnorr_batch_verify(
         points_r.push(point_r);
     }
 
-    let tag = sha256(
-        b"BIP0340/challenge",
-        #[cfg(feature = "hints")]
-        hints,
-    );
+    let tag = sha256(b"BIP0340/challenge");
     let mut challenges = Vec::with_capacity(u);
 
     for i in 0..u {
@@ -230,26 +172,14 @@ pub fn secp256k1_schnorr_batch_verify(
         buf.extend_from_slice(sig_rs[i]);
         buf.extend_from_slice(pk_xs[i]);
         buf.extend_from_slice(msgs[i]);
-        let e_hash = sha256(
-            &buf,
-            #[cfg(feature = "hints")]
-            hints,
-        );
-        let e = secp256k1_fn_reduce(
-            &bytes_be_to_u64_le(&e_hash),
-            #[cfg(feature = "hints")]
-            hints,
-        );
+        let e_hash = sha256(&buf);
+        let e = secp256k1_fn_reduce(&bytes_be_to_u64_le(&e_hash));
         challenges.push(e);
     }
 
     // Deterministic random coefficients seeded by all inputs.
     // SHA256 counter mode (equivalent security to BIP-340's recommended ChaCha20).
-    let batch_tag = sha256(
-        b"BIP0340/batch",
-        #[cfg(feature = "hints")]
-        hints,
-    );
+    let batch_tag = sha256(b"BIP0340/batch");
     let mut seed_buf = Vec::new();
     seed_buf.extend_from_slice(&batch_tag);
     seed_buf.extend_from_slice(&batch_tag);
@@ -265,11 +195,7 @@ pub fn secp256k1_schnorr_batch_verify(
         seed_buf.extend_from_slice(*r);
         seed_buf.extend_from_slice(*s);
     }
-    let seed = sha256(
-        &seed_buf,
-        #[cfg(feature = "hints")]
-        hints,
-    );
+    let seed = sha256(&seed_buf);
 
     let mut coeffs = Vec::with_capacity(u);
     coeffs.push([1u64, 0, 0, 0]);
@@ -277,16 +203,8 @@ pub fn secp256k1_schnorr_batch_verify(
         let mut coeff_buf = [0u8; 36];
         coeff_buf[..32].copy_from_slice(&seed);
         coeff_buf[32..36].copy_from_slice(&((i - 1) as u32).to_le_bytes());
-        let hash = sha256(
-            &coeff_buf,
-            #[cfg(feature = "hints")]
-            hints,
-        );
-        let a = secp256k1_fn_reduce(
-            &bytes_be_to_u64_le(&hash),
-            #[cfg(feature = "hints")]
-            hints,
-        );
+        let hash = sha256(&coeff_buf);
+        let a = secp256k1_fn_reduce(&bytes_be_to_u64_le(&hash));
         if eq(&a, &ZERO_256) {
             return false;
         }
@@ -296,18 +214,8 @@ pub fn secp256k1_schnorr_batch_verify(
     // MSM batch equation: (Σ aᵢ·sᵢ)·G + Σ (-aᵢ)·Rᵢ + Σ (-aᵢ·eᵢ)·Pᵢ = O
     let mut s_total = s_vals[0];
     for i in 1..u {
-        let ai_si = secp256k1_fn_mul(
-            &coeffs[i],
-            &s_vals[i],
-            #[cfg(feature = "hints")]
-            hints,
-        );
-        s_total = secp256k1_fn_add(
-            &s_total,
-            &ai_si,
-            #[cfg(feature = "hints")]
-            hints,
-        );
+        let ai_si = secp256k1_fn_mul(&coeffs[i], &s_vals[i]);
+        s_total = secp256k1_fn_add(&s_total, &ai_si);
     }
 
     let mut msm_scalars = Vec::with_capacity(2 * u + 1);
@@ -319,22 +227,9 @@ pub fn secp256k1_schnorr_batch_verify(
     }
 
     for i in 0..u {
-        let neg_ai = secp256k1_fn_neg(
-            &coeffs[i],
-            #[cfg(feature = "hints")]
-            hints,
-        );
-        let ai_ei = secp256k1_fn_mul(
-            &coeffs[i],
-            &challenges[i],
-            #[cfg(feature = "hints")]
-            hints,
-        );
-        let neg_ai_ei = secp256k1_fn_neg(
-            &ai_ei,
-            #[cfg(feature = "hints")]
-            hints,
-        );
+        let neg_ai = secp256k1_fn_neg(&coeffs[i]);
+        let ai_ei = secp256k1_fn_mul(&coeffs[i], &challenges[i]);
+        let neg_ai_ei = secp256k1_fn_neg(&ai_ei);
 
         msm_scalars.push(neg_ai);
         msm_points.push(points_r[i]);
@@ -345,13 +240,7 @@ pub fn secp256k1_schnorr_batch_verify(
         }
     }
 
-    secp256k1_multi_scalar_mul(
-        &msm_scalars,
-        &msm_points,
-        #[cfg(feature = "hints")]
-        hints,
-    )
-    .is_none()
+    secp256k1_multi_scalar_mul(&msm_scalars, &msm_points).is_none()
 }
 
 /// C FFI for batch verification where all signatures share the same message.
@@ -370,7 +259,6 @@ pub(crate) unsafe fn secp256k1_schnorr_batch_verify_c(
     msg_len: usize,
     pk_xs: *const u8,
     sigs: *const u8,
-    #[cfg(feature = "hints")] hints: &mut Vec<u64>,
 ) -> u8 {
     let msg_bytes: &[u8] =
         if msg_len == 0 { &[] } else { core::slice::from_raw_parts(msg, msg_len) };
@@ -404,14 +292,7 @@ pub(crate) unsafe fn secp256k1_schnorr_batch_verify_c(
         s_refs.push(&s_bufs[i]);
     }
 
-    if secp256k1_schnorr_batch_verify(
-        &msgs_refs,
-        &pk_refs,
-        &r_refs,
-        &s_refs,
-        #[cfg(feature = "hints")]
-        hints,
-    ) {
+    if secp256k1_schnorr_batch_verify(&msgs_refs, &pk_refs, &r_refs, &s_refs) {
         0
     } else {
         1

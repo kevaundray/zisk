@@ -33,10 +33,7 @@ pub struct SyscallArith256Params<'a> {
 #[allow(unused_variables)]
 #[cfg_attr(not(feature = "hints"), no_mangle)]
 #[cfg_attr(feature = "hints", export_name = "hints_syscall_arith256")]
-pub extern "C" fn syscall_arith256(
-    params: &mut SyscallArith256Params,
-    #[cfg(feature = "hints")] hints: &mut Vec<u64>,
-) {
+pub extern "C" fn syscall_arith256(params: &mut SyscallArith256Params) {
     #[cfg(all(target_os = "zkvm", target_vendor = "zisk"))]
     ziskos_syscall!(zisk_definitions::SYSCALL_ARITH256_ID, params);
     #[cfg(not(all(target_os = "zkvm", target_vendor = "zisk")))]
@@ -44,8 +41,8 @@ pub extern "C" fn syscall_arith256(
         precompiles_helpers::arith256(params.a, params.b, params.c, params.dl, params.dh);
         #[cfg(feature = "hints")]
         {
-            hints.extend_from_slice(params.dl);
-            hints.extend_from_slice(params.dh);
+            crate::hints_collect::hints_extend(params.dl);
+            crate::hints_collect::hints_extend(params.dh);
         }
     }
 }

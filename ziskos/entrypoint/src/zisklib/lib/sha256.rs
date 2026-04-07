@@ -8,7 +8,7 @@ const SHA256_INIT: [u32; 8] = [
 ];
 
 /// SHA-256 hash function. For reference: https://nvlpubs.nist.gov/nistpubs/FIPS/NIST.FIPS.180-4.pdf
-pub fn sha256(input: &[u8], #[cfg(feature = "hints")] hints: &mut Vec<u64>) -> [u8; 32] {
+pub fn sha256(input: &[u8]) -> [u8; 32] {
     let mut state = SHA256_INIT;
     let input_len = input.len();
 
@@ -18,12 +18,7 @@ pub fn sha256(input: &[u8], #[cfg(feature = "hints")] hints: &mut Vec<u64>) -> [
         // Fast path: input is aligned, use directly
         while offset + 64 <= input_len {
             let block: &[u8; 64] = input[offset..offset + 64].try_into().unwrap();
-            compress_block(
-                &mut state,
-                block,
-                #[cfg(feature = "hints")]
-                hints,
-            );
+            compress_block(&mut state, block);
             offset += 64;
         }
     } else {
@@ -31,12 +26,7 @@ pub fn sha256(input: &[u8], #[cfg(feature = "hints")] hints: &mut Vec<u64>) -> [
         let mut aligned_block = [0u8; 64];
         while offset + 64 <= input_len {
             aligned_block.copy_from_slice(&input[offset..offset + 64]);
-            compress_block(
-                &mut state,
-                &aligned_block,
-                #[cfg(feature = "hints")]
-                hints,
-            );
+            compress_block(&mut state, &aligned_block);
             offset += 64;
         }
     }
@@ -57,31 +47,16 @@ pub fn sha256(input: &[u8], #[cfg(feature = "hints")] hints: &mut Vec<u64>) -> [
     // If remaining + 9 > 64, we need 2 blocks
     if remaining + 9 > 64 {
         // First block
-        compress_block(
-            &mut state,
-            &final_block,
-            #[cfg(feature = "hints")]
-            hints,
-        );
+        compress_block(&mut state, &final_block);
 
         // Second block
         final_block = [0u8; 64];
         final_block[56..64].copy_from_slice(&bit_len.to_be_bytes());
-        compress_block(
-            &mut state,
-            &final_block,
-            #[cfg(feature = "hints")]
-            hints,
-        );
+        compress_block(&mut state, &final_block);
     } else {
         // Single final block
         final_block[56..64].copy_from_slice(&bit_len.to_be_bytes());
-        compress_block(
-            &mut state,
-            &final_block,
-            #[cfg(feature = "hints")]
-            hints,
-        );
+        compress_block(&mut state, &final_block);
     }
 
     // Convert state to big-endian bytes
@@ -95,19 +70,11 @@ pub fn sha256(input: &[u8], #[cfg(feature = "hints")] hints: &mut Vec<u64>) -> [
 
 /// Compress a single 64-byte block into the state
 #[inline]
-fn compress_block(
-    state: &mut [u32; 8],
-    block: &[u8; 64],
-    #[cfg(feature = "hints")] hints: &mut Vec<u64>,
-) {
+fn compress_block(state: &mut [u32; 8], block: &[u8; 64]) {
     let state_64: &mut [u64; 4] = unsafe { &mut *(state.as_mut_ptr() as *mut [u64; 4]) };
     let input_u64: &[u64; 8] = unsafe { &*(block.as_ptr() as *const [u64; 8]) };
     let mut sha256_params = SyscallSha256Params { state: state_64, input: input_u64 };
-    syscall_sha256_f(
-        &mut sha256_params,
-        #[cfg(feature = "hints")]
-        hints,
-    );
+    syscall_sha256_f(&mut sha256_params);
 }
 
 /// C-compatible wrapper for full SHA-256 hash
@@ -116,18 +83,9 @@ fn compress_block(
 /// - `input` must point to at least `input_len` bytes
 /// - `output` must point to a writable buffer of at least 32 bytes
 #[inline]
-pub(crate) unsafe fn sha256_c(
-    input: *const u8,
-    input_len: usize,
-    output: *mut u8,
-    #[cfg(feature = "hints")] hints: &mut Vec<u64>,
-) {
+pub(crate) unsafe fn sha256_c(input: *const u8, input_len: usize, output: *mut u8) {
     let input_slice = core::slice::from_raw_parts(input, input_len);
-    let hash = sha256(
-        input_slice,
-        #[cfg(feature = "hints")]
-        hints,
-    );
+    let hash = sha256(input_slice);
     let output_slice = core::slice::from_raw_parts_mut(output, 32);
     output_slice.copy_from_slice(&hash);
 }

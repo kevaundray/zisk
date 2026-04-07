@@ -11,11 +11,7 @@ use super::{add_short, mul_short, U256};
 ///
 /// # Returns
 /// A tuple of (quotient, remainder) where a = q × b + r
-pub fn div_short(
-    a: &[U256],
-    b: &U256,
-    #[cfg(feature = "hints")] hints: &mut Vec<u64>,
-) -> (Vec<U256>, U256) {
+pub fn div_short(a: &[U256], b: &U256) -> (Vec<U256>, U256) {
     let len_a = a.len();
     #[cfg(debug_assertions)]
     {
@@ -43,14 +39,7 @@ pub fn div_short(
     // Hint the quotient and remainder
     let mut quo_flat = vec![0u64; len_a * 4];
     let mut rem_flat = [0u64; 4];
-    let (limbs_quo, _) = fcall_division(
-        a_flat,
-        b.as_limbs(),
-        &mut quo_flat,
-        &mut rem_flat,
-        #[cfg(feature = "hints")]
-        hints,
-    );
+    let (limbs_quo, _) = fcall_division(a_flat, b.as_limbs(), &mut quo_flat, &mut rem_flat);
     let quo = U256::flat_to_slice(&quo_flat[..limbs_quo]);
     let rem = U256::from_u64s(&rem_flat);
 
@@ -64,13 +53,7 @@ pub fn div_short(
 
     // Multiply the quotient by b
     let mut q_b = vec![U256::ZERO; len_a + 1]; // The +1 is because mul_short is a general purpose function
-    let q_b_len = mul_short(
-        quo,
-        b,
-        &mut q_b,
-        #[cfg(feature = "hints")]
-        hints,
-    );
+    let q_b_len = mul_short(quo, b, &mut q_b);
 
     if rem.is_zero() {
         // If the remainder is zero, then a must be equal to q·b
@@ -80,13 +63,7 @@ pub fn div_short(
         assert!(rem.lt(b), "Remainder must be less than divisor");
 
         let mut q_b_r = vec![U256::ZERO; len_a + 1]; // The +1 is because add_short is a general purpose function
-        let q_b_r_len = add_short(
-            &q_b[..q_b_len],
-            &rem,
-            &mut q_b_r,
-            #[cfg(feature = "hints")]
-            hints,
-        );
+        let q_b_r_len = add_short(&q_b[..q_b_len], &rem, &mut q_b_r);
         assert!(U256::eq_slices(a, &q_b_r[..q_b_r_len]), "a != q·b + r");
     }
 

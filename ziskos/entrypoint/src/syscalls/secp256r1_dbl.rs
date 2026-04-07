@@ -27,10 +27,7 @@ use super::point::SyscallPoint256;
 #[allow(unused_variables)]
 #[cfg_attr(not(feature = "hints"), no_mangle)]
 #[cfg_attr(feature = "hints", export_name = "hints_syscall_secp256r1_dbl")]
-pub extern "C" fn syscall_secp256r1_dbl(
-    p1: &mut SyscallPoint256,
-    #[cfg(feature = "hints")] hints: &mut Vec<u64>,
-) {
+pub extern "C" fn syscall_secp256r1_dbl(p1: &mut SyscallPoint256) {
     #[cfg(all(target_os = "zkvm", target_vendor = "zisk"))]
     ziskos_syscall!(zisk_definitions::SYSCALL_SECP256R1_DBL_ID, p1);
     #[cfg(not(all(target_os = "zkvm", target_vendor = "zisk")))]
@@ -42,7 +39,7 @@ pub extern "C" fn syscall_secp256r1_dbl(
         p1.y.copy_from_slice(&p3[4..8]);
         #[cfg(feature = "hints")]
         {
-            hints.extend_from_slice(&p3);
+            crate::hints_collect::hints_extend(&p3);
         }
     }
 }

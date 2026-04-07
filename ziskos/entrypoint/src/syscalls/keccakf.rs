@@ -23,10 +23,7 @@ use tiny_keccak::keccakf;
 #[allow(unused_variables)]
 #[cfg_attr(not(feature = "hints"), no_mangle)]
 #[cfg_attr(feature = "hints", export_name = "hints_syscall_keccak_f")]
-pub unsafe extern "C" fn syscall_keccak_f(
-    state: *mut [u64; 25],
-    #[cfg(feature = "hints")] hints: &mut Vec<u64>,
-) {
+pub unsafe extern "C" fn syscall_keccak_f(state: *mut [u64; 25]) {
     #[cfg(all(target_os = "zkvm", target_vendor = "zisk"))]
     ziskos_syscall!(zisk_definitions::SYSCALL_KECCAKF_ID, state);
     #[cfg(not(all(target_os = "zkvm", target_vendor = "zisk")))]
@@ -37,7 +34,7 @@ pub unsafe extern "C" fn syscall_keccak_f(
         // Store results in hints vector
         #[cfg(feature = "hints")]
         {
-            hints.extend_from_slice(unsafe { &*state });
+            crate::hints_collect::hints_extend(unsafe { &*state });
         }
     }
 }

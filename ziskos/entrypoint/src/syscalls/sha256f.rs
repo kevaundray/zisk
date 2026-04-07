@@ -35,10 +35,7 @@ pub struct SyscallSha256Params<'a> {
 #[allow(unused_variables)]
 #[cfg_attr(not(feature = "hints"), no_mangle)]
 #[cfg_attr(feature = "hints", export_name = "hints_syscall_sha256_f")]
-pub extern "C" fn syscall_sha256_f(
-    params: &mut SyscallSha256Params,
-    #[cfg(feature = "hints")] hints: &mut Vec<u64>,
-) {
+pub extern "C" fn syscall_sha256_f(params: &mut SyscallSha256Params) {
     #[cfg(all(target_os = "zkvm", target_vendor = "zisk"))]
     ziskos_syscall!(zisk_definitions::SYSCALL_SHA256F_ID, params);
     #[cfg(not(all(target_os = "zkvm", target_vendor = "zisk")))]
@@ -47,7 +44,7 @@ pub extern "C" fn syscall_sha256_f(
 
         #[cfg(feature = "hints")]
         {
-            hints.extend_from_slice(params.state);
+            crate::hints_collect::hints_extend(params.state);
         }
     }
 }

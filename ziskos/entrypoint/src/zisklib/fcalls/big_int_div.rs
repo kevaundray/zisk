@@ -26,7 +26,6 @@ pub fn fcall_division(
     b_value: &[u64],
     quo: &mut [u64],
     rem: &mut [u64],
-    #[cfg(feature = "hints")] hints: &mut Vec<u64>,
 ) -> (usize, usize) {
     #[cfg(not(all(target_os = "zkvm", target_vendor = "zisk")))]
     {
@@ -39,11 +38,11 @@ pub fn fcall_division(
         let len_rem = rem_vector.len();
         #[cfg(feature = "hints")]
         {
-            hints.push(len_quo as u64 + len_rem as u64 + 2);
-            hints.push(len_quo as u64);
-            hints.extend_from_slice(&quo_vector);
-            hints.push(len_rem as u64);
-            hints.extend_from_slice(&rem_vector);
+            crate::hints_collect::hints_push(len_quo as u64 + len_rem as u64 + 2);
+            crate::hints_collect::hints_push(len_quo as u64);
+            crate::hints_collect::hints_extend(&quo_vector);
+            crate::hints_collect::hints_push(len_rem as u64);
+            crate::hints_collect::hints_extend(&rem_vector);
         }
 
         (len_quo, len_rem)

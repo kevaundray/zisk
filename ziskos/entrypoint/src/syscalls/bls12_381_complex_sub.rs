@@ -36,10 +36,7 @@ pub struct SyscallBls12_381ComplexSubParams<'a> {
 #[allow(unused_variables)]
 #[cfg_attr(not(feature = "hints"), no_mangle)]
 #[cfg_attr(feature = "hints", export_name = "hints_syscall_bls12_381_complex_sub")]
-pub extern "C" fn syscall_bls12_381_complex_sub(
-    params: &mut SyscallBls12_381ComplexSubParams,
-    #[cfg(feature = "hints")] hints: &mut Vec<u64>,
-) {
+pub extern "C" fn syscall_bls12_381_complex_sub(params: &mut SyscallBls12_381ComplexSubParams) {
     #[cfg(all(target_os = "zkvm", target_vendor = "zisk"))]
     ziskos_syscall!(zisk_definitions::SYSCALL_BLS12_381_COMPLEX_SUB_ID, params);
     #[cfg(not(all(target_os = "zkvm", target_vendor = "zisk")))]
@@ -52,7 +49,7 @@ pub extern "C" fn syscall_bls12_381_complex_sub(
         params.f1.y.copy_from_slice(&f3[6..12]);
         #[cfg(feature = "hints")]
         {
-            hints.extend_from_slice(&f3);
+            crate::hints_collect::hints_extend(&f3);
         }
     }
 }

@@ -11,19 +11,15 @@ cfg_if! {
 }
 
 #[allow(unused_variables)]
-pub fn fcall_msb_pos_384(
-    x: &[u64; 6],
-    y: &[u64; 6],
-    #[cfg(feature = "hints")] hints: &mut Vec<u64>,
-) -> (u64, u64) {
+pub fn fcall_msb_pos_384(x: &[u64; 6], y: &[u64; 6]) -> (u64, u64) {
     #[cfg(not(all(target_os = "zkvm", target_vendor = "zisk")))]
     {
         let (i, pos) = msb_pos_384(x, y);
         #[cfg(feature = "hints")]
         {
-            hints.push(2);
-            hints.push(i as u64);
-            hints.push(pos as u64);
+            crate::hints_collect::hints_push(2);
+            crate::hints_collect::hints_push(i as u64);
+            crate::hints_collect::hints_push(pos as u64);
         }
         (i as u64, pos as u64)
     }
