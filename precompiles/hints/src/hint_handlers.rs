@@ -63,6 +63,9 @@ impl HintHandlers {
     }
 
     /// Dispatches built-in hints to their corresponding handler functions.
+    /// The `data_len_bytes` parameter is used for hints that operate on byte arrays (e.g., SHA256, Keccak256)
+    /// to indicate the actual length of the data in bytes, since the `data` field is a `Vec<u64>` and may contain padding.
+    /// The BuiltInHint::Input is intentionally not handled here, as input hints require special handling and should be processed separately before dispatching to workers.
     /// The dispatcher owns the hints buffer lifecycle: clear before, drain after.
     #[inline]
     fn dispatch_builtin(
