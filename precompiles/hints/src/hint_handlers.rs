@@ -118,7 +118,7 @@ impl HintHandlers {
             ),
         };
 
-        // Always drain (resets DEPTH), even on error
+        // Always drain, even on error
         let hints = ziskos_hints::hints_collect::hints_drain();
         result?;
         Ok(hints)
